@@ -1,10 +1,15 @@
-import { Link } from '@tanstack/react-router'
-import { ChevronRight, ListTree } from 'lucide-react'
+import { ChevronRight } from 'lucide-react'
+import { useState, type ReactNode } from 'react'
 
-import { useAgents, useRuns } from '@/api/queries'
-import type { ProjectId, RunId, RunSummary } from '@/api/types'
-import { AsyncState, EmptyState } from '@/components/AsyncState'
+import { useCurrentRun } from '@/api/currentRun'
+import { useAgents, usePlans, useRun, useRuns } from '@/api/queries'
+import type { AgentId, ProjectId, RunId, RunSummary } from '@/api/types'
+import { AsyncState } from '@/components/AsyncState'
 import { PaneHeader } from '@/components/workspace/PaneHeader'
+import { AgentTree } from '@/components/workspace/runAgents/AgentTree'
+import { PlanRevisions } from '@/components/workspace/runAgents/PlanRevisions'
+import { RunSelector } from '@/components/workspace/runAgents/RunSelector'
+import { OUTCOME_LABEL, formatTimestamp } from '@/components/workspace/runAgents/reporting'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import {
@@ -14,7 +19,6 @@ import {
 } from '@/components/ui/collapsible'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Separator } from '@/components/ui/separator'
-import { cn } from '@/lib/utils'
 
 export interface RunAgentPaneProps {
   projectId: ProjectId
@@ -22,81 +26,124 @@ export interface RunAgentPaneProps {
 }
 
 /**
- * Left pane: run selection and the agent hierarchy of the selected run.
+ * Left pane: run selection, the agent/subagent hierarchy and the plans of the
+ * selected run.
  *
- * The shell owns the **navigation** between runs, because direct navigation to a
- * run is an acceptance criterion of this issue. The agent/subagent tree itself,
- * its progress rendering and the plan revisions are built in #11 — this pane
- * only provides the named region and the correct loading, error and empty
- * states for it. No agent data is invented here.
+ * Four rules hold across everything below, and each of them is a rule about what
+ * the pane must *not* do:
+ *
+ * 1. **Nothing is derived from silence.** A run without `run.finished` is open
+ *    and shows its last reported values. There is no timeout, no heuristic and
+ *    no "seems stuck" anywhere in this subtree — `lastEventAt` is rendered as a
+ *    timestamp and never compared against a clock.
+ * 2. **A historical run never overlays the current one.** Looking at an older
+ *    run is a different URL, announced by a banner that carries the way back.
+ * 3. **Estimates and counted facts keep different shapes.** See
+ *    `runAgents/ProgressDisplay.tsx`.
+ * 4. **Live events invalidate narrowly.** The queries below are keyed per run
+ *    (ADR 0003), so an `agent.progress_reported` refetches this run's agent list
+ *    and nothing else. Selection and collapse state live outside the cache, so a
+ *    refetch cannot move them.
  */
 export function RunAgentPane({ projectId, runId }: RunAgentPaneProps) {
   const runs = useRuns(projectId)
+  const currentRun = useCurrentRun(projectId)
+  const run = useRun(projectId, runId)
   const agents = useAgents(projectId, runId)
+  const plans = usePlans(projectId, runId)
+
+  // Selection is transient by design (ADR 0003): it describes this tab looking
+  // at the run, not the run. Keeping it in component state is also what makes a
+  // live refetch harmless — the query cache changes, this value does not.
+  const [selectedAgentId, setSelectedAgentId] = useState<AgentId | null>(null)
 
   const runList: RunSummary[] = runs.data?.pages.flatMap((page) => page.runs) ?? []
-  const agentCount = agents.data?.agents.length ?? 0
+  const agentList = agents.data?.agents ?? []
+  const planList = plans.data?.plans ?? []
 
   return (
     <section
       className="pane-surface"
       aria-label="Run- und Agent-Bereich"
       data-testid="pane-run-agents"
+      data-run-id={runId}
     >
       <PaneHeader title="Runs und Agents" subtitle={projectId} />
 
       <ScrollArea className="min-h-0 flex-1">
         <div className="space-y-4 p-3">
-          <Collapsible defaultOpen>
-            <div className="flex items-center justify-between gap-2">
-              <CollapsibleTrigger asChild>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="h-7 gap-1 px-1.5 [&[data-state=open]>svg]:rotate-90"
-                >
-                  <ChevronRight className="size-3.5 transition-transform" aria-hidden="true" />
-                  <span className="pane-heading">Runs</span>
-                </Button>
-              </CollapsibleTrigger>
-              {runList.length > 0 && (
-                <span className="text-muted-foreground text-2xs">
-                  {runList.length} geladen
-                </span>
-              )}
-            </div>
+          <Section
+            title="Runs"
+            count={runList.length > 0 ? `${runList.length} geladen` : null}
+          >
+            <RunSelector
+              projectId={projectId}
+              runId={runId}
+              currentRun={currentRun.data}
+              runs={runList}
+              isPending={runs.isPending}
+              isError={runs.isError}
+              error={runs.error}
+              hasNextPage={runs.hasNextPage}
+              isFetchingNextPage={runs.isFetchingNextPage}
+              onFetchNextPage={() => void runs.fetchNextPage()}
+              onRetry={() => void runs.refetch()}
+            />
+          </Section>
 
-            <CollapsibleContent className="pt-1">
+          <Separator />
+
+          <section aria-label="Gemeldeter Runzustand" data-testid="run-state">
+            <span className="pane-heading">Runzustand</span>
+            <div className="pt-1">
               <AsyncState
-                isPending={runs.isPending}
-                isError={runs.isError}
-                error={runs.error}
-                isEmpty={runList.length === 0}
-                emptyTitle="Keine Runs gemeldet"
-                emptyDescription="Sobald ein Orchestrator Ereignisse sendet, erscheint sein Run hier."
-                onRetry={() => void runs.refetch()}
+                isPending={run.isPending}
+                isError={run.isError}
+                error={run.error}
+                emptyTitle="Run nicht verfügbar"
+                onRetry={() => void run.refetch()}
+                skeletonRows={2}
               >
-                <ul className="space-y-1">
-                  {runList.map((run) => (
-                    <li key={run.runId}>
-                      <RunLink projectId={projectId} run={run} active={run.runId === runId} />
-                    </li>
-                  ))}
-                </ul>
-                {runs.hasNextPage && (
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="mt-2 w-full"
-                    disabled={runs.isFetchingNextPage}
-                    onClick={() => void runs.fetchNextPage()}
-                  >
-                    {runs.isFetchingNextPage ? 'Lädt…' : 'Ältere Runs laden'}
-                  </Button>
+                {run.data && (
+                  <dl className="space-y-0.5 text-2xs">
+                    <Row label="Run">
+                      <span className="font-mono">{run.data.run.runId}</span>
+                    </Row>
+                    <Row label="Zustand">
+                      <span
+                        data-testid="run-openness"
+                        data-open={run.data.run.isOpen ? 'true' : 'false'}
+                      >
+                        {run.data.run.isOpen
+                          ? 'offen — kein Terminalereignis gemeldet'
+                          : `beendet: ${
+                              run.data.run.outcome
+                                ? OUTCOME_LABEL[run.data.run.outcome]
+                                : 'ohne gemeldetes Ergebnis'
+                            }`}
+                      </span>
+                    </Row>
+                    <Row label="Beginn">
+                      <span className="font-mono">
+                        {formatTimestamp(run.data.run.startedAt)}
+                      </span>
+                    </Row>
+                    <Row label="Ende">
+                      <span className="font-mono">
+                        {run.data.run.finishedAt
+                          ? formatTimestamp(run.data.run.finishedAt)
+                          : 'kein Ende gemeldet'}
+                      </span>
+                    </Row>
+                    <Row label="Umfang">
+                      {run.data.run.counts.agents} Agents · {run.data.run.counts.plans}{' '}
+                      Pläne · {run.data.run.counts.workSteps} Arbeitsschritte
+                    </Row>
+                  </dl>
                 )}
               </AsyncState>
-            </CollapsibleContent>
-          </Collapsible>
+            </div>
+          </section>
 
           <Separator />
 
@@ -105,7 +152,7 @@ export function RunAgentPane({ projectId, runId }: RunAgentPaneProps) {
               <span className="pane-heading">Agenthierarchie</span>
               {agents.isSuccess && (
                 <Badge variant="outline" className="text-2xs font-normal">
-                  {agentCount} gemeldet
+                  {agentList.length} gemeldet
                 </Badge>
               )}
             </div>
@@ -115,65 +162,78 @@ export function RunAgentPane({ projectId, runId }: RunAgentPaneProps) {
                 isPending={agents.isPending}
                 isError={agents.isError}
                 error={agents.error}
-                isEmpty={agentCount === 0}
+                isEmpty={agentList.length === 0}
                 emptyTitle="Keine Agents gemeldet"
                 emptyDescription={`Für Run ${runId} liegt noch kein agent.started-Ereignis vor.`}
                 onRetry={() => void agents.refetch()}
                 skeletonRows={4}
               >
-                <EmptyState
-                  title="Agentbaum folgt"
-                  description="Die Darstellung von Agents, Subagents, Fortschritt und Planrevisionen wird in einem eigenen Arbeitspaket ergänzt. Die Daten werden bereits geladen und live invalidiert."
-                >
-                  <p className="text-muted-foreground mt-2 flex items-center gap-1.5 text-xs">
-                    <ListTree className="size-3.5" aria-hidden="true" />
-                    {agentCount} Agents im Run {runId}
-                  </p>
-                </EmptyState>
+                <AgentTree
+                  agents={agentList}
+                  selectedAgentId={selectedAgentId}
+                  onSelectAgent={setSelectedAgentId}
+                />
               </AsyncState>
             </div>
           </section>
+
+          <Separator />
+
+          <Section title="Pläne" count={planList.length > 0 ? `${planList.length}` : null}>
+            <AsyncState
+              isPending={plans.isPending}
+              isError={plans.isError}
+              error={plans.error}
+              isEmpty={planList.length === 0}
+              emptyTitle="Kein Plan veröffentlicht"
+              emptyDescription={`Für Run ${runId} liegt noch kein plan.published-Ereignis vor.`}
+              onRetry={() => void plans.refetch()}
+              skeletonRows={3}
+            >
+              <PlanRevisions plans={planList} />
+            </AsyncState>
+          </Section>
         </div>
       </ScrollArea>
     </section>
   )
 }
 
-function RunLink({
-  projectId,
-  run,
-  active,
+/** A collapsible block of the pane, with the same header row everywhere. */
+function Section({
+  title,
+  count,
+  children,
 }: {
-  projectId: ProjectId
-  run: RunSummary
-  active: boolean
+  title: string
+  count: string | null
+  children: ReactNode
 }) {
   return (
-    <Link
-      to="/projects/$projectId/runs/$runId"
-      params={{ projectId, runId: run.runId }}
-      search={{}}
-      aria-current={active ? 'page' : undefined}
-      className={cn(
-        'hover:bg-accent focus-visible:ring-ring block rounded-md px-2 py-1.5 text-sm focus-visible:ring-2 focus-visible:outline-none',
-        active && 'bg-accent text-accent-foreground',
-      )}
-    >
-      <span className="block truncate font-mono text-xs">{run.runId}</span>
-      <span className="text-muted-foreground flex items-center gap-1.5 text-2xs">
-        {run.outcome ? (
-          <>abgeschlossen: {run.outcome}</>
-        ) : (
-          <>ohne Terminalereignis</>
-        )}
-        {/*
-          `RunSummary` carries no agent count — only `RunDetail.counts` does, and
-          the list endpoint does not return it. The root agent is what the
-          summary actually reports.
-        */}
-        <span aria-hidden="true">·</span>
-        {run.rootAgentId ?? 'kein Root-Agent gemeldet'}
-      </span>
-    </Link>
+    <Collapsible defaultOpen>
+      <div className="flex items-center justify-between gap-2">
+        <CollapsibleTrigger asChild>
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-7 gap-1 px-1.5 [&[data-state=open]>svg]:rotate-90"
+          >
+            <ChevronRight className="size-3.5 transition-transform" aria-hidden="true" />
+            <span className="pane-heading">{title}</span>
+          </Button>
+        </CollapsibleTrigger>
+        {count && <span className="text-muted-foreground text-2xs">{count}</span>}
+      </div>
+      <CollapsibleContent className="pt-1">{children}</CollapsibleContent>
+    </Collapsible>
+  )
+}
+
+function Row({ label, children }: { label: string; children: ReactNode }) {
+  return (
+    <div className="flex gap-1.5">
+      <dt className="text-muted-foreground w-16 shrink-0">{label}</dt>
+      <dd className="min-w-0">{children}</dd>
+    </div>
   )
 }
