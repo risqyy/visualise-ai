@@ -1,14 +1,20 @@
-import { Boxes } from 'lucide-react'
+import { useMemo } from 'react'
 
 import { useArchitecture } from '@/api/queries'
-import type { ProjectId } from '@/api/types'
+import type { ComponentId, ProjectId } from '@/api/types'
+import { ArchitectureCanvas } from '@/canvas/ArchitectureCanvas'
 import { AsyncState } from '@/components/AsyncState'
 import { StatusLegend } from '@/components/StatusLegend'
 import { PaneHeader } from '@/components/workspace/PaneHeader'
+import { RelationshipLegend } from '@/components/workspace/RelationshipLegend'
 import { Badge } from '@/components/ui/badge'
 
 export interface ArchitecturePaneProps {
   projectId: ProjectId
+  /** Selection from the URL; the canvas mirrors it, it never owns it. */
+  selectedComponentId?: ComponentId | undefined
+  /** Writes the selection back into the `component` search param. */
+  onSelectComponent: (componentId: ComponentId | null) => void
 }
 
 /**
@@ -16,17 +22,30 @@ export interface ArchitecturePaneProps {
  *
  * It stays the visually dominant area at 1920 × 1080 — it gets the largest
  * default share of the layout, the brightest surface and the only unbounded
- * region of the workspace. The interactive React Flow canvas with the ELK layout
- * is built in #9; this pane provides the named, correctly sized region, the
- * loading/error/empty states of the architecture read model and the accessible
- * work-state legend the overlays (#10) will use.
+ * region of the workspace. The pane itself only owns the read model, the
+ * loading/error/empty states and the two legends; the interactive graph lives
+ * in `src/canvas`.
  */
-export function ArchitecturePane({ projectId }: ArchitecturePaneProps) {
+export function ArchitecturePane({
+  projectId,
+  selectedComponentId,
+  onSelectComponent,
+}: ArchitecturePaneProps) {
   const architecture = useArchitecture(projectId)
 
   const componentCount = architecture.data?.components.length ?? 0
   const relationshipCount = architecture.data?.relationships.length ?? 0
   const activeChangeCount = architecture.data?.activeChanges.length ?? 0
+
+  // Kept stable across refetches: TanStack Query's structural sharing returns
+  // the same arrays when nothing changed, so the canvas does not re-layout.
+  const model = useMemo(
+    () => ({
+      components: architecture.data?.components ?? [],
+      relationships: architecture.data?.relationships ?? [],
+    }),
+    [architecture.data?.components, architecture.data?.relationships],
+  )
 
   return (
     <section
@@ -54,54 +73,37 @@ export function ArchitecturePane({ projectId }: ArchitecturePaneProps) {
         }
       />
 
-      {/* The canvas region owns its own overflow: wide graphs scroll here, the
-          page itself never gets a horizontal scrollbar. */}
-      <div className="relative min-h-0 min-w-0 flex-1 overflow-auto p-4">
-        <div
-          className="pointer-events-none absolute inset-0 opacity-60"
-          aria-hidden="true"
-          style={{
-            backgroundImage:
-              'linear-gradient(to right, var(--canvas-grid) 1px, transparent 1px),' +
-              'linear-gradient(to bottom, var(--canvas-grid) 1px, transparent 1px)',
-            backgroundSize: '32px 32px',
-          }}
-        />
-        <div className="relative flex h-full min-h-64 items-center justify-center">
-          <AsyncState
-            isPending={architecture.isPending}
-            isError={architecture.isError}
-            error={architecture.error}
-            isEmpty={componentCount === 0}
-            emptyTitle="Noch kein Architekturmodell gemeldet"
-            emptyDescription="Das Modell erscheint, sobald ein Agent architecture.snapshot_published sendet."
-            onRetry={() => void architecture.refetch()}
-            skeletonRows={5}
-            className="w-full max-w-2xl"
-          >
-            <div
-              className="border-border/70 bg-card/60 text-muted-foreground max-w-2xl rounded-lg border border-dashed p-6 text-center"
-              data-testid="architecture-canvas-placeholder"
+      {/* The canvas region owns its own overflow: a wide graph pans inside the
+          React Flow viewport, the page itself never gets a scrollbar. */}
+      <div className="relative min-h-0 min-w-0 flex-1 overflow-hidden">
+        {architecture.isPending || architecture.isError || componentCount === 0 ? (
+          <div className="flex h-full items-center justify-center p-4">
+            <AsyncState
+              isPending={architecture.isPending}
+              isError={architecture.isError}
+              error={architecture.error}
+              isEmpty={componentCount === 0}
+              emptyTitle="Noch kein Architekturmodell gemeldet"
+              emptyDescription="Das Modell erscheint, sobald ein Agent architecture.snapshot_published sendet."
+              onRetry={() => void architecture.refetch()}
+              skeletonRows={5}
+              className="w-full max-w-2xl"
             >
-              <Boxes className="mx-auto mb-2 size-6" aria-hidden="true" />
-              <p className="text-foreground/80 font-medium">
-                Interaktiver Architekturcanvas folgt
-              </p>
-              <p className="mt-1 text-xs">
-                Der hierarchische React-Flow-Canvas mit deterministischem ELK-Layout wird in
-                einem eigenen Arbeitspaket ergänzt. Das Modell wird hier bereits geladen und
-                bei Live-Ereignissen gezielt invalidiert.
-              </p>
-              <p className="mt-3 font-mono text-xs">
-                {componentCount} Komponenten · {relationshipCount} Beziehungen ·{' '}
-                {activeChangeCount} aktive Änderungen
-              </p>
-            </div>
-          </AsyncState>
-        </div>
+              {null}
+            </AsyncState>
+          </div>
+        ) : (
+          <ArchitectureCanvas
+            projectId={projectId}
+            model={model}
+            selectedComponentId={selectedComponentId}
+            onSelectComponent={onSelectComponent}
+          />
+        )}
       </div>
 
-      <div className="border-border bg-card/80 shrink-0 border-t px-3 py-2">
+      <div className="border-border bg-card/80 shrink-0 space-y-1.5 border-t px-3 py-2">
+        <RelationshipLegend />
         <StatusLegend />
       </div>
     </section>

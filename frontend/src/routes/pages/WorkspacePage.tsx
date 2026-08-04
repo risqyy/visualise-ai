@@ -56,6 +56,19 @@ export function WorkspacePage() {
     [navigate],
   )
 
+  // Canvas selection -> URL. The canvas never keeps a selection of its own: a
+  // click and a deep link go through the same `component` search parameter, so
+  // an incoming live update cannot change what is selected.
+  const setSelectedComponent = useCallback(
+    (componentId: string | null) => {
+      void navigate({
+        search: (previous) => ({ ...previous, component: componentId ?? undefined }),
+        replace: true,
+      })
+    },
+    [navigate],
+  )
+
   const setHistoryMode = useCallback(
     (enabled: boolean) => {
       void navigate({
@@ -85,7 +98,13 @@ export function WorkspacePage() {
       />
       <WorkspaceLayout
         left={<RunAgentPane projectId={projectId} runId={runId} />}
-        center={<ArchitecturePane projectId={projectId} />}
+        center={
+          <ArchitecturePane
+            projectId={projectId}
+            selectedComponentId={search.component}
+            onSelectComponent={setSelectedComponent}
+          />
+        }
         right={
           <InspectorPane
             projectId={projectId}
