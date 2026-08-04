@@ -129,6 +129,7 @@ Checkout funktionieren.
 | Variable | Wofür | Default | Wann ändern |
 | --- | --- | --- | --- |
 | `FRONTEND_HTTP_PORT` | Der einzige vom Deployment veröffentlichte Host-Port. Nginx lauscht im Container immer auf 8080; diese Variable bestimmt nur, worauf er auf dem Host abgebildet wird. | `8080` | Bei [Portkonflikten](#portkonflikte) oder wenn mehrere Stacks parallel laufen |
+| `MAX_REQUEST_BODY_SIZE` | Größter Request-Body, den Nginx durchlässt, in Nginx-Notation (`4m`, `16m`). Das ist das Limit des Einstiegspunkts, nicht das des Vertrags. Muss über `MAX_EVENT_BYTES` bleiben. | `4m` | Gemeinsam mit `MAX_EVENT_BYTES` — siehe die Warnung unten |
 | `POSTGRES_USER` | Datenbanknutzer. Geht auch in die vom Compose zusammengesetzte `DATABASE_URL` ein. | `visualise` | Praktisch nie — die Datenbank ist nicht von außen erreichbar |
 | `POSTGRES_PASSWORD` | Passwort dieses Nutzers | `visualise` | Praktisch nie, siehe oben |
 | `POSTGRES_DB` | Name der Datenbank | `visualise` | Praktisch nie |
