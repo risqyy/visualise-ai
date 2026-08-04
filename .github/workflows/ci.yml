@@ -1,0 +1,94 @@
+name: CI
+
+# The fast suites. They are cheap enough to run on every push and they are what
+# tells a contributor *where* something broke; the mandatory end-to-end
+# acceptance run (issue #14) lives in `e2e.yml` because it needs Docker, a build
+# of every service and a real browser.
+
+# `push` is limited to the default branch on purpose: with `branches: ['**']` a
+# branch that has an open pull request is built twice for the same commit.
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  contract:
+    name: contract (api)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: api/package-lock.json
+      - run: npm ci
+        working-directory: api
+      - run: npm test
+        working-directory: api
+
+  backend:
+    name: backend (go)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: backend/go.mod
+          cache-dependency-path: backend/go.sum
+      - run: go build ./...
+        working-directory: backend
+      - run: go vet ./...
+        working-directory: backend
+      - run: go test ./...
+        working-directory: backend
+
+  frontend:
+    name: frontend (react)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - run: npm ci
+        working-directory: frontend
+      # The generated contract types must match the checked-in contract, or the
+      # frontend would be typed against a document nobody published.
+      - run: npm run check:contract
+        working-directory: frontend
+      - run: npm run lint
+        working-directory: frontend
+      - run: npm run typecheck
+        working-directory: frontend
+      - run: npm test
+        working-directory: frontend
+      - run: npm run build
+        working-directory: frontend
+
+  simulator:
+    name: simulator (node)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: simulator/package-lock.json
+      - run: npm ci
+        working-directory: simulator
+      - run: npm run lint
+        working-directory: simulator
+      - run: npm run typecheck
+        working-directory: simulator
+      - run: npm test
+        working-directory: simulator
