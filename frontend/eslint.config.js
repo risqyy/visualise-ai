@@ -5,7 +5,12 @@ import reactRefresh from 'eslint-plugin-react-refresh'
 import tseslint from 'typescript-eslint'
 
 export default tseslint.config(
-  { ignores: ['dist', 'node_modules'] },
+  {
+    // `src/api/generated/` is written by `npm run generate:contract` out of
+    // `api/openapi.yaml`. Linting a generated artefact only produces findings
+    // nobody may fix in place — the fix always belongs in the contract.
+    ignores: ['dist', 'node_modules', 'src/api/generated'],
+  },
   {
     files: ['**/*.{ts,tsx}'],
     extends: [js.configs.recommended, ...tseslint.configs.recommended],

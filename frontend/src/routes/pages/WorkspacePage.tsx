@@ -27,7 +27,9 @@ export function WorkspacePage() {
   const search = route.useSearch()
   const navigate = route.useNavigate()
 
-  const project = useProject(projectId)
+  // Keeps the project detail subscribed so live events invalidate and refetch
+  // it. The header renders the slug — the contract has no project display name.
+  useProject(projectId)
   useLiveStream(projectId)
 
   const setSelectedComponentId = useUiStore((state) => state.setSelectedComponentId)
@@ -91,11 +93,7 @@ export function WorkspacePage() {
 
   return (
     <>
-      <WorkspaceHeader
-        projectId={projectId}
-        runId={runId}
-        projectName={project.data?.project.name}
-      />
+      <WorkspaceHeader projectId={projectId} runId={runId} />
       <WorkspaceLayout
         left={<RunAgentPane projectId={projectId} runId={runId} />}
         center={

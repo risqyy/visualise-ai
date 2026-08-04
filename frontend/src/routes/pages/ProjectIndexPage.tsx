@@ -27,9 +27,8 @@ export function ProjectIndexPage() {
         emptyTitle="Projekt nicht verfügbar"
         onRetry={() => void project.refetch()}
       >
-        <h1 className="text-xl font-semibold">
-          {project.data?.project.name ?? projectId}
-        </h1>
+        {/* A project has no display name in the contract — it is its slug. */}
+        <h1 className="font-mono text-xl font-semibold">{projectId}</h1>
         <EmptyState
           className="mt-4"
           title="Noch kein Run gemeldet"

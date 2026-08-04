@@ -11,14 +11,16 @@ import { useUiStore } from '@/state/uiStore'
 export interface WorkspaceHeaderProps {
   projectId: ProjectId
   runId: RunId
-  projectName?: string | undefined
 }
 
 /**
  * Top bar of the workspace: where you are, whether the stream is live and the
  * two independent pane toggles.
+ *
+ * The project is shown as its slug. The contract carries no display name for a
+ * project, and the cockpit does not invent one.
  */
-export function WorkspaceHeader({ projectId, runId, projectName }: WorkspaceHeaderProps) {
+export function WorkspaceHeader({ projectId, runId }: WorkspaceHeaderProps) {
   const leftCollapsed = useUiStore((state) => state.leftCollapsed)
   const rightCollapsed = useUiStore((state) => state.rightCollapsed)
   const toggleLeft = useUiStore((state) => state.toggleLeftCollapsed)
@@ -46,7 +48,7 @@ export function WorkspaceHeader({ projectId, runId, projectName }: WorkspaceHead
         <span aria-hidden="true" className="text-muted-foreground text-xs">
           /
         </span>
-        <span className="truncate text-sm font-medium">{projectName ?? projectId}</span>
+        <span className="truncate font-mono text-sm font-medium">{projectId}</span>
         <span aria-hidden="true" className="text-muted-foreground text-xs">
           /
         </span>

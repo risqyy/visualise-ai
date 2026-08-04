@@ -25,6 +25,22 @@ describe('resolveWorkState', () => {
     )
   })
 
+  it('shows nothing for a retracted change — the agent withdrew it', () => {
+    expect(resolveWorkState({ change: { state: 'retracted', operation: 'add' } })).toBeNull()
+    expect(
+      resolveWorkState({ change: { state: 'retracted', operation: 'remove' } }),
+    ).toBeNull()
+  })
+
+  it('still reports a running work step when the change was retracted', () => {
+    expect(
+      resolveWorkState({
+        hasActiveWorkStep: true,
+        change: { state: 'retracted', operation: 'modify' },
+      }),
+    ).toBe('active')
+  })
+
   it('prefers a running work step over a merely planned change', () => {
     expect(
       resolveWorkState({

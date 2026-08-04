@@ -1,11 +1,13 @@
 import { describe, expect, it } from 'vitest'
 
-import type { Component, Relationship } from '@/api/types'
+import type { AppliedComponent, AppliedRelationship } from '@/api/types'
 import {
   ALL_RELATIONSHIP_KINDS,
   BUNDLED_TOPIC_CHANNELS,
   NESTED_COMPONENTS,
   NESTED_RELATIONSHIPS,
+  appliedComponent,
+  appliedRelationship,
   reorder,
 } from '@/test/architectureFixtures'
 
@@ -172,23 +174,23 @@ describe('projectArchitecture — bundling and NATS topics', () => {
   })
 
   it('does not bundle across directions', () => {
-    const components: Component[] = [
-      { componentId: 'a', name: 'A', kind: 'service', parentComponentId: null },
-      { componentId: 'b', name: 'B', kind: 'service', parentComponentId: null },
+    const components: AppliedComponent[] = [
+      appliedComponent({ componentId: 'a', name: 'A', kind: 'service', parentComponentId: null }),
+      appliedComponent({ componentId: 'b', name: 'B', kind: 'service', parentComponentId: null }),
     ]
-    const relationships: Relationship[] = [
-      {
+    const relationships: AppliedRelationship[] = [
+      appliedRelationship({
         relationshipId: 'x',
         sourceComponentId: 'a',
         targetComponentId: 'b',
         kind: 'http',
-      },
-      {
+      }),
+      appliedRelationship({
         relationshipId: 'y',
         sourceComponentId: 'b',
         targetComponentId: 'a',
         kind: 'http',
-      },
+      }),
     ]
 
     const { edges } = projectArchitecture({ components, relationships })
@@ -199,14 +201,19 @@ describe('projectArchitecture — bundling and NATS topics', () => {
 
 describe('projectArchitecture — robustness', () => {
   it('renders a component with a missing parent as a root instead of dropping it', () => {
-    const components: Component[] = [
-      { componentId: 'root', name: 'Root', kind: 'system', parentComponentId: null },
-      {
+    const components: AppliedComponent[] = [
+      appliedComponent({
+        componentId: 'root',
+        name: 'Root',
+        kind: 'system',
+        parentComponentId: null,
+      }),
+      appliedComponent({
         componentId: 'orphan',
         name: 'Orphan',
         kind: 'service',
         parentComponentId: 'gone-in-this-snapshot',
-      },
+      }),
     ]
 
     const { nodes, diagnostics } = projectArchitecture({ components, relationships: [] })
@@ -221,11 +228,16 @@ describe('projectArchitecture — robustness', () => {
   })
 
   it('breaks a hierarchy cycle deterministically instead of looping forever', () => {
-    const components: Component[] = [
-      { componentId: 'c-b', name: 'B', kind: 'module', parentComponentId: 'c-a' },
-      { componentId: 'c-a', name: 'A', kind: 'module', parentComponentId: 'c-c' },
-      { componentId: 'c-c', name: 'C', kind: 'module', parentComponentId: 'c-b' },
-      { componentId: 'c-leaf', name: 'Leaf', kind: 'module', parentComponentId: 'c-c' },
+    const components: AppliedComponent[] = [
+      appliedComponent({ componentId: 'c-b', name: 'B', kind: 'module', parentComponentId: 'c-a' }),
+      appliedComponent({ componentId: 'c-a', name: 'A', kind: 'module', parentComponentId: 'c-c' }),
+      appliedComponent({ componentId: 'c-c', name: 'C', kind: 'module', parentComponentId: 'c-b' }),
+      appliedComponent({
+        componentId: 'c-leaf',
+        name: 'Leaf',
+        kind: 'module',
+        parentComponentId: 'c-c',
+      }),
     ]
 
     const { nodes, diagnostics } = projectArchitecture({ components, relationships: [] })
@@ -256,8 +268,13 @@ describe('projectArchitecture — robustness', () => {
   })
 
   it('handles a component that is its own parent', () => {
-    const components: Component[] = [
-      { componentId: 'self', name: 'Self', kind: 'module', parentComponentId: 'self' },
+    const components: AppliedComponent[] = [
+      appliedComponent({
+        componentId: 'self',
+        name: 'Self',
+        kind: 'module',
+        parentComponentId: 'self',
+      }),
     ]
 
     const { nodes, diagnostics } = projectArchitecture({ components, relationships: [] })
@@ -268,12 +285,22 @@ describe('projectArchitecture — robustness', () => {
   })
 
   it('drops relationships with an endpoint outside the snapshot and reports them', () => {
-    const components: Component[] = [
-      { componentId: 'a', name: 'A', kind: 'service', parentComponentId: null },
+    const components: AppliedComponent[] = [
+      appliedComponent({ componentId: 'a', name: 'A', kind: 'service', parentComponentId: null }),
     ]
-    const relationships: Relationship[] = [
-      { relationshipId: 'r1', sourceComponentId: 'a', targetComponentId: 'b', kind: 'http' },
-      { relationshipId: 'r2', sourceComponentId: 'z', targetComponentId: 'a', kind: 'grpc' },
+    const relationships: AppliedRelationship[] = [
+      appliedRelationship({
+        relationshipId: 'r1',
+        sourceComponentId: 'a',
+        targetComponentId: 'b',
+        kind: 'http',
+      }),
+      appliedRelationship({
+        relationshipId: 'r2',
+        sourceComponentId: 'z',
+        targetComponentId: 'a',
+        kind: 'grpc',
+      }),
     ]
 
     const { edges, diagnostics } = projectArchitecture({ components, relationships })
@@ -286,9 +313,19 @@ describe('projectArchitecture — robustness', () => {
   })
 
   it('keeps the first of two components sharing an id', () => {
-    const components: Component[] = [
-      { componentId: 'dup', name: 'First', kind: 'service', parentComponentId: null },
-      { componentId: 'dup', name: 'Second', kind: 'module', parentComponentId: null },
+    const components: AppliedComponent[] = [
+      appliedComponent({
+        componentId: 'dup',
+        name: 'First',
+        kind: 'service',
+        parentComponentId: null,
+      }),
+      appliedComponent({
+        componentId: 'dup',
+        name: 'Second',
+        kind: 'module',
+        parentComponentId: null,
+      }),
     ]
 
     const { nodes, diagnostics } = projectArchitecture({ components, relationships: [] })

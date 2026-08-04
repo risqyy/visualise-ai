@@ -1,4 +1,4 @@
-import type { Problem, ValidationErrorDetail, ValidationProblem } from './types'
+import type { Problem, ValidationError, ValidationProblem } from './types'
 
 /**
  * A response the backend rejected, expressed as RFC 9457 problem details.
@@ -12,7 +12,7 @@ export class ProblemError extends Error {
   readonly name = 'ProblemError'
   readonly problem: Problem
   /** Field-level violations of a `400 ValidationProblem`, otherwise empty. */
-  readonly errors: readonly ValidationErrorDetail[]
+  readonly errors: readonly ValidationError[]
   /** Request URL that produced the problem, for logging. */
   readonly url: string
 

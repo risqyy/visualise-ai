@@ -117,9 +117,17 @@ export interface WorkStateInput {
  * Resolves the work state of a component or relationship from what was actually
  * reported. Returns `null` when nothing was reported — the element is then drawn
  * in the neutral graphite of the applied model, with no state colour at all.
+ *
+ * The contract knows three change states, not two: besides `planned` and
+ * `applied` there is `retracted`, a proposal its agent withdrew. A withdrawn
+ * proposal contributes **nothing** to the overlay — it is neither planned nor
+ * applied, and inventing a fifth colour for it would show the reviewer work
+ * that is no longer claimed. A running work step is reported independently of
+ * the change and still counts.
  */
 export function resolveWorkState(input: WorkStateInput): WorkStateId | null {
-  const { change, hasActiveWorkStep } = input
+  const { hasActiveWorkStep } = input
+  const change = input.change?.state === 'retracted' ? null : input.change
 
   if (change?.state === 'applied' && change.operation === 'remove') return 'removed'
   if (hasActiveWorkStep) return 'active'

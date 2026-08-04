@@ -1,6 +1,7 @@
 import { screen, waitFor } from '@testing-library/react'
 import { describe, expect, it } from 'vitest'
 
+import type { ProjectResponse } from '@/api/types'
 import { PROJECT_ID, RUN_ID, createFakeFetch } from '@/test/fixtures'
 import { renderApp } from '@/test/renderApp'
 
@@ -41,16 +42,19 @@ describe('routing', () => {
           projectPosition: 3,
           project: {
             projectId: PROJECT_ID,
-            name: 'Visualise AI',
+            firstSeenAt: '2026-08-04T09:00:00Z',
+            lastEventAt: '2026-08-04T09:00:00Z',
+            lastPosition: 3,
             currentRunId: null,
-            runCount: 0,
-            lastEventAt: null,
-            description: null,
-            firstEventAt: null,
-            componentCount: 0,
-            relationshipCount: 0,
+            counts: {
+              runs: 0,
+              openRuns: 0,
+              components: 0,
+              relationships: 0,
+              activeChanges: 0,
+            },
           },
-        },
+        } satisfies ProjectResponse,
       }),
     })
 
