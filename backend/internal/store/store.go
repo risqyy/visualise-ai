@@ -92,6 +92,22 @@ func New(db *gorm.DB) *Store {
 	}
 }
 
+// Guard is an optional check the caller runs inside the append transaction,
+// after idempotency has been resolved and before the event row is created.
+//
+// It exists so the ingestion layer can enforce rules that depend on the current
+// project state — which agents exist, whether a run is still open — without
+// racing. Checking those before the transaction would let two concurrent
+// requests both observe "the run is open"; inside it the project row is already
+// locked, so the checks see a state no other append can move underneath them.
+// Returning an error rolls the whole append back, so a rejected event consumes
+// no position and changes no projection.
+//
+// The guard sees only genuinely new events: an idempotent retry is answered
+// from the stored event before the guard runs, because an event that was
+// accepted once must keep its position even if the project has moved on since.
+type Guard func(tx *gorm.DB, env Envelope) error
+
 // Append stores one event and advances every affected read model inside a
 // single transaction. Any failure rolls the whole append back, including the
 // position, which is therefore never consumed by a rejected event.
@@ -102,6 +118,12 @@ func New(db *gorm.DB) *Store {
 //   - known key, identical content   -> nothing written, Duplicate true
 //   - known key, different content   -> ClientEventIDConflictError
 func (s *Store) Append(ctx context.Context, env Envelope) (Result, error) {
+	return s.AppendGuarded(ctx, env, nil)
+}
+
+// AppendGuarded is Append with a Guard that runs inside the same transaction.
+// A nil guard makes it behave exactly like Append.
+func (s *Store) AppendGuarded(ctx context.Context, env Envelope, guard Guard) (Result, error) {
 	canonical, err := canonicalJSON(env.Payload)
 	if err != nil {
 		return Result{}, fmt.Errorf("store: canonicalising payload: %w", err)
@@ -141,6 +163,12 @@ func (s *Store) Append(ctx context.Context, env Envelope) (Result, error) {
 				ProjectID:        env.ProjectID,
 				ClientEventID:    env.ClientEventID,
 				ExistingPosition: existing.Position,
+			}
+		}
+
+		if guard != nil {
+			if err := guard(tx, env); err != nil {
+				return err
 			}
 		}
 

@@ -1,0 +1,2147 @@
+openapi: 3.1.0
+
+info:
+  title: Visualise AI — Agent Cockpit Event Contract
+  version: 1.0.0
+  summary: Versioned contract for agent event ingestion and project event streaming.
+  description: |
+    The Visualise AI Agent Cockpit is fed exclusively by this contract. An orchestrator and
+    its subagents report **semantic work steps**; the cockpit is observing and read-only and
+    never infers state that was not explicitly reported.
+
+    ## Scope of this document
+
+    | Endpoint | Purpose |
+    | --- | --- |
+    | `POST /api/v1/events` | Single-event ingestion, idempotent per `clientEventId`. |
+    | `GET /api/v1/projects/{projectId}/stream` | Server-Sent Events: gap-free replay followed by the live stream. |
+    | `GET /healthz`, `GET /readyz` | Internal container probes, not reachable from outside the Compose network. |
+
+    The historical read API (paged history and materialised snapshots over plain HTTP) is
+    specified separately and is deliberately **not** part of this document.
+
+    ## Versioning
+
+    * `info.version` versions this document as a whole (SemVer).
+    * `schemaVersion` inside every envelope versions the **payload schema of one event type**.
+      Version `1.0` is the only value accepted by v0.
+    * The event catalogue is closed. `type` is an enumeration, every event schema sets
+      `additionalProperties: false`, and the ingestion request body is a discriminated
+      `oneOf`. Unknown event types, unknown schema versions and unknown fields are therefore
+      structurally rejected — there is no free-form fallback event.
+
+    ## What is deliberately not in the catalogue
+
+    Low-level tool calls, terminal commands, file reads, token usage and raw model output are
+    **not** part of the contract. Only steps that carry meaning for a human reviewer of the
+    observed application are reported.
+
+    ## Reporting rules
+
+    * Agent status (`agent.status_reported`) is always explicitly reported and never derived
+      from silence, timeouts or event frequency.
+    * Progress (`agent.progress_reported`) is a self-assessment of the reporting agent.
+      `risk.reported` and `problem.reported` are agent statements as well; the system performs
+      no quality or drift evaluation of its own.
+    * `run.finished` is optional. A run that stops emitting events keeps its last reported
+      state; the backend never invents a terminal state.
+
+    ## Ordering, idempotency and size
+
+    * The server assigns every accepted event a monotonically increasing `position` that is
+      unique **per project**. That position is the cursor used for SSE replay.
+    * `clientEventId` is the idempotency key. Re-sending a byte-identical event returns
+      `200 OK` with `duplicate: true` and the original position. Re-using the id with
+      different content returns `409 Conflict`.
+    * The default maximum request size is **2 MiB (2097152 bytes)** and is configurable
+      server-side through the `MAX_EVENT_BYTES` environment variable.
+
+    ## Reconnect walkthrough
+
+    A worked SSE reconnect example (including `Last-Event-ID` handling) lives next to this
+    document in [`examples/sse-reconnect.md`](./examples/sse-reconnect.md).
+
+servers:
+  - url: http://localhost:8080
+    description: Nginx frontend container — the only external entry point
+
+# v0 runs locally or inside a private network and deliberately has no authentication and no
+# multi-tenancy. The empty list states that explicitly: no operation requires credentials.
+security: []
+
+tags:
+  - name: Ingestion
+    description: |
+      Write path used by orchestrator and subagents. Exactly one event per request.
+  - name: Streaming
+    description: |
+      Read path used by the cockpit UI. Server-Sent Events with replay from a known position.
+  - name: Operations
+    description: |
+      Container probes for the internal Go backend. Not exposed through the Nginx frontend.
+
+paths:
+  /api/v1/events:
+    post:
+      tags:
+        - Ingestion
+      operationId: ingestEvent
+      summary: Ingest a single agent event
+      description: |
+        Accepts exactly one event. The request body is a discriminated union over the closed
+        v0 event catalogue; the `type` field selects the concrete envelope schema and therefore
+        the concrete payload schema.
+
+        The endpoint is idempotent on `clientEventId` within a project:
+
+        * first delivery -> `201 Created`, `duplicate: false`
+        * byte-identical redelivery -> `200 OK`, `duplicate: true`, original `position`
+        * same `clientEventId` with different content -> `409 Conflict`
+
+        Requests larger than the configured limit (default 2 MiB / 2097152 bytes,
+        `MAX_EVENT_BYTES`) are rejected with `413`.
+      requestBody:
+        required: true
+        description: One event envelope from the closed v0 catalogue.
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/IngestEventRequest'
+            examples:
+              rootAgentStarted:
+                summary: Root orchestrator started (no parent agent)
+                externalValue: './examples/root-agent-started.json'
+              subagentStarted:
+                summary: Subagent started below the root orchestrator
+                externalValue: './examples/subagent-started.json'
+              architectureSnapshot:
+                summary: Full architecture snapshot with nested components and typed relationships
+                externalValue: './examples/architecture-snapshot.json'
+              componentChangePlanned:
+                summary: Planned component change
+                externalValue: './examples/component-change-planned.json'
+              componentChangeApplied:
+                summary: Applied component change
+                externalValue: './examples/component-change-applied.json'
+              feedbackPublished:
+                summary: Component-scoped markdown feedback
+                externalValue: './examples/feedback-published.json'
+              diffReported:
+                summary: Unified diff for exactly one repository file
+                externalValue: './examples/diff-reported.json'
+              correctionIssued:
+                summary: Correction of a previously sent event
+                externalValue: './examples/correction-issued.json'
+              runFinished:
+                summary: Optional terminal run event, orchestrator only
+                externalValue: './examples/run-finished.json'
+      responses:
+        '200':
+          description: |
+            Idempotent retry. The event was already stored under this `clientEventId` with
+            identical content; the original `position` is returned and nothing is appended.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EventAccepted'
+              examples:
+                idempotentRetry:
+                  summary: Retry of an already accepted event
+                  externalValue: './examples/retry-idempotent-response.json'
+        '201':
+          description: Event accepted and appended to the project event log.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EventAccepted'
+              examples:
+                accepted:
+                  summary: First delivery of an event
+                  value:
+                    projectId: visualise-ai
+                    position: 42
+                    serverEventId: 6a3d1c0e-6b1e-4a2f-9c5d-2f8b0c7a1d33
+                    clientEventId: 3f2504e0-4f89-41d3-9a0c-0305e82c3301
+                    duplicate: false
+                    receivedAt: '2026-08-04T09:12:00.481Z'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '413':
+          $ref: '#/components/responses/ContentTooLarge'
+        '415':
+          $ref: '#/components/responses/UnsupportedMediaType'
+        '422':
+          $ref: '#/components/responses/UnprocessableContent'
+
+  /api/v1/projects/{projectId}/stream:
+    get:
+      tags:
+        - Streaming
+      operationId: streamProjectEvents
+      summary: Stream project events via Server-Sent Events
+      description: |
+        Opens a Server-Sent Events stream for one project. The stream first replays every
+        committed event after the requested position and then continues seamlessly with live
+        events. Each committed event is delivered **exactly once, in position order, without
+        duplicates and without gaps**.
+
+        ## Choosing the start position
+
+        1. `Last-Event-ID` request header (the standard SSE reconnect path). It carries the
+           server-side project `position` of the last event the client processed.
+        2. `lastEventPosition` query parameter, for clients that persist the cursor themselves.
+        3. Neither given -> the stream starts with the live tail only, no replay.
+
+        If both are present, `lastEventPosition` wins. Replay starts at
+        `lastEventPosition + 1`.
+
+        ## Frame format
+
+        OpenAPI cannot describe SSE frames structurally, so the wire format is documented here.
+        The response schema describes the JSON object carried in a single `data:` line.
+
+        * `id:` — server-side project `position` (an integer). Browsers echo it back as
+          `Last-Event-ID` on reconnect.
+        * `event:` — the event `type` from the catalogue, so clients can subscribe per type.
+        * `data:` — one line of compact JSON, a `StreamedEvent`.
+        * Keepalives are sent as SSE comment lines (`: keepalive`) and carry no `id:`.
+
+        ```text
+        id: 41
+        event: agent.status_reported
+        data: {"schemaVersion":"1.0","clientEventId":"9a1f...","projectId":"visualise-ai","runId":"run-2026-08-04-0001","agentId":"subagent-openapi-contract","parentAgentId":"orchestrator-root","occurredAt":"2026-08-04T09:31:02Z","type":"agent.status_reported","payload":{"status":"working","note":"Writing the OpenAPI document."},"position":41,"serverEventId":"1d2c...","receivedAt":"2026-08-04T09:31:02.117Z"}
+
+        : keepalive
+
+        id: 42
+        event: diff.reported
+        data: {"schemaVersion":"1.0", ...}
+
+        ```
+
+        A full reconnect walkthrough is documented in
+        [`examples/sse-reconnect.md`](./examples/sse-reconnect.md).
+      parameters:
+        - $ref: '#/components/parameters/ProjectIdPath'
+        - $ref: '#/components/parameters/LastEventPositionQuery'
+        - $ref: '#/components/parameters/LastEventIdHeader'
+      responses:
+        '200':
+          description: |
+            The event stream. The body is an endless `text/event-stream` document; the schema
+            below describes the JSON payload of a single `data:` line.
+          headers:
+            Cache-Control:
+              description: Always `no-cache`; the stream must never be cached.
+              schema:
+                type: string
+                examples:
+                  - no-cache
+            Connection:
+              description: Always `keep-alive`.
+              schema:
+                type: string
+                examples:
+                  - keep-alive
+            X-Accel-Buffering:
+              description: |
+                Always `no`. Disables response buffering in the Nginx frontend so that events
+                reach the browser immediately.
+              schema:
+                type: string
+                examples:
+                  - 'no'
+          content:
+            text/event-stream:
+              schema:
+                $ref: '#/components/schemas/StreamedEvent'
+        '404':
+          $ref: '#/components/responses/ProjectNotFound'
+
+  /healthz:
+    get:
+      tags:
+        - Operations
+      operationId: getLiveness
+      summary: Liveness probe (internal)
+      description: |
+        Internal liveness probe of the Go backend container. It reports only that the process
+        is running and answering; it never touches PostgreSQL. Not routed through the Nginx
+        frontend and therefore not reachable from outside the Compose network.
+      servers:
+        - url: http://backend:8080
+          description: Internal Go backend container — reachable only inside the Compose network
+      responses:
+        '200':
+          description: The process is alive.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LivenessStatus'
+
+  /readyz:
+    get:
+      tags:
+        - Operations
+      operationId: getReadiness
+      summary: Readiness probe (internal)
+      description: |
+        Internal readiness probe of the Go backend container. It reports whether the backend
+        can serve traffic, which includes a reachable PostgreSQL and applied migrations. Not
+        routed through the Nginx frontend.
+      servers:
+        - url: http://backend:8080
+          description: Internal Go backend container — reachable only inside the Compose network
+      responses:
+        '200':
+          description: The backend is ready to serve ingestion and streaming.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReadinessStatus'
+        '503':
+          description: The backend is not ready, for example because PostgreSQL is unreachable.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+              examples:
+                notReady:
+                  summary: Database not reachable
+                  value:
+                    type: 'https://visualise-ai.local/problems/not-ready'
+                    title: Service not ready
+                    status: 503
+                    detail: The event store is not reachable.
+                    code: not_ready
+
+components:
+
+  parameters:
+
+    ProjectIdPath:
+      name: projectId
+      in: path
+      required: true
+      description: Project whose event stream is requested.
+      schema:
+        $ref: '#/components/schemas/ProjectId'
+
+    LastEventPositionQuery:
+      name: lastEventPosition
+      in: query
+      required: false
+      description: |
+        Last server-side project position the client has already processed. Replay starts at
+        `lastEventPosition + 1`. Use `0` to replay the whole project from the beginning.
+        Takes precedence over the `Last-Event-ID` header.
+      schema:
+        type: integer
+        format: int64
+        minimum: 0
+      example: 41
+
+    LastEventIdHeader:
+      name: Last-Event-ID
+      in: header
+      required: false
+      description: |
+        Standard SSE reconnect header. Browsers set it automatically to the `id:` of the last
+        received frame, which is the server-side project position. Ignored when
+        `lastEventPosition` is present.
+      schema:
+        type: string
+      example: '41'
+
+  responses:
+
+    BadRequest:
+      description: |
+        The request body is syntactically valid JSON but violates the contract. Common codes:
+        `invalid_field`, `unsupported_event_type`, `unsupported_schema_version`.
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/ValidationProblem'
+          examples:
+            validationFailed:
+              summary: Two field-level violations
+              externalValue: './examples/validation-error-response.json'
+
+    Conflict:
+      description: |
+        The `clientEventId` was already used within this project for an event with different
+        content. Code: `client_event_id_conflict`.
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+          examples:
+            clientEventIdConflict:
+              summary: Idempotency key reused with different content
+              externalValue: './examples/conflict-response.json'
+
+    ContentTooLarge:
+      description: |
+        The request body exceeds the configured maximum event size. The default limit is
+        2 MiB (2097152 bytes) and is configurable server-side via `MAX_EVENT_BYTES`.
+        Code: `event_too_large`.
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+          examples:
+            eventTooLarge:
+              summary: Payload above the 2 MiB default limit
+              value:
+                type: 'https://visualise-ai.local/problems/event-too-large'
+                title: Event too large
+                status: 413
+                detail: The event body is 3145728 bytes; the configured limit is 2097152 bytes.
+                code: event_too_large
+
+    UnsupportedMediaType:
+      description: |
+        The request `Content-Type` is not `application/json`. Code: `unsupported_media_type`.
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+          examples:
+            unsupportedMediaType:
+              summary: Wrong content type
+              value:
+                type: 'https://visualise-ai.local/problems/unsupported-media-type'
+                title: Unsupported media type
+                status: 415
+                detail: Expected application/json but received text/plain.
+                code: unsupported_media_type
+
+    UnprocessableContent:
+      description: |
+        The event is well-formed and schema-valid but contradicts the current state of the
+        project. Codes: `unknown_agent`, `run_already_finished`, `run_not_started`,
+        `parent_agent_unknown`, `terminal_event_not_allowed`, `correction_target_unknown`.
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+          examples:
+            runAlreadyFinished:
+              summary: Work event after run.finished
+              value:
+                type: 'https://visualise-ai.local/problems/run-already-finished'
+                title: Run already finished
+                status: 422
+                detail: Run "run-2026-08-04-0001" reported run.finished at position 1204; work events are rejected.
+                code: run_already_finished
+            terminalEventNotAllowed:
+              summary: Subagent tried to end the run
+              value:
+                type: 'https://visualise-ai.local/problems/terminal-event-not-allowed'
+                title: Terminal event not allowed
+                status: 422
+                detail: run.finished may only be reported by the orchestrator of the run.
+                code: terminal_event_not_allowed
+
+    ProjectNotFound:
+      description: 'The project is unknown. Code: `project_not_found`.'
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+          examples:
+            projectNotFound:
+              summary: Unknown project
+              value:
+                type: 'https://visualise-ai.local/problems/project-not-found'
+                title: Project not found
+                status: 404
+                detail: No project with id "unknown-project" exists.
+                code: project_not_found
+
+  schemas:
+
+    # ---------------------------------------------------------------------------
+    # Primitive identifier types
+    # ---------------------------------------------------------------------------
+
+    ProjectId:
+      type: string
+      description: |
+        Stable, human-readable project slug. Lowercase alphanumerics and hyphens,
+        3 to 64 characters, must start and end with an alphanumeric character.
+      pattern: '^[a-z0-9][a-z0-9-]{1,62}[a-z0-9]$'
+      examples:
+        - visualise-ai
+
+    RunId:
+      type: string
+      description: |
+        Identifier of one agent run inside a project. Same character rules as `ProjectId`.
+        A run groups every agent, plan and work event of a single orchestrated session.
+      pattern: '^[a-z0-9][a-z0-9-]{1,62}[a-z0-9]$'
+      examples:
+        - run-2026-08-04-0001
+
+    AgentId:
+      type: string
+      description: |
+        Identifier of the reporting agent, unique within a run. Same character rules as
+        `ProjectId`.
+      pattern: '^[a-z0-9][a-z0-9-]{1,62}[a-z0-9]$'
+      examples:
+        - subagent-openapi-contract
+
+    ComponentId:
+      type: string
+      description: |
+        Identifier of an architecture component, stable across snapshots. Lowercase
+        alphanumerics plus `.`, `_` and `-`; must start and end with an alphanumeric
+        character. Dotted paths are a convention, not a hierarchy: the hierarchy is expressed
+        exclusively through `parentComponentId`.
+      pattern: '^[a-z0-9][a-z0-9._-]{0,126}[a-z0-9]$'
+      examples:
+        - shop-platform.orders.domain
+
+    Identifier:
+      type: string
+      description: |
+        Opaque, agent-assigned identifier for a domain object such as a plan, work step,
+        feedback item, diff, risk or relationship. Stable for the lifetime of the run.
+      minLength: 1
+      maxLength: 128
+      examples:
+        - plan-2026-08-04-0001
+
+    Uuid:
+      type: string
+      format: uuid
+      description: RFC 4122 UUID.
+      examples:
+        - 3f2504e0-4f89-41d3-9a0c-0305e82c3301
+
+    Timestamp:
+      type: string
+      format: date-time
+      description: RFC 3339 timestamp. Agents must report in UTC (`Z` suffix).
+      examples:
+        - '2026-08-04T09:12:00Z'
+
+    SchemaVersion:
+      type: string
+      description: |
+        Version of the payload schema of the reported event type. v0 accepts `1.0` only; any
+        other value is rejected with `400` and code `unsupported_schema_version`.
+      enum:
+        - '1.0'
+
+    RepositoryFilePath:
+      type: string
+      description: |
+        Repository-relative POSIX path of exactly one file. Must not start with `/`, must not
+        contain a `.` or `..` path segment, must not contain backslashes and must not end with
+        a slash. Absolute paths and traversal are rejected by the pattern itself.
+      minLength: 1
+      maxLength: 4096
+      pattern: '^([^/\\.][^/\\]*|\.[^/\\.][^/\\]*|\.\.[^/\\]+)(/([^/\\.][^/\\]*|\.[^/\\.][^/\\]*|\.\.[^/\\]+))*$'
+      examples:
+        - internal/ingest/handler.go
+
+    EventType:
+      type: string
+      description: |
+        The closed v0 event catalogue. There is no free-form or fallback event type; anything
+        outside this enumeration is rejected with `400` and code `unsupported_event_type`.
+        Low-level tool, terminal and file-read events are intentionally absent.
+      enum:
+        - agent.started
+        - agent.status_reported
+        - agent.progress_reported
+        - agent.finished
+        - plan.published
+        - plan.step_updated
+        - work.step_started
+        - work.step_completed
+        - feedback.published
+        - architecture.snapshot_published
+        - component.change_planned
+        - component.change_applied
+        - relationship.change_planned
+        - relationship.change_applied
+        - diff.reported
+        - risk.reported
+        - problem.reported
+        - correction.issued
+        - retraction.issued
+        - run.finished
+
+    ChangeOperation:
+      type: string
+      description: |
+        Kind of change applied to a component or relationship of the architecture model.
+      enum:
+        - add
+        - modify
+        - remove
+
+    Outcome:
+      type: string
+      description: Terminal outcome reported by an agent or for a run.
+      enum:
+        - completed
+        - failed
+        - cancelled
+
+    PlanStepState:
+      type: string
+      description: Reported state of a single plan step.
+      enum:
+        - pending
+        - in_progress
+        - done
+        - skipped
+
+    # ---------------------------------------------------------------------------
+    # Architecture model
+    # ---------------------------------------------------------------------------
+
+    Technology:
+      type: object
+      description: |
+        Technology metadata of a component. Every field is optional; agents report what they
+        know and omit the rest.
+      properties:
+        language:
+          type: string
+          description: Primary implementation language, for example `Go` or `TypeScript`.
+        framework:
+          type: string
+          description: Dominant framework or library, for example `React` or `chi`.
+        runtime:
+          type: string
+          description: Execution runtime, for example `Node.js`, `JVM` or `PostgreSQL`.
+        version:
+          type: string
+          description: Version of the language, framework or runtime, as reported.
+      additionalProperties: false
+
+    Component:
+      type: object
+      description: |
+        One node of the application architecture. Components form a tree through
+        `parentComponentId`; the root of a tree has `parentComponentId: null`. Arbitrary
+        nesting depth is allowed, for example system -> service -> module -> module.
+      properties:
+        componentId:
+          $ref: '#/components/schemas/ComponentId'
+        name:
+          type: string
+          description: Human-readable display name shown on the architecture canvas.
+          minLength: 1
+          maxLength: 200
+        kind:
+          type: string
+          description: |
+            Structural role of the component. `topic` models a single message topic as its own
+            node so that topic-level relationships stay visible.
+          enum:
+            - system
+            - service
+            - module
+            - datastore
+            - queue
+            - topic
+            - ui
+            - external
+            - library
+        parentComponentId:
+          description: |
+            Parent node in the component hierarchy, or `null` for a root component. The value
+            must reference a `componentId` contained in the same architecture model.
+          oneOf:
+            - $ref: '#/components/schemas/ComponentId'
+            - type: 'null'
+        description:
+          type: string
+          description: Short explanation of the component's responsibility.
+        technology:
+          $ref: '#/components/schemas/Technology'
+        tags:
+          type: array
+          description: Free-form labels for filtering and grouping on the canvas.
+          items:
+            type: string
+            minLength: 1
+            maxLength: 64
+      required:
+        - componentId
+        - name
+        - kind
+        - parentComponentId
+      additionalProperties: false
+
+    Relationship:
+      type: object
+      description: |
+        A typed, directed edge between two components.
+
+        Message topics are never aggregated server-side: **every NATS topic is its own
+        relationship** with its own `relationshipId`, `kind: nats_topic` and the topic name in
+        `channel`. Two producers publishing to two topics therefore yield two relationships,
+        not one merged "messaging" edge.
+      properties:
+        relationshipId:
+          $ref: '#/components/schemas/Identifier'
+        sourceComponentId:
+          $ref: '#/components/schemas/ComponentId'
+        targetComponentId:
+          $ref: '#/components/schemas/ComponentId'
+        kind:
+          type: string
+          description: |
+            Interaction type of the edge. `nats_topic` denotes exactly one topic, named in
+            `channel`.
+          enum:
+            - http
+            - grpc
+            - data
+            - async
+            - nats_topic
+            - dependency
+        label:
+          type: string
+          description: Short human-readable edge label for the canvas.
+        protocol:
+          type: string
+          description: Concrete protocol, for example `HTTPS`, `gRPC/HTTP2` or `postgresql`.
+        operation:
+          type: string
+          description: |
+            Concrete operation carried by the edge, for example `GET /orders` or
+            `orders.v1.OrderService/PlaceOrder`.
+        channel:
+          type: string
+          description: |
+            Channel name for message-based edges. For `kind: nats_topic` this is the NATS
+            topic name and identifies the relationship semantically.
+      required:
+        - relationshipId
+        - sourceComponentId
+        - targetComponentId
+        - kind
+      additionalProperties: false
+
+    PlanStep:
+      type: object
+      description: One step of a published plan revision.
+      properties:
+        stepId:
+          $ref: '#/components/schemas/Identifier'
+        order:
+          type: integer
+          description: Zero-based position of the step within the plan revision.
+          minimum: 0
+        title:
+          type: string
+          description: Short description of what the step achieves.
+          minLength: 1
+          maxLength: 300
+        state:
+          $ref: '#/components/schemas/PlanStepState'
+        componentIds:
+          type: array
+          description: Architecture components the step touches.
+          items:
+            $ref: '#/components/schemas/ComponentId'
+      required:
+        - stepId
+        - order
+        - title
+        - state
+      additionalProperties: false
+
+    # ---------------------------------------------------------------------------
+    # Payloads
+    # ---------------------------------------------------------------------------
+
+    AgentStartedPayload:
+      type: object
+      description: |
+        An agent has begun working. Root orchestrators report `role: orchestrator` and send
+        `parentAgentId: null`; subagents report `role: subagent` and set `parentAgentId`.
+      properties:
+        role:
+          type: string
+          description: Position of the agent in the run hierarchy.
+          enum:
+            - orchestrator
+            - subagent
+        displayName:
+          type: string
+          description: Name shown for this agent in the cockpit.
+          minLength: 1
+          maxLength: 200
+        assignedTask:
+          type: string
+          description: The task the agent was given, in the agent's own words.
+          minLength: 1
+        capabilities:
+          type: array
+          description: Self-declared capabilities, used for grouping and filtering only.
+          items:
+            type: string
+            minLength: 1
+            maxLength: 64
+      required:
+        - role
+        - displayName
+        - assignedTask
+      additionalProperties: false
+
+    AgentStatusReportedPayload:
+      type: object
+      description: |
+        Explicitly reported agent status. The system never derives status from silence,
+        timeouts or event frequency; the last reported status stays valid until the agent
+        reports a new one.
+      properties:
+        status:
+          type: string
+          description: Status as stated by the agent itself.
+          enum:
+            - working
+            - waiting
+            - blocked
+            - idle
+            - done
+        note:
+          type: string
+          description: Optional one-line explanation, for example what the agent waits for.
+      required:
+        - status
+      additionalProperties: false
+
+    AgentProgressReportedPayload:
+      type: object
+      description: |
+        Self-assessed progress of the reporting agent. This is a claim, not a measurement; the
+        cockpit displays it as reported and performs no plausibility check.
+      properties:
+        percent:
+          type: integer
+          description: Reported completion in percent.
+          minimum: 0
+          maximum: 100
+        scope:
+          type: string
+          description: |
+            What the percentage refers to: the agent's own assigned task, or the agent's
+            estimate for the overall run.
+          enum:
+            - own_task
+            - overall_estimate
+        basis:
+          type: string
+          description: |
+            How the number was derived: a free estimate by the agent, or the ratio of completed
+            plan or work steps.
+          enum:
+            - reported_estimate
+            - completed_steps
+        note:
+          type: string
+          description: Optional explanation of the reported number.
+      required:
+        - percent
+        - scope
+        - basis
+      additionalProperties: false
+
+    AgentFinishedPayload:
+      type: object
+      description: The reporting agent has finished. Terminal for this agent, not for the run.
+      properties:
+        outcome:
+          $ref: '#/components/schemas/Outcome'
+        summary:
+          type: string
+          description: Short closing summary of what the agent achieved.
+      required:
+        - outcome
+      additionalProperties: false
+
+    PlanPublishedPayload:
+      type: object
+      description: |
+        A complete plan revision. Revisions are append-only: a changed plan is published as a
+        new `revision` of the same `planId` and replaces the previously displayed revision.
+        Earlier revisions stay in the event log and remain inspectable.
+      properties:
+        planId:
+          $ref: '#/components/schemas/Identifier'
+        revision:
+          type: integer
+          description: Revision number, starting at 1 and strictly increasing per `planId`.
+          minimum: 1
+        steps:
+          type: array
+          description: All steps of this revision, in full. Partial plans are not supported.
+          minItems: 1
+          items:
+            $ref: '#/components/schemas/PlanStep'
+      required:
+        - planId
+        - revision
+        - steps
+      additionalProperties: false
+
+    PlanStepUpdatedPayload:
+      type: object
+      description: |
+        State change of a single step of the currently published plan revision. Used instead of
+        republishing the whole plan when only a step state changes.
+      properties:
+        planId:
+          $ref: '#/components/schemas/Identifier'
+        stepId:
+          $ref: '#/components/schemas/Identifier'
+        state:
+          $ref: '#/components/schemas/PlanStepState'
+        note:
+          type: string
+          description: Optional explanation of the state change.
+      required:
+        - planId
+        - stepId
+        - state
+      additionalProperties: false
+
+    WorkStepStartedPayload:
+      type: object
+      description: |
+        The agent has started a concrete unit of work. A work step is what actually happens;
+        `planStepId` links it back to the plan when the work follows a planned step.
+      properties:
+        workStepId:
+          $ref: '#/components/schemas/Identifier'
+        title:
+          type: string
+          description: Short description of the work being started.
+          minLength: 1
+          maxLength: 300
+        componentIds:
+          type: array
+          description: Architecture components affected by this work step.
+          items:
+            $ref: '#/components/schemas/ComponentId'
+        planStepId:
+          $ref: '#/components/schemas/Identifier'
+      required:
+        - workStepId
+        - title
+        - componentIds
+      additionalProperties: false
+
+    WorkStepCompletedPayload:
+      type: object
+      description: The work step identified by `workStepId` has been completed.
+      properties:
+        workStepId:
+          $ref: '#/components/schemas/Identifier'
+        summary:
+          type: string
+          description: Short summary of the result.
+      required:
+        - workStepId
+      additionalProperties: false
+
+    FeedbackPublishedPayload:
+      type: object
+      description: |
+        Component-scoped feedback written by the agent. v0 supports markdown only; the body is
+        rendered as untrusted markdown in the inspector.
+      properties:
+        feedbackId:
+          $ref: '#/components/schemas/Identifier'
+        componentIds:
+          type: array
+          description: Components the feedback refers to. At least one is required.
+          minItems: 1
+          items:
+            $ref: '#/components/schemas/ComponentId'
+        format:
+          type: string
+          description: Body format. v0 accepts markdown only.
+          enum:
+            - markdown
+        body:
+          type: string
+          description: The feedback text.
+          minLength: 1
+        title:
+          type: string
+          description: Optional short headline.
+          maxLength: 300
+      required:
+        - feedbackId
+        - componentIds
+        - format
+        - body
+      additionalProperties: false
+
+    ArchitectureSnapshotPublishedPayload:
+      type: object
+      description: |
+        A complete architecture model. The snapshot **replaces the applied model entirely**:
+        components and relationships not contained in the snapshot no longer exist in the
+        current model. Use it for the initial model and for full re-syncs; use
+        `component.change_*` and `relationship.change_*` for incremental updates.
+      properties:
+        snapshotId:
+          $ref: '#/components/schemas/Identifier'
+        components:
+          type: array
+          description: All components of the model, including nested children.
+          items:
+            $ref: '#/components/schemas/Component'
+        relationships:
+          type: array
+          description: All relationships of the model. One entry per NATS topic.
+          items:
+            $ref: '#/components/schemas/Relationship'
+      required:
+        - snapshotId
+        - components
+        - relationships
+      additionalProperties: false
+
+    ComponentChangePlannedPayload:
+      type: object
+      description: |
+        The agent intends to change a component. Planned changes are shown as proposals and do
+        not modify the applied architecture model.
+      properties:
+        changeId:
+          $ref: '#/components/schemas/Identifier'
+        operation:
+          $ref: '#/components/schemas/ChangeOperation'
+        component:
+          $ref: '#/components/schemas/Component'
+        rationale:
+          type: string
+          description: Why the change is planned.
+      required:
+        - changeId
+        - operation
+        - component
+      additionalProperties: false
+
+    ComponentChangeAppliedPayload:
+      type: object
+      description: |
+        A component change has been carried out and is merged into the applied architecture
+        model. `changeId` references the corresponding `component.change_planned` event when
+        the change was planned beforehand; unplanned changes omit it.
+      properties:
+        changeId:
+          $ref: '#/components/schemas/Identifier'
+        operation:
+          $ref: '#/components/schemas/ChangeOperation'
+        component:
+          $ref: '#/components/schemas/Component'
+      required:
+        - operation
+        - component
+      additionalProperties: false
+
+    RelationshipChangePlannedPayload:
+      type: object
+      description: |
+        The agent intends to change a relationship. Planned changes are shown as proposals and
+        do not modify the applied architecture model.
+      properties:
+        changeId:
+          $ref: '#/components/schemas/Identifier'
+        operation:
+          $ref: '#/components/schemas/ChangeOperation'
+        relationship:
+          $ref: '#/components/schemas/Relationship'
+        rationale:
+          type: string
+          description: Why the change is planned.
+      required:
+        - changeId
+        - operation
+        - relationship
+      additionalProperties: false
+
+    RelationshipChangeAppliedPayload:
+      type: object
+      description: |
+        A relationship change has been carried out and is merged into the applied architecture
+        model. `changeId` references the corresponding `relationship.change_planned` event when
+        the change was planned beforehand.
+      properties:
+        changeId:
+          $ref: '#/components/schemas/Identifier'
+        operation:
+          $ref: '#/components/schemas/ChangeOperation'
+        relationship:
+          $ref: '#/components/schemas/Relationship'
+      required:
+        - operation
+        - relationship
+      additionalProperties: false
+
+    DiffReportedPayload:
+      type: object
+      description: |
+        A unified diff for **exactly one repository file**. Multi-file changes are reported as
+        one `diff.reported` event per file, each with its own `diffId`. The backend never
+        splits or merges diffs, and v0 has no repository access: `unifiedDiff` is taken as
+        reported.
+      properties:
+        diffId:
+          $ref: '#/components/schemas/Identifier'
+        changeId:
+          $ref: '#/components/schemas/Identifier'
+        componentIds:
+          type: array
+          description: Components the changed file belongs to. At least one is required.
+          minItems: 1
+          items:
+            $ref: '#/components/schemas/ComponentId'
+        filePath:
+          $ref: '#/components/schemas/RepositoryFilePath'
+        unifiedDiff:
+          type: string
+          description: |
+            Unified diff of this one file, including the `---`, `+++` and `@@` markers.
+          minLength: 1
+      required:
+        - diffId
+        - componentIds
+        - filePath
+        - unifiedDiff
+      additionalProperties: false
+
+    RiskReportedPayload:
+      type: object
+      description: |
+        A risk **as reported by the agent**. This is an agent statement, not a quality or drift
+        assessment produced by the system. The cockpit displays it verbatim and never derives,
+        scores or aggregates risks on its own; the human reviewer judges it.
+      properties:
+        riskId:
+          $ref: '#/components/schemas/Identifier'
+        componentIds:
+          type: array
+          description: Components the risk applies to.
+          items:
+            $ref: '#/components/schemas/ComponentId'
+        title:
+          type: string
+          description: Short headline of the risk.
+          minLength: 1
+          maxLength: 300
+        detail:
+          type: string
+          description: Longer explanation of the risk.
+        severity:
+          type: string
+          description: Severity as assessed by the reporting agent.
+          enum:
+            - low
+            - medium
+            - high
+      required:
+        - riskId
+        - componentIds
+        - title
+        - severity
+      additionalProperties: false
+
+    ProblemReportedPayload:
+      type: object
+      description: |
+        A concrete problem the agent has run into, as reported by the agent. Like
+        `risk.reported`, this is an agent statement and never a system-side evaluation.
+      properties:
+        problemId:
+          $ref: '#/components/schemas/Identifier'
+        componentIds:
+          type: array
+          description: Components the problem applies to.
+          items:
+            $ref: '#/components/schemas/ComponentId'
+        title:
+          type: string
+          description: Short headline of the problem.
+          minLength: 1
+          maxLength: 300
+        detail:
+          type: string
+          description: Longer explanation of the problem.
+      required:
+        - problemId
+        - componentIds
+        - title
+      additionalProperties: false
+
+    CorrectionIssuedPayload:
+      type: object
+      description: |
+        Corrects the content of a previously accepted event. The event log stays append-only:
+        the original event is never mutated, the correction is appended and the cockpit renders
+        the corrected content while keeping the original inspectable.
+      properties:
+        correctsClientEventId:
+          $ref: '#/components/schemas/Uuid'
+        reason:
+          type: string
+          description: Why the original event was wrong.
+          minLength: 1
+        correctedType:
+          $ref: '#/components/schemas/EventType'
+        correctedPayload:
+          type: object
+          description: |
+            Payload of the corrected event, valid for the corrected event type. It must satisfy
+            the payload schema selected by `correctedType`.
+      required:
+        - correctsClientEventId
+        - reason
+        - correctedType
+        - correctedPayload
+      additionalProperties: false
+
+    RetractionIssuedPayload:
+      type: object
+      description: |
+        Withdraws a previously accepted event without replacing it. The original event is kept
+        in the log and marked as retracted in the cockpit.
+      properties:
+        retractsClientEventId:
+          $ref: '#/components/schemas/Uuid'
+        reason:
+          type: string
+          description: Why the original event is withdrawn.
+          minLength: 1
+      required:
+        - retractsClientEventId
+        - reason
+      additionalProperties: false
+
+    RunFinishedPayload:
+      type: object
+      description: |
+        Optional terminal event for the whole run, reported by the orchestrator only.
+
+        * It is optional. A run may simply stop emitting events.
+        * No state is derived from silence: without `run.finished` the run keeps its last
+          reported state and is never auto-completed or auto-failed.
+        * After `run.finished`, further work events of that run are rejected with `422` and
+          code `run_already_finished`.
+      properties:
+        outcome:
+          $ref: '#/components/schemas/Outcome'
+        summary:
+          type: string
+          description: Closing summary of the run.
+      required:
+        - outcome
+      additionalProperties: false
+
+    # ---------------------------------------------------------------------------
+    # Envelopes
+    # ---------------------------------------------------------------------------
+
+    EventEnvelope:
+      type: object
+      description: |
+        Common envelope of every event. It is a base schema only: the concrete event schemas
+        below narrow `type` to a single value and `payload` to the matching payload schema.
+        `additionalProperties: false` closes the envelope, so unknown top-level fields are
+        rejected for every event type.
+      properties:
+        schemaVersion:
+          $ref: '#/components/schemas/SchemaVersion'
+        clientEventId:
+          description: |
+            Agent-assigned idempotency key, unique per project. Retries must reuse the same
+            value; distinct events must never share one.
+          allOf:
+            - $ref: '#/components/schemas/Uuid'
+        projectId:
+          $ref: '#/components/schemas/ProjectId'
+        runId:
+          $ref: '#/components/schemas/RunId'
+        agentId:
+          $ref: '#/components/schemas/AgentId'
+        parentAgentId:
+          description: |
+            The delegating agent. Set for subagents, `null` (or omitted) for the root
+            orchestrator. The value must reference an agent that already reported
+            `agent.started` in the same run, otherwise the event is rejected with `422` and
+            code `parent_agent_unknown`.
+          oneOf:
+            - $ref: '#/components/schemas/AgentId'
+            - type: 'null'
+        occurredAt:
+          description: |
+            When the reported step happened, as observed by the agent. Independent of the
+            server-side `receivedAt`.
+          allOf:
+            - $ref: '#/components/schemas/Timestamp'
+        type:
+          $ref: '#/components/schemas/EventType'
+        payload:
+          type: object
+          description: |
+            Type-specific payload. The effective schema is fixed by `type`; see the concrete
+            event schemas.
+      required:
+        - schemaVersion
+        - clientEventId
+        - projectId
+        - runId
+        - agentId
+        - occurredAt
+        - type
+        - payload
+      additionalProperties: false
+
+    AgentStartedEvent:
+      description: An agent started working.
+      allOf:
+        - $ref: '#/components/schemas/EventEnvelope'
+        - type: object
+          properties:
+            type:
+              enum:
+                - agent.started
+            payload:
+              $ref: '#/components/schemas/AgentStartedPayload'
+
+    AgentStatusReportedEvent:
+      description: An agent explicitly reported its status.
+      allOf:
+        - $ref: '#/components/schemas/EventEnvelope'
+        - type: object
+          properties:
+            type:
+              enum:
+                - agent.status_reported
+            payload:
+              $ref: '#/components/schemas/AgentStatusReportedPayload'
+
+    AgentProgressReportedEvent:
+      description: An agent reported self-assessed progress.
+      allOf:
+        - $ref: '#/components/schemas/EventEnvelope'
+        - type: object
+          properties:
+            type:
+              enum:
+                - agent.progress_reported
+            payload:
+              $ref: '#/components/schemas/AgentProgressReportedPayload'
+
+    AgentFinishedEvent:
+      description: An agent finished its assigned task.
+      allOf:
+        - $ref: '#/components/schemas/EventEnvelope'
+        - type: object
+          properties:
+            type:
+              enum:
+                - agent.finished
+            payload:
+              $ref: '#/components/schemas/AgentFinishedPayload'
+
+    PlanPublishedEvent:
+      description: A plan revision was published.
+      allOf:
+        - $ref: '#/components/schemas/EventEnvelope'
+        - type: object
+          properties:
+            type:
+              enum:
+                - plan.published
+            payload:
+              $ref: '#/components/schemas/PlanPublishedPayload'
+
+    PlanStepUpdatedEvent:
+      description: The state of a single plan step changed.
+      allOf:
+        - $ref: '#/components/schemas/EventEnvelope'
+        - type: object
+          properties:
+            type:
+              enum:
+                - plan.step_updated
+            payload:
+              $ref: '#/components/schemas/PlanStepUpdatedPayload'
+
+    WorkStepStartedEvent:
+      description: A concrete work step started.
+      allOf:
+        - $ref: '#/components/schemas/EventEnvelope'
+        - type: object
+          properties:
+            type:
+              enum:
+                - work.step_started
+            payload:
+              $ref: '#/components/schemas/WorkStepStartedPayload'
+
+    WorkStepCompletedEvent:
+      description: A concrete work step completed.
+      allOf:
+        - $ref: '#/components/schemas/EventEnvelope'
+        - type: object
+          properties:
+            type:
+              enum:
+                - work.step_completed
+            payload:
+              $ref: '#/components/schemas/WorkStepCompletedPayload'
+
+    FeedbackPublishedEvent:
+      description: Component-scoped markdown feedback was published.
+      allOf:
+        - $ref: '#/components/schemas/EventEnvelope'
+        - type: object
+          properties:
+            type:
+              enum:
+                - feedback.published
+            payload:
+              $ref: '#/components/schemas/FeedbackPublishedPayload'
+
+    ArchitectureSnapshotPublishedEvent:
+      description: A complete architecture model was published and replaces the applied model.
+      allOf:
+        - $ref: '#/components/schemas/EventEnvelope'
+        - type: object
+          properties:
+            type:
+              enum:
+                - architecture.snapshot_published
+            payload:
+              $ref: '#/components/schemas/ArchitectureSnapshotPublishedPayload'
+
+    ComponentChangePlannedEvent:
+      description: A component change was planned.
+      allOf:
+        - $ref: '#/components/schemas/EventEnvelope'
+        - type: object
+          properties:
+            type:
+              enum:
+                - component.change_planned
+            payload:
+              $ref: '#/components/schemas/ComponentChangePlannedPayload'
+
+    ComponentChangeAppliedEvent:
+      description: A component change was applied.
+      allOf:
+        - $ref: '#/components/schemas/EventEnvelope'
+        - type: object
+          properties:
+            type:
+              enum:
+                - component.change_applied
+            payload:
+              $ref: '#/components/schemas/ComponentChangeAppliedPayload'
+
+    RelationshipChangePlannedEvent:
+      description: A relationship change was planned.
+      allOf:
+        - $ref: '#/components/schemas/EventEnvelope'
+        - type: object
+          properties:
+            type:
+              enum:
+                - relationship.change_planned
+            payload:
+              $ref: '#/components/schemas/RelationshipChangePlannedPayload'
+
+    RelationshipChangeAppliedEvent:
+      description: A relationship change was applied.
+      allOf:
+        - $ref: '#/components/schemas/EventEnvelope'
+        - type: object
+          properties:
+            type:
+              enum:
+                - relationship.change_applied
+            payload:
+              $ref: '#/components/schemas/RelationshipChangeAppliedPayload'
+
+    DiffReportedEvent:
+      description: A unified diff for exactly one repository file was reported.
+      allOf:
+        - $ref: '#/components/schemas/EventEnvelope'
+        - type: object
+          properties:
+            type:
+              enum:
+                - diff.reported
+            payload:
+              $ref: '#/components/schemas/DiffReportedPayload'
+
+    RiskReportedEvent:
+      description: The agent reported a risk.
+      allOf:
+        - $ref: '#/components/schemas/EventEnvelope'
+        - type: object
+          properties:
+            type:
+              enum:
+                - risk.reported
+            payload:
+              $ref: '#/components/schemas/RiskReportedPayload'
+
+    ProblemReportedEvent:
+      description: The agent reported a problem.
+      allOf:
+        - $ref: '#/components/schemas/EventEnvelope'
+        - type: object
+          properties:
+            type:
+              enum:
+                - problem.reported
+            payload:
+              $ref: '#/components/schemas/ProblemReportedPayload'
+
+    CorrectionIssuedEvent:
+      description: A previously accepted event was corrected.
+      allOf:
+        - $ref: '#/components/schemas/EventEnvelope'
+        - type: object
+          properties:
+            type:
+              enum:
+                - correction.issued
+            payload:
+              $ref: '#/components/schemas/CorrectionIssuedPayload'
+
+    RetractionIssuedEvent:
+      description: A previously accepted event was retracted.
+      allOf:
+        - $ref: '#/components/schemas/EventEnvelope'
+        - type: object
+          properties:
+            type:
+              enum:
+                - retraction.issued
+            payload:
+              $ref: '#/components/schemas/RetractionIssuedPayload'
+
+    RunFinishedEvent:
+      description: Optional terminal event of the run, orchestrator only.
+      allOf:
+        - $ref: '#/components/schemas/EventEnvelope'
+        - type: object
+          properties:
+            type:
+              enum:
+                - run.finished
+            payload:
+              $ref: '#/components/schemas/RunFinishedPayload'
+
+    IngestEventRequest:
+      description: |
+        The closed union of all v0 events. `type` acts as the discriminator and selects exactly
+        one envelope schema, which in turn fixes the payload schema. A body whose `type` is not
+        in the mapping cannot match any branch and is rejected.
+      oneOf:
+        - $ref: '#/components/schemas/AgentStartedEvent'
+        - $ref: '#/components/schemas/AgentStatusReportedEvent'
+        - $ref: '#/components/schemas/AgentProgressReportedEvent'
+        - $ref: '#/components/schemas/AgentFinishedEvent'
+        - $ref: '#/components/schemas/PlanPublishedEvent'
+        - $ref: '#/components/schemas/PlanStepUpdatedEvent'
+        - $ref: '#/components/schemas/WorkStepStartedEvent'
+        - $ref: '#/components/schemas/WorkStepCompletedEvent'
+        - $ref: '#/components/schemas/FeedbackPublishedEvent'
+        - $ref: '#/components/schemas/ArchitectureSnapshotPublishedEvent'
+        - $ref: '#/components/schemas/ComponentChangePlannedEvent'
+        - $ref: '#/components/schemas/ComponentChangeAppliedEvent'
+        - $ref: '#/components/schemas/RelationshipChangePlannedEvent'
+        - $ref: '#/components/schemas/RelationshipChangeAppliedEvent'
+        - $ref: '#/components/schemas/DiffReportedEvent'
+        - $ref: '#/components/schemas/RiskReportedEvent'
+        - $ref: '#/components/schemas/ProblemReportedEvent'
+        - $ref: '#/components/schemas/CorrectionIssuedEvent'
+        - $ref: '#/components/schemas/RetractionIssuedEvent'
+        - $ref: '#/components/schemas/RunFinishedEvent'
+      discriminator:
+        propertyName: type
+        mapping:
+          agent.started: '#/components/schemas/AgentStartedEvent'
+          agent.status_reported: '#/components/schemas/AgentStatusReportedEvent'
+          agent.progress_reported: '#/components/schemas/AgentProgressReportedEvent'
+          agent.finished: '#/components/schemas/AgentFinishedEvent'
+          plan.published: '#/components/schemas/PlanPublishedEvent'
+          plan.step_updated: '#/components/schemas/PlanStepUpdatedEvent'
+          work.step_started: '#/components/schemas/WorkStepStartedEvent'
+          work.step_completed: '#/components/schemas/WorkStepCompletedEvent'
+          feedback.published: '#/components/schemas/FeedbackPublishedEvent'
+          architecture.snapshot_published: '#/components/schemas/ArchitectureSnapshotPublishedEvent'
+          component.change_planned: '#/components/schemas/ComponentChangePlannedEvent'
+          component.change_applied: '#/components/schemas/ComponentChangeAppliedEvent'
+          relationship.change_planned: '#/components/schemas/RelationshipChangePlannedEvent'
+          relationship.change_applied: '#/components/schemas/RelationshipChangeAppliedEvent'
+          diff.reported: '#/components/schemas/DiffReportedEvent'
+          risk.reported: '#/components/schemas/RiskReportedEvent'
+          problem.reported: '#/components/schemas/ProblemReportedEvent'
+          correction.issued: '#/components/schemas/CorrectionIssuedEvent'
+          retraction.issued: '#/components/schemas/RetractionIssuedEvent'
+          run.finished: '#/components/schemas/RunFinishedEvent'
+
+    # ---------------------------------------------------------------------------
+    # Streaming envelopes
+    # ---------------------------------------------------------------------------
+
+    StreamedEventEnvelope:
+      type: object
+      description: |
+        Envelope of a streamed event: the ingested envelope plus the server-assigned metadata
+        `position`, `serverEventId` and `receivedAt`. Base schema only; the concrete streamed
+        event schemas narrow `type` and `payload`.
+      properties:
+        schemaVersion:
+          $ref: '#/components/schemas/SchemaVersion'
+        clientEventId:
+          description: Idempotency key as reported by the agent.
+          allOf:
+            - $ref: '#/components/schemas/Uuid'
+        projectId:
+          $ref: '#/components/schemas/ProjectId'
+        runId:
+          $ref: '#/components/schemas/RunId'
+        agentId:
+          $ref: '#/components/schemas/AgentId'
+        parentAgentId:
+          description: The delegating agent, or `null` for the root orchestrator.
+          oneOf:
+            - $ref: '#/components/schemas/AgentId'
+            - type: 'null'
+        occurredAt:
+          description: When the reported step happened, as observed by the agent.
+          allOf:
+            - $ref: '#/components/schemas/Timestamp'
+        type:
+          $ref: '#/components/schemas/EventType'
+        payload:
+          type: object
+          description: Type-specific payload, fixed by `type`.
+        position:
+          type: integer
+          format: int64
+          description: |
+            Server-assigned, strictly increasing position of the event within the project. This
+            is the value sent as the SSE `id:` field and the cursor for replay.
+          minimum: 1
+        serverEventId:
+          description: Server-assigned identity of the stored event.
+          allOf:
+            - $ref: '#/components/schemas/Uuid'
+        receivedAt:
+          description: When the backend accepted and committed the event.
+          allOf:
+            - $ref: '#/components/schemas/Timestamp'
+      required:
+        - schemaVersion
+        - clientEventId
+        - projectId
+        - runId
+        - agentId
+        - occurredAt
+        - type
+        - payload
+        - position
+        - serverEventId
+        - receivedAt
+      additionalProperties: false
+
+    StreamedAgentStartedEvent:
+      description: Streamed `agent.started` event.
+      allOf:
+        - $ref: '#/components/schemas/StreamedEventEnvelope'
+        - type: object
+          properties:
+            type:
+              enum:
+                - agent.started
+            payload:
+              $ref: '#/components/schemas/AgentStartedPayload'
+
+    StreamedAgentStatusReportedEvent:
+      description: Streamed `agent.status_reported` event.
+      allOf:
+        - $ref: '#/components/schemas/StreamedEventEnvelope'
+        - type: object
+          properties:
+            type:
+              enum:
+                - agent.status_reported
+            payload:
+              $ref: '#/components/schemas/AgentStatusReportedPayload'
+
+    StreamedAgentProgressReportedEvent:
+      description: Streamed `agent.progress_reported` event.
+      allOf:
+        - $ref: '#/components/schemas/StreamedEventEnvelope'
+        - type: object
+          properties:
+            type:
+              enum:
+                - agent.progress_reported
+            payload:
+              $ref: '#/components/schemas/AgentProgressReportedPayload'
+
+    StreamedAgentFinishedEvent:
+      description: Streamed `agent.finished` event.
+      allOf:
+        - $ref: '#/components/schemas/StreamedEventEnvelope'
+        - type: object
+          properties:
+            type:
+              enum:
+                - agent.finished
+            payload:
+              $ref: '#/components/schemas/AgentFinishedPayload'
+
+    StreamedPlanPublishedEvent:
+      description: Streamed `plan.published` event.
+      allOf:
+        - $ref: '#/components/schemas/StreamedEventEnvelope'
+        - type: object
+          properties:
+            type:
+              enum:
+                - plan.published
+            payload:
+              $ref: '#/components/schemas/PlanPublishedPayload'
+
+    StreamedPlanStepUpdatedEvent:
+      description: Streamed `plan.step_updated` event.
+      allOf:
+        - $ref: '#/components/schemas/StreamedEventEnvelope'
+        - type: object
+          properties:
+            type:
+              enum:
+                - plan.step_updated
+            payload:
+              $ref: '#/components/schemas/PlanStepUpdatedPayload'
+
+    StreamedWorkStepStartedEvent:
+      description: Streamed `work.step_started` event.
+      allOf:
+        - $ref: '#/components/schemas/StreamedEventEnvelope'
+        - type: object
+          properties:
+            type:
+              enum:
+                - work.step_started
+            payload:
+              $ref: '#/components/schemas/WorkStepStartedPayload'
+
+    StreamedWorkStepCompletedEvent:
+      description: Streamed `work.step_completed` event.
+      allOf:
+        - $ref: '#/components/schemas/StreamedEventEnvelope'
+        - type: object
+          properties:
+            type:
+              enum:
+                - work.step_completed
+            payload:
+              $ref: '#/components/schemas/WorkStepCompletedPayload'
+
+    StreamedFeedbackPublishedEvent:
+      description: Streamed `feedback.published` event.
+      allOf:
+        - $ref: '#/components/schemas/StreamedEventEnvelope'
+        - type: object
+          properties:
+            type:
+              enum:
+                - feedback.published
+            payload:
+              $ref: '#/components/schemas/FeedbackPublishedPayload'
+
+    StreamedArchitectureSnapshotPublishedEvent:
+      description: Streamed `architecture.snapshot_published` event.
+      allOf:
+        - $ref: '#/components/schemas/StreamedEventEnvelope'
+        - type: object
+          properties:
+            type:
+              enum:
+                - architecture.snapshot_published
+            payload:
+              $ref: '#/components/schemas/ArchitectureSnapshotPublishedPayload'
+
+    StreamedComponentChangePlannedEvent:
+      description: Streamed `component.change_planned` event.
+      allOf:
+        - $ref: '#/components/schemas/StreamedEventEnvelope'
+        - type: object
+          properties:
+            type:
+              enum:
+                - component.change_planned
+            payload:
+              $ref: '#/components/schemas/ComponentChangePlannedPayload'
+
+    StreamedComponentChangeAppliedEvent:
+      description: Streamed `component.change_applied` event.
+      allOf:
+        - $ref: '#/components/schemas/StreamedEventEnvelope'
+        - type: object
+          properties:
+            type:
+              enum:
+                - component.change_applied
+            payload:
+              $ref: '#/components/schemas/ComponentChangeAppliedPayload'
+
+    StreamedRelationshipChangePlannedEvent:
+      description: Streamed `relationship.change_planned` event.
+      allOf:
+        - $ref: '#/components/schemas/StreamedEventEnvelope'
+        - type: object
+          properties:
+            type:
+              enum:
+                - relationship.change_planned
+            payload:
+              $ref: '#/components/schemas/RelationshipChangePlannedPayload'
+
+    StreamedRelationshipChangeAppliedEvent:
+      description: Streamed `relationship.change_applied` event.
+      allOf:
+        - $ref: '#/components/schemas/StreamedEventEnvelope'
+        - type: object
+          properties:
+            type:
+              enum:
+                - relationship.change_applied
+            payload:
+              $ref: '#/components/schemas/RelationshipChangeAppliedPayload'
+
+    StreamedDiffReportedEvent:
+      description: Streamed `diff.reported` event.
+      allOf:
+        - $ref: '#/components/schemas/StreamedEventEnvelope'
+        - type: object
+          properties:
+            type:
+              enum:
+                - diff.reported
+            payload:
+              $ref: '#/components/schemas/DiffReportedPayload'
+
+    StreamedRiskReportedEvent:
+      description: Streamed `risk.reported` event.
+      allOf:
+        - $ref: '#/components/schemas/StreamedEventEnvelope'
+        - type: object
+          properties:
+            type:
+              enum:
+                - risk.reported
+            payload:
+              $ref: '#/components/schemas/RiskReportedPayload'
+
+    StreamedProblemReportedEvent:
+      description: Streamed `problem.reported` event.
+      allOf:
+        - $ref: '#/components/schemas/StreamedEventEnvelope'
+        - type: object
+          properties:
+            type:
+              enum:
+                - problem.reported
+            payload:
+              $ref: '#/components/schemas/ProblemReportedPayload'
+
+    StreamedCorrectionIssuedEvent:
+      description: Streamed `correction.issued` event.
+      allOf:
+        - $ref: '#/components/schemas/StreamedEventEnvelope'
+        - type: object
+          properties:
+            type:
+              enum:
+                - correction.issued
+            payload:
+              $ref: '#/components/schemas/CorrectionIssuedPayload'
+
+    StreamedRetractionIssuedEvent:
+      description: Streamed `retraction.issued` event.
+      allOf:
+        - $ref: '#/components/schemas/StreamedEventEnvelope'
+        - type: object
+          properties:
+            type:
+              enum:
+                - retraction.issued
+            payload:
+              $ref: '#/components/schemas/RetractionIssuedPayload'
+
+    StreamedRunFinishedEvent:
+      description: Streamed `run.finished` event.
+      allOf:
+        - $ref: '#/components/schemas/StreamedEventEnvelope'
+        - type: object
+          properties:
+            type:
+              enum:
+                - run.finished
+            payload:
+              $ref: '#/components/schemas/RunFinishedPayload'
+
+    StreamedEvent:
+      description: |
+        JSON object carried in a single SSE `data:` line. Same closed union as ingestion, plus
+        the server-assigned `position`, `serverEventId` and `receivedAt`. The SSE `event:`
+        field always equals the `type` of the object.
+      oneOf:
+        - $ref: '#/components/schemas/StreamedAgentStartedEvent'
+        - $ref: '#/components/schemas/StreamedAgentStatusReportedEvent'
+        - $ref: '#/components/schemas/StreamedAgentProgressReportedEvent'
+        - $ref: '#/components/schemas/StreamedAgentFinishedEvent'
+        - $ref: '#/components/schemas/StreamedPlanPublishedEvent'
+        - $ref: '#/components/schemas/StreamedPlanStepUpdatedEvent'
+        - $ref: '#/components/schemas/StreamedWorkStepStartedEvent'
+        - $ref: '#/components/schemas/StreamedWorkStepCompletedEvent'
+        - $ref: '#/components/schemas/StreamedFeedbackPublishedEvent'
+        - $ref: '#/components/schemas/StreamedArchitectureSnapshotPublishedEvent'
+        - $ref: '#/components/schemas/StreamedComponentChangePlannedEvent'
+        - $ref: '#/components/schemas/StreamedComponentChangeAppliedEvent'
+        - $ref: '#/components/schemas/StreamedRelationshipChangePlannedEvent'
+        - $ref: '#/components/schemas/StreamedRelationshipChangeAppliedEvent'
+        - $ref: '#/components/schemas/StreamedDiffReportedEvent'
+        - $ref: '#/components/schemas/StreamedRiskReportedEvent'
+        - $ref: '#/components/schemas/StreamedProblemReportedEvent'
+        - $ref: '#/components/schemas/StreamedCorrectionIssuedEvent'
+        - $ref: '#/components/schemas/StreamedRetractionIssuedEvent'
+        - $ref: '#/components/schemas/StreamedRunFinishedEvent'
+      discriminator:
+        propertyName: type
+        mapping:
+          agent.started: '#/components/schemas/StreamedAgentStartedEvent'
+          agent.status_reported: '#/components/schemas/StreamedAgentStatusReportedEvent'
+          agent.progress_reported: '#/components/schemas/StreamedAgentProgressReportedEvent'
+          agent.finished: '#/components/schemas/StreamedAgentFinishedEvent'
+          plan.published: '#/components/schemas/StreamedPlanPublishedEvent'
+          plan.step_updated: '#/components/schemas/StreamedPlanStepUpdatedEvent'
+          work.step_started: '#/components/schemas/StreamedWorkStepStartedEvent'
+          work.step_completed: '#/components/schemas/StreamedWorkStepCompletedEvent'
+          feedback.published: '#/components/schemas/StreamedFeedbackPublishedEvent'
+          architecture.snapshot_published: '#/components/schemas/StreamedArchitectureSnapshotPublishedEvent'
+          component.change_planned: '#/components/schemas/StreamedComponentChangePlannedEvent'
+          component.change_applied: '#/components/schemas/StreamedComponentChangeAppliedEvent'
+          relationship.change_planned: '#/components/schemas/StreamedRelationshipChangePlannedEvent'
+          relationship.change_applied: '#/components/schemas/StreamedRelationshipChangeAppliedEvent'
+          diff.reported: '#/components/schemas/StreamedDiffReportedEvent'
+          risk.reported: '#/components/schemas/StreamedRiskReportedEvent'
+          problem.reported: '#/components/schemas/StreamedProblemReportedEvent'
+          correction.issued: '#/components/schemas/StreamedCorrectionIssuedEvent'
+          retraction.issued: '#/components/schemas/StreamedRetractionIssuedEvent'
+          run.finished: '#/components/schemas/StreamedRunFinishedEvent'
+
+    # ---------------------------------------------------------------------------
+    # Responses
+    # ---------------------------------------------------------------------------
+
+    EventAccepted:
+      type: object
+      description: |
+        Acknowledgement of an ingested event. Returned with `201` for a first delivery and with
+        `200` for an idempotent retry, in which case the originally assigned `position` and
+        `serverEventId` are repeated unchanged.
+      properties:
+        projectId:
+          $ref: '#/components/schemas/ProjectId'
+        position:
+          type: integer
+          format: int64
+          description: |
+            Server-assigned, strictly increasing position of the event within the project.
+          minimum: 1
+        serverEventId:
+          description: Server-assigned identity of the stored event.
+          allOf:
+            - $ref: '#/components/schemas/Uuid'
+        clientEventId:
+          description: The idempotency key echoed back from the request.
+          allOf:
+            - $ref: '#/components/schemas/Uuid'
+        duplicate:
+          type: boolean
+          description: |
+            `false` for a newly appended event (`201`), `true` for an idempotent retry (`200`).
+        receivedAt:
+          description: When the backend accepted and committed the event.
+          allOf:
+            - $ref: '#/components/schemas/Timestamp'
+      required:
+        - projectId
+        - position
+        - serverEventId
+        - clientEventId
+        - duplicate
+        - receivedAt
+      additionalProperties: false
+
+    Problem:
+      type: object
+      description: |
+        Error object following RFC 9457, served as `application/problem+json`. `code` is the
+        stable, machine-readable discriminator that clients should branch on; `type`, `title`
+        and `detail` are for humans.
+      properties:
+        type:
+          type: string
+          format: uri
+          description: URI identifying the problem type.
+        title:
+          type: string
+          description: Short, human-readable summary of the problem type.
+        status:
+          type: integer
+          description: HTTP status code, repeated for convenience.
+          minimum: 100
+          maximum: 599
+        detail:
+          type: string
+          description: Human-readable explanation specific to this occurrence.
+        code:
+          type: string
+          description: |
+            Stable machine-readable error code, for example `invalid_field`,
+            `unsupported_event_type`, `unsupported_schema_version`,
+            `client_event_id_conflict`, `event_too_large`, `unsupported_media_type`,
+            `unknown_agent`, `run_already_finished`, `run_not_started`,
+            `parent_agent_unknown`, `terminal_event_not_allowed`,
+            `correction_target_unknown`, `project_not_found` or `not_ready`.
+          minLength: 1
+        instance:
+          type: string
+          format: uri-reference
+          description: URI reference identifying this specific occurrence.
+      required:
+        - type
+        - title
+        - status
+        - detail
+        - code
+      additionalProperties: false
+
+    ValidationError:
+      type: object
+      description: One field-level violation inside a `ValidationProblem`.
+      properties:
+        field:
+          type: string
+          description: |
+            RFC 6901 JSON Pointer into the rejected request body, for example
+            `/payload/percent`.
+          minLength: 1
+        code:
+          type: string
+          description: |
+            Machine-readable violation code, for example `required`, `out_of_range`,
+            `pattern_mismatch`, `unknown_property` or `invalid_format`.
+          minLength: 1
+        message:
+          type: string
+          description: Human-readable explanation of this single violation.
+          minLength: 1
+      required:
+        - field
+        - code
+        - message
+      additionalProperties: false
+
+    ValidationProblem:
+      type: object
+      description: |
+        RFC 9457 problem extended with structured field errors. Returned for `400` responses
+        with codes `invalid_field`, `unsupported_event_type` or `unsupported_schema_version`.
+      properties:
+        type:
+          type: string
+          format: uri
+          description: URI identifying the problem type.
+        title:
+          type: string
+          description: Short, human-readable summary of the problem type.
+        status:
+          type: integer
+          description: HTTP status code, repeated for convenience.
+          minimum: 100
+          maximum: 599
+        detail:
+          type: string
+          description: Human-readable explanation specific to this occurrence.
+        code:
+          type: string
+          description: |
+            Stable machine-readable error code: `invalid_field`, `unsupported_event_type` or
+            `unsupported_schema_version`.
+          minLength: 1
+        instance:
+          type: string
+          format: uri-reference
+          description: URI reference identifying this specific occurrence.
+        errors:
+          type: array
+          description: All detected field-level violations, never empty.
+          minItems: 1
+          items:
+            $ref: '#/components/schemas/ValidationError'
+      required:
+        - type
+        - title
+        - status
+        - detail
+        - code
+        - errors
+      additionalProperties: false
+
+    LivenessStatus:
+      type: object
+      description: Liveness probe response of the internal backend.
+      properties:
+        status:
+          type: string
+          description: Always `ok` while the process is answering.
+          enum:
+            - ok
+      required:
+        - status
+      additionalProperties: false
+
+    ReadinessStatus:
+      type: object
+      description: Readiness probe response of the internal backend.
+      properties:
+        status:
+          type: string
+          description: Always `ready`; a backend that is not ready answers `503` instead.
+          enum:
+            - ready
+      required:
+        - status
+      additionalProperties: false
