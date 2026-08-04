@@ -1,11 +1,19 @@
-import { defineConfig } from 'vitest/config'
+import { fileURLToPath, URL } from 'node:url'
+
+import tailwindcss from '@tailwindcss/vite'
 import react from '@vitejs/plugin-react'
+import { defineConfig } from 'vitest/config'
 
 // The production bundle is served by Nginx from the frontend container.
 // `vite dev` proxies to the backend so local development uses the same paths
 // as the Compose deployment.
 export default defineConfig({
-  plugins: [react()],
+  plugins: [react(), tailwindcss()],
+  resolve: {
+    alias: {
+      '@': fileURLToPath(new URL('./src', import.meta.url)),
+    },
+  },
   server: {
     port: 5173,
     proxy: {
@@ -24,6 +32,7 @@ export default defineConfig({
   test: {
     environment: 'jsdom',
     globals: true,
+    setupFiles: ['./src/test/setup.ts'],
     include: ['src/**/*.test.ts', 'src/**/*.test.tsx'],
   },
 })

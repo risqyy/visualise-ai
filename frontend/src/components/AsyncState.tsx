@@ -1,0 +1,122 @@
+import { RefreshCw, TriangleAlert } from 'lucide-react'
+import type { ReactNode } from 'react'
+
+import { describeError, isProblemError } from '@/api/problem'
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
+import { Button } from '@/components/ui/button'
+import { Skeleton } from '@/components/ui/skeleton'
+import { cn } from '@/lib/utils'
+
+export interface AsyncStateProps {
+  /** `true` while the first load is in flight. */
+  isPending: boolean
+  isError: boolean
+  error: unknown
+  /** `true` when the request succeeded but returned nothing to show. */
+  isEmpty?: boolean
+  emptyTitle: string
+  emptyDescription?: string
+  onRetry?: () => void
+  /** Number of skeleton rows rendered while pending. */
+  skeletonRows?: number
+  className?: string
+  children: ReactNode
+}
+
+/**
+ * One place where loading, error and empty states are rendered.
+ *
+ * Every pane routes its queries through it so the three states look and behave
+ * the same everywhere, and so an empty result is never silently indistinguishable
+ * from a failed one.
+ */
+export function AsyncState({
+  isPending,
+  isError,
+  error,
+  isEmpty = false,
+  emptyTitle,
+  emptyDescription,
+  onRetry,
+  skeletonRows = 3,
+  className,
+  children,
+}: AsyncStateProps) {
+  if (isPending) {
+    return (
+      <div
+        className={cn('space-y-2', className)}
+        role="status"
+        aria-live="polite"
+        aria-busy="true"
+      >
+        <span className="sr-only">Daten werden geladen…</span>
+        {Array.from({ length: skeletonRows }, (_, index) => (
+          <Skeleton key={index} className="h-9 w-full" />
+        ))}
+      </div>
+    )
+  }
+
+  if (isError) {
+    return (
+      <Alert variant="destructive" className={className}>
+        <TriangleAlert />
+        <AlertTitle>Daten konnten nicht geladen werden</AlertTitle>
+        <AlertDescription>
+          <p>{describeError(error)}</p>
+          {isProblemError(error) && error.errors.length > 0 && (
+            <ul className="list-disc space-y-0.5 pl-4">
+              {error.errors.map((violation) => (
+                <li key={`${violation.field}:${violation.code}`}>
+                  <code className="font-mono">{violation.field}</code>: {violation.message}
+                </li>
+              ))}
+            </ul>
+          )}
+          {onRetry && (
+            <Button variant="outline" size="sm" onClick={onRetry} className="mt-1">
+              <RefreshCw />
+              Erneut versuchen
+            </Button>
+          )}
+        </AlertDescription>
+      </Alert>
+    )
+  }
+
+  if (isEmpty) {
+    return (
+      <EmptyState
+        title={emptyTitle}
+        description={emptyDescription}
+        className={className}
+      />
+    )
+  }
+
+  return <>{children}</>
+}
+
+export interface EmptyStateProps {
+  title: string
+  description?: string | undefined
+  className?: string | undefined
+  children?: ReactNode
+}
+
+/** Neutral "nothing was reported" state. Never invents placeholder content. */
+export function EmptyState({ title, description, className, children }: EmptyStateProps) {
+  return (
+    <div
+      className={cn(
+        'border-border/70 text-muted-foreground rounded-md border border-dashed px-3 py-4 text-sm',
+        className,
+      )}
+    >
+      <p className="text-foreground/80 font-medium">{title}</p>
+      {description && <p className="mt-1 text-xs">{description}</p>}
+      {children}
+    </div>
+  )
+}

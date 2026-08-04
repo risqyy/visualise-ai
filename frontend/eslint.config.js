@@ -23,6 +23,16 @@ export default tseslint.config(
     },
   },
   {
+    // Vendored shadcn/ui primitives. They follow the upstream file layout, which
+    // exports the cva variant maps next to the components; that is intentional
+    // and must not be reformatted, otherwise `shadcn add` would conflict on the
+    // next update.
+    files: ['src/components/ui/**/*.tsx'],
+    rules: {
+      'react-refresh/only-export-components': 'off',
+    },
+  },
+  {
     files: ['vite.config.ts'],
     languageOptions: { globals: globals.node },
   },
