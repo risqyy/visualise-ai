@@ -1,8 +1,7 @@
 // Package httpapi wires the Gin HTTP surface of the backend.
 //
-// v0 exposes exactly two internal probe routes plus the versioned API prefix
-// that later work packages fill with event ingestion, the read models and the
-// SSE stream.
+// v0 exposes two internal probe routes plus the versioned API prefix carrying
+// event ingestion, the read models and the SSE stream.
 package httpapi
 
 import (
@@ -16,6 +15,7 @@ import (
 	"github.com/risqyy/visualise-ai/backend/internal/health"
 	"github.com/risqyy/visualise-ai/backend/internal/ingest"
 	"github.com/risqyy/visualise-ai/backend/internal/readapi"
+	"github.com/risqyy/visualise-ai/backend/internal/sse"
 )
 
 // APIPrefix is the single versioned prefix Nginx proxies to the backend.
@@ -34,6 +34,9 @@ type Options struct {
 	// Read serves the project scoped read models. A nil value leaves the read
 	// routes unmounted, which keeps the probe-only router usable in tests.
 	Read *readapi.Service
+	// Stream serves the project SSE endpoint. Nil leaves the route
+	// unregistered, so a router without a broker stays usable in tests.
+	Stream *sse.Handler
 }
 
 // New builds the Gin engine.
@@ -53,6 +56,7 @@ func New(opts Options) *gin.Engine {
 
 	registerIngestRoutes(engine, opts.Ingest)
 	registerRead(engine, opts.Read, opts.Logger)
+	registerStream(engine, opts.Stream)
 
 	engine.NoRoute(notFoundHandler())
 
