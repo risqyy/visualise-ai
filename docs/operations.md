@@ -254,9 +254,11 @@ npm test
 
 Ein Fehlschlag blockiert die v0-Freigabe. Aufbau, Voraussetzungen und
 Konfiguration des Tests stehen in [`e2e/README.md`](../e2e/README.md); dieser
-Abschnitt beschreibt bewusst nur den Aufruf. Das Verzeichnis `e2e/` wird mit
-Issue #14 geliefert; bis dessen Pull Request gemergt ist, zeigt der Link ins
-Leere.
+Abschnitt beschreibt bewusst nur den Aufruf.
+
+Der Test bringt seinen eigenen Stack hoch und wieder herunter — unter dem
+Compose-Projektnamen `vai-e2e` und auf Port `8100`, damit er einen laufenden
+Entwicklungs-Stack auf `8080` weder benutzt noch beim Aufräumen löscht.
 
 ## Fehlersuche
 

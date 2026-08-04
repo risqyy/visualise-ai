@@ -1,0 +1,17 @@
+{
+  "name": "visualise-ai-e2e",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Mandatory Playwright end-to-end acceptance test for the v0 cockpit",
+  "scripts": {
+    "test": "playwright test",
+    "report": "playwright show-report",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.62.1",
+    "@types/node": "^24.10.0",
+    "typescript": "~5.9.0"
+  }
+}

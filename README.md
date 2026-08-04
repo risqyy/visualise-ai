@@ -117,6 +117,11 @@ npm run lint && npm run typecheck && npm test
 cd api
 npm ci
 npm test
+
+# End-to-End-Abnahme (braucht Docker; siehe e2e/README.md)
+cd e2e
+npm install && npx playwright install chromium
+npm test
 ```
 
 `npm run dev` im `frontend/` startet Vite auf Port 5173 und proxyt `/api`,

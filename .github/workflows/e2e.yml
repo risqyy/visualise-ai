@@ -1,0 +1,85 @@
+name: E2E acceptance
+
+# The mandatory end-to-end acceptance run of the v0 epic (issue #14).
+#
+# It builds the real Compose deployment from this checkout, starts it from an
+# empty PostgreSQL database and drives it through Nginx with Chromium at
+# 1920 × 1080. A failure here blocks the v0 release — see
+# `docs/decisions/0013-mandatory-end-to-end-acceptance.md`.
+
+on:
+  push:
+    branches: ['**']
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: e2e-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  acceptance:
+    name: playwright acceptance (chromium 1920×1080)
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    env:
+      # The runner's 8080 is free, so CI keeps the documented default port
+      # exercised. Locally the suite defaults to 8100.
+      FRONTEND_HTTP_PORT: '8080'
+      E2E_COMPOSE_PROJECT: vai-e2e-ci
+
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: |
+            e2e/package-lock.json
+            simulator/package-lock.json
+
+      - name: Show Docker and Compose versions
+        run: |
+          docker version
+          docker compose version
+
+      # The suite installs these itself when they are missing; doing it here
+      # keeps the cache warm and separates a dependency failure from a test one.
+      - name: Install simulator dependencies
+        run: npm ci
+        working-directory: simulator
+
+      - name: Install e2e dependencies
+        run: npm ci
+        working-directory: e2e
+
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+        working-directory: e2e
+
+      - name: Run the acceptance suite
+        run: npm test
+        working-directory: e2e
+
+      - name: Upload the Playwright report
+        if: always()
+        uses: actions/upload-artifact@v5
+        with:
+          name: playwright-report
+          path: e2e/playwright-report/
+          retention-days: 14
+
+      # Traces, screenshots and videos of failed tests. Only produced on
+      # failure, so the step is a no-op on a green run.
+      - name: Upload failure artefacts
+        if: failure()
+        uses: actions/upload-artifact@v5
+        with:
+          name: playwright-test-results
+          path: e2e/test-results/
+          retention-days: 14
+
+      - name: Dump the deployment logs on failure
+        if: failure()
+        run: docker compose -p "${E2E_COMPOSE_PROJECT}" logs --no-color --tail 400 || true
