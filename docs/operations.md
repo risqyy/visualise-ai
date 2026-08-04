@@ -87,7 +87,7 @@ rechts nach einem Klick auf eine Komponente.
 | `--project <id>` | Projekt, unter dem gemeldet wird | Projekt des Szenarios |
 | `--run <id>` | Run-ID | Run-ID des Szenarios |
 | `--speed <faktor>` | Pausenmultiplikator: `1` normal, `0` keine Pausen, `2` doppelt so langsam | `1` |
-| `--scenario <name>` | `full`, `retry` oder `conflict` | `full` |
+| `--scenario <name>` | `full`, `retry`, `conflict` oder `self` | `full` |
 | `--seed <n>` | Seed der ID-, Pausen- und Uhrenströme | `20260804` |
 | `--finish <bool>` | Ob der `full`-Run `run.finished` sendet | `false` |
 | `--json` | Maschinenlesbare Zusammenfassung auf stdout, Erzählung auf stderr | aus |
@@ -99,11 +99,30 @@ rechts nach einem Klick auf eine Komponente.
 | `full` | `visualise-ai` | Den repräsentativen Run: 62 Events, jeden Eventtyp außer dem optionalen `run.finished` |
 | `retry` | `visualise-ai-retry` | `201`, danach eine byte-identische Wiederholung mit `200 duplicate: true` und **derselben** Position |
 | `conflict` | `visualise-ai-conflict` | Dieselbe `clientEventId` mit anderem Inhalt: `409 client_event_id_conflict` |
+| `self` | `visualise-ai-self` | Dieses Repository selbst: 122 Events, 28 Komponenten, 35 Beziehungen, 10 Agents, 7 Diffs — nichts davon erfunden |
 
 Jedes Szenario schreibt in ein eigenes Projekt mit eigenem Root-Orchestrator, so
 dass keines den aktuellen Run eines anderen überschreibt.
 
-**Alle drei Szenarien setzen eine leere Datenbank voraus.** Gegen eine bereits
+`full` ist bewusst eine Fiktion: eine Shop-Plattform mit Orders-Service,
+Payment-Provider und zwei NATS-Topics, weil das Szenario jedes Strukturmerkmal
+des Vertrags zeigen muss — auch die, die dieses Projekt nicht benutzt.
+
+`self` ist das Gegenteil. Jede Komponente stammt aus dem Dateibaum, der
+`docker-compose.yml`, `backend/go.mod` und `frontend/package.json`; jede Beziehung
+aus einem echten Go- oder TypeScript-Import oder einem `location`-Block der
+Nginx-Konfiguration; Agents und Plan aus den sechzehn gemergten Pull Requests von
+Epic #1; Feedback, Risiken und Probleme aus den ADRs unter `docs/decisions/`; die
+Diffs aus `git show`. Wo der Beleg endet, endet das Modell: **es gibt keine
+`nats_topic`-Beziehung**, weil es hier keinen Message Bus gibt, und ein Test
+verweigert sie namentlich. Details in
+[`simulator/README.md`](../simulator/README.md#self--the-cockpit-on-its-own-architecture).
+
+```bash
+npm run simulate -- --scenario self
+```
+
+**Alle vier Szenarien setzen ein leeres Projekt voraus.** Gegen eine bereits
 gefüllte Datenbank ist die erste Zustellung berechtigterweise ein Duplikat — das
 ist korrektes Verhalten, aber nicht das, was die Szenarien behaupten. Vor einem
 Wiederholungslauf also:

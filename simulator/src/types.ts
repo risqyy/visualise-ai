@@ -63,7 +63,7 @@ export interface Scenario {
   steps: ScenarioStep[]
 }
 
-export const SCENARIO_NAMES = ['full', 'retry', 'conflict'] as const
+export const SCENARIO_NAMES = ['full', 'retry', 'conflict', 'self'] as const
 export type ScenarioName = (typeof SCENARIO_NAMES)[number]
 
 /** `EventAccepted` from the contract. */
