@@ -103,18 +103,31 @@ export function plansQuery(projectId: ProjectId, runId: RunId) {
   })
 }
 
+/**
+ * The component inspector of exactly one run.
+ *
+ * Paged, because diffs are the one component-scoped collection that can grow
+ * without bound (ADR 0005): the endpoint answers `diffLimit` diffs plus
+ * `nextDiffCursor`, while every other collection comes complete. The first page
+ * is therefore authoritative for the component, the responsible agent, the work
+ * step, the feedback, the risks and the problems; further pages exist only to
+ * continue `diffs`.
+ */
 export function componentInspectorQuery(
   projectId: ProjectId,
   componentId: ComponentId,
   runId: RunId,
+  diffLimit = PAGE_SIZE,
 ) {
-  return queryOptions({
+  return infiniteQueryOptions({
     queryKey: queryKeys.componentInspector(projectId, componentId, runId),
-    queryFn: ({ signal }) =>
+    queryFn: ({ signal, pageParam }) =>
       fetchJson<ComponentInspectorResponse>(
         `/projects/${encodeURIComponent(projectId)}/components/${encodeURIComponent(componentId)}`,
-        { signal, query: { runId } },
+        { signal, query: { runId, diffLimit, diffCursor: pageParam } },
       ),
+    initialPageParam: null as string | null,
+    getNextPageParam: (lastPage: ComponentInspectorResponse) => lastPage.nextDiffCursor,
   })
 }
 
@@ -175,7 +188,7 @@ export function usePlans(projectId: ProjectId, runId: RunId) {
 }
 
 /**
- * `GET /projects/{projectId}/components/{componentId}?runId={runId}`
+ * `GET /projects/{projectId}/components/{componentId}?runId&diffLimit&diffCursor`
  *
  * Disabled while no component is selected: the inspector shows its empty state
  * instead of firing a request without a subject.
@@ -184,9 +197,10 @@ export function useComponentInspector(
   projectId: ProjectId,
   componentId: ComponentId | undefined,
   runId: RunId,
+  diffLimit = PAGE_SIZE,
 ) {
-  return useQuery({
-    ...componentInspectorQuery(projectId, componentId ?? '', runId),
+  return useInfiniteQuery({
+    ...componentInspectorQuery(projectId, componentId ?? '', runId, diffLimit),
     enabled: Boolean(componentId),
   })
 }
