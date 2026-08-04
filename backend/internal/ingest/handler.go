@@ -446,7 +446,15 @@ func (h *Handler) fail(c *gin.Context, err error, what string) {
 }
 
 // committedEvent assembles what the publisher receives.
+//
+// The payload comes from the store, not from the request: the store keeps the
+// canonical form, so a live SSE frame and the same event replayed from the log
+// are byte-identical instead of differing in object key order.
 func committedEvent(env store.Envelope, result store.Result) CommittedEvent {
+	payload := result.Payload
+	if payload == nil {
+		payload = env.Payload
+	}
 	return CommittedEvent{
 		SchemaVersion: env.SchemaVersion,
 		ClientEventID: env.ClientEventID,
@@ -456,7 +464,7 @@ func committedEvent(env store.Envelope, result store.Result) CommittedEvent {
 		ParentAgentID: env.ParentAgentID,
 		OccurredAt:    env.OccurredAt.UTC(),
 		Type:          env.Type,
-		Payload:       env.Payload,
+		Payload:       payload,
 		Position:      result.Position,
 		ServerEventID: result.ServerEventID,
 		ReceivedAt:    result.ReceivedAt.UTC(),

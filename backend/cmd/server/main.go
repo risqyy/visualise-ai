@@ -20,6 +20,7 @@ import (
 	"github.com/risqyy/visualise-ai/backend/internal/ingest"
 	"github.com/risqyy/visualise-ai/backend/internal/logging"
 	"github.com/risqyy/visualise-ai/backend/internal/readapi"
+	"github.com/risqyy/visualise-ai/backend/internal/sse"
 	"github.com/risqyy/visualise-ai/backend/internal/store"
 )
 
@@ -60,11 +61,15 @@ func run() error {
 		return database.Ping(ctx, db)
 	})
 
-	// The publisher stays a no-op until the SSE broker replaces it; ingestion
-	// does not depend on anyone listening.
+	// The broker is the single publisher of the instance: ingestion calls it
+	// once per committed event, and every open SSE connection fans out from it.
+	// It is process-local by design — v0 runs exactly one backend, and anything
+	// a subscriber misses is replayed from PostgreSQL rather than from memory.
+	broker := sse.NewBroker(sse.BrokerOptions{Logger: logger})
+
 	ingestHandler, err := ingest.NewHandler(ingest.HandlerOptions{
 		Store:         store.New(db),
-		Publisher:     ingest.NopPublisher{},
+		Publisher:     broker,
 		MaxEventBytes: cfg.MaxEventBytes,
 		Logger:        logger,
 	})
@@ -78,6 +83,11 @@ func run() error {
 		Version: version,
 		Ingest:  ingestHandler,
 		Read:    readapi.New(db),
+		Stream: sse.NewHandler(sse.HandlerOptions{
+			Broker: broker,
+			Reader: sse.NewEventReader(db),
+			Logger: logger,
+		}),
 	})
 
 	server := &http.Server{
@@ -109,6 +119,13 @@ func run() error {
 	}
 
 	checker.MarkNotBootstrapped()
+
+	// Every open stream blocks on its subscription, so an SSE connection never
+	// goes idle on its own and Shutdown would wait for the full timeout. Ending
+	// the subscriptions first closes the streams in an orderly way and lets the
+	// in-flight read and write requests drain normally.
+	logger.Info().Int("streams", broker.Subscribers()).Msg("closing open event streams")
+	broker.Shutdown()
 
 	shutdownCtx, cancel := context.WithTimeout(context.Background(), cfg.ShutdownTimeout)
 	defer cancel()

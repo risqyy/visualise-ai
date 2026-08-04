@@ -47,6 +47,11 @@ type Result struct {
 	ClientEventID string
 	Duplicate     bool
 	ReceivedAt    time.Time
+	// Payload is the canonical form that was stored. Publishing this rather
+	// than the bytes the agent sent keeps a live SSE frame byte-identical to
+	// the same event replayed from the log, which would otherwise differ in
+	// object key order.
+	Payload json.RawMessage
 }
 
 // ErrClientEventIDConflict marks a reused idempotency key whose content differs
@@ -156,6 +161,7 @@ func (s *Store) AppendGuarded(ctx context.Context, env Envelope, guard Guard) (R
 					ClientEventID: existing.ClientEventID,
 					Duplicate:     true,
 					ReceivedAt:    existing.ReceivedAt,
+					Payload:       json.RawMessage(existing.Payload),
 				}
 				return nil
 			}
@@ -207,6 +213,7 @@ func (s *Store) AppendGuarded(ctx context.Context, env Envelope, guard Guard) (R
 			ClientEventID: event.ClientEventID,
 			Duplicate:     false,
 			ReceivedAt:    event.ReceivedAt,
+			Payload:       canonical,
 		}
 		return nil
 	})

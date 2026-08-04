@@ -278,6 +278,8 @@ paths:
             text/event-stream:
               schema:
                 $ref: '#/components/schemas/StreamedEvent'
+        '400':
+          $ref: '#/components/responses/InvalidQueryParameter'
         '404':
           $ref: '#/components/responses/ProjectNotFound'
 
@@ -875,6 +877,13 @@ components:
         Last server-side project position the client has already processed. Replay starts at
         `lastEventPosition + 1`. Use `0` to replay the whole project from the beginning.
         Takes precedence over the `Last-Event-ID` header.
+
+        A value that cannot be used as a cursor is rejected with `400`
+        (`invalid_query_parameter`) rather than silently ignored, because a client that spells
+        its own cursor wrongly must not believe it received a gap-free replay. An unusable
+        `Last-Event-ID` header is ignored instead: browsers set it automatically and a stream
+        that refuses to open would be worse than one that starts live. A position beyond the
+        end of the log is clamped to the current end.
       schema:
         type: integer
         format: int64
