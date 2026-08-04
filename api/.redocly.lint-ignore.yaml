@@ -1,0 +1,10 @@
+# Documented lint exceptions. Keep this file small and justified.
+#
+# operation-4xx-response:
+#   /healthz and /readyz are internal container probes on the Go backend. They answer 200 or,
+#   for readiness, 503 — there is no meaningful client error for a probe. The rule stays
+#   enabled for every externally reachable operation.
+openapi.yaml:
+  operation-4xx-response:
+    - '#/paths/~1healthz/get/responses'
+    - '#/paths/~1readyz/get/responses'

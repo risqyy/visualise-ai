@@ -1,0 +1,16 @@
+{
+  "schemaVersion": "1.0",
+  "clientEventId": "b1c0d2e3-5f47-4a91-8b2c-7d6e5f4a3b21",
+  "projectId": "visualise-ai",
+  "runId": "run-2026-08-04-0001",
+  "agentId": "subagent-openapi-contract",
+  "parentAgentId": "orchestrator-root",
+  "occurredAt": "2026-08-04T09:13:40Z",
+  "type": "agent.started",
+  "payload": {
+    "role": "subagent",
+    "displayName": "OpenAPI Contract Agent",
+    "assignedTask": "Define the versioned OpenAPI event contract for ingestion and SSE.",
+    "capabilities": ["openapi", "json-schema", "technical-writing"]
+  }
+}

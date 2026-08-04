@@ -1,0 +1,17 @@
+{
+  "schemaVersion": "1.0",
+  "clientEventId": "5d41402a-bc4b-4a76-b971-9d911017c592",
+  "projectId": "visualise-ai",
+  "runId": "run-2026-08-04-0001",
+  "agentId": "subagent-implementer",
+  "parentAgentId": "orchestrator-root",
+  "occurredAt": "2026-08-04T09:46:18Z",
+  "type": "diff.reported",
+  "payload": {
+    "diffId": "diff-2026-08-04-0011",
+    "changeId": "change-2026-08-04-0007",
+    "componentIds": ["shop-platform.orders.domain.pricing"],
+    "filePath": "internal/orders/domain/pricing/pricing.go",
+    "unifiedDiff": "--- a/internal/orders/domain/pricing/pricing.go\n+++ b/internal/orders/domain/pricing/pricing.go\n@@ -1,6 +1,7 @@\n package pricing\n \n import (\n \t\"shop-platform/internal/shared/money\"\n+\t\"shop-platform/internal/orders/domain/tax\"\n )\n \n@@ -18,11 +19,9 @@ func (p *Pricing) Total(order Order) money.Amount {\n \tsum := money.Zero(order.Currency)\n \tfor _, line := range order.Lines {\n \t\tsum = sum.Add(line.Net)\n \t}\n-\n-\tvat := sum.MultiplyFloat(0.19)\n-\tsum = sum.Add(vat)\n+\tsum = sum.Add(tax.For(order.DeliveryCountry).Apply(sum))\n \n \treturn sum.Sub(p.discountFor(order))\n }\n"
+  }
+}

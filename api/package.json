@@ -1,0 +1,13 @@
+{
+  "name": "visualise-ai-event-contract",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Versioned OpenAPI event contract for the Visualise AI agent cockpit",
+  "scripts": {
+    "lint": "redocly lint openapi.yaml",
+    "bundle": "redocly bundle openapi.yaml -o dist/openapi.bundled.yaml"
+  },
+  "devDependencies": {
+    "@redocly/cli": "^2.4.0"
+  }
+}

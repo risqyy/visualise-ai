@@ -1,0 +1,228 @@
+{
+  "schemaVersion": "1.0",
+  "clientEventId": "7c9e6679-7425-40de-944b-e07fc1f90ae7",
+  "projectId": "visualise-ai",
+  "runId": "run-2026-08-04-0001",
+  "agentId": "subagent-architecture-mapper",
+  "parentAgentId": "orchestrator-root",
+  "occurredAt": "2026-08-04T09:21:05Z",
+  "type": "architecture.snapshot_published",
+  "payload": {
+    "snapshotId": "snapshot-2026-08-04-0001",
+    "components": [
+      {
+        "componentId": "shop-platform",
+        "name": "Shop Platform",
+        "kind": "system",
+        "parentComponentId": null,
+        "description": "The observed application. Root of the component hierarchy."
+      },
+      {
+        "componentId": "shop-platform.storefront",
+        "name": "Storefront",
+        "kind": "ui",
+        "parentComponentId": "shop-platform",
+        "description": "Customer-facing single page application.",
+        "technology": {
+          "language": "TypeScript",
+          "framework": "React",
+          "runtime": "Browser",
+          "version": "19"
+        },
+        "tags": ["frontend", "public"]
+      },
+      {
+        "componentId": "shop-platform.api-gateway",
+        "name": "API Gateway",
+        "kind": "service",
+        "parentComponentId": "shop-platform",
+        "description": "Single external entry point, terminates TLS and fans out to services.",
+        "technology": {
+          "language": "Go",
+          "framework": "chi",
+          "runtime": "Go",
+          "version": "1.24"
+        }
+      },
+      {
+        "componentId": "shop-platform.orders",
+        "name": "Orders Service",
+        "kind": "service",
+        "parentComponentId": "shop-platform",
+        "description": "Owns the order lifecycle.",
+        "technology": {
+          "language": "Go",
+          "runtime": "Go",
+          "version": "1.24"
+        },
+        "tags": ["core-domain"]
+      },
+      {
+        "componentId": "shop-platform.orders.api",
+        "name": "Orders API Layer",
+        "kind": "module",
+        "parentComponentId": "shop-platform.orders",
+        "description": "gRPC handlers and request mapping."
+      },
+      {
+        "componentId": "shop-platform.orders.domain",
+        "name": "Orders Domain Layer",
+        "kind": "module",
+        "parentComponentId": "shop-platform.orders",
+        "description": "Order aggregate, invariants and state machine."
+      },
+      {
+        "componentId": "shop-platform.orders.domain.pricing",
+        "name": "Pricing",
+        "kind": "module",
+        "parentComponentId": "shop-platform.orders.domain",
+        "description": "Fourth hierarchy level: discount and tax calculation inside the domain layer.",
+        "tags": ["pricing"]
+      },
+      {
+        "componentId": "shop-platform.orders.persistence",
+        "name": "Orders Persistence Layer",
+        "kind": "module",
+        "parentComponentId": "shop-platform.orders",
+        "description": "Repository implementations and SQL migrations."
+      },
+      {
+        "componentId": "shop-platform.inventory",
+        "name": "Inventory Service",
+        "kind": "service",
+        "parentComponentId": "shop-platform",
+        "description": "Reserves and releases stock.",
+        "technology": {
+          "language": "Go",
+          "runtime": "Go",
+          "version": "1.24"
+        }
+      },
+      {
+        "componentId": "shop-platform.orders-db",
+        "name": "Orders Database",
+        "kind": "datastore",
+        "parentComponentId": "shop-platform",
+        "description": "Relational store owned exclusively by the orders service.",
+        "technology": {
+          "runtime": "PostgreSQL",
+          "version": "17"
+        }
+      },
+      {
+        "componentId": "shop-platform.events",
+        "name": "Event Bus",
+        "kind": "queue",
+        "parentComponentId": "shop-platform",
+        "description": "NATS cluster. Each topic below is modelled as its own component.",
+        "technology": {
+          "runtime": "NATS",
+          "version": "2.10"
+        }
+      },
+      {
+        "componentId": "shop-platform.events.order-created",
+        "name": "orders.order.created",
+        "kind": "topic",
+        "parentComponentId": "shop-platform.events",
+        "description": "Published once per accepted order."
+      },
+      {
+        "componentId": "shop-platform.events.inventory-reserved",
+        "name": "inventory.item.reserved",
+        "kind": "topic",
+        "parentComponentId": "shop-platform.events",
+        "description": "Published once per successful stock reservation."
+      },
+      {
+        "componentId": "shop-platform.shared-money",
+        "name": "Shared Money Library",
+        "kind": "library",
+        "parentComponentId": "shop-platform",
+        "description": "Currency and amount value objects shared across services.",
+        "technology": {
+          "language": "Go"
+        }
+      },
+      {
+        "componentId": "payment-provider",
+        "name": "Payment Provider",
+        "kind": "external",
+        "parentComponentId": null,
+        "description": "Third-party payment system outside the system boundary."
+      }
+    ],
+    "relationships": [
+      {
+        "relationshipId": "rel-storefront-gateway-http",
+        "sourceComponentId": "shop-platform.storefront",
+        "targetComponentId": "shop-platform.api-gateway",
+        "kind": "http",
+        "label": "Browse and place orders",
+        "protocol": "HTTPS",
+        "operation": "GET /orders"
+      },
+      {
+        "relationshipId": "rel-gateway-orders-grpc",
+        "sourceComponentId": "shop-platform.api-gateway",
+        "targetComponentId": "shop-platform.orders.api",
+        "kind": "grpc",
+        "label": "Place order",
+        "protocol": "gRPC/HTTP2",
+        "operation": "orders.v1.OrderService/PlaceOrder"
+      },
+      {
+        "relationshipId": "rel-orders-persistence-data",
+        "sourceComponentId": "shop-platform.orders.persistence",
+        "targetComponentId": "shop-platform.orders-db",
+        "kind": "data",
+        "label": "Order aggregate storage",
+        "protocol": "postgresql",
+        "operation": "SELECT/INSERT/UPDATE orders"
+      },
+      {
+        "relationshipId": "rel-orders-payment-async",
+        "sourceComponentId": "shop-platform.orders",
+        "targetComponentId": "payment-provider",
+        "kind": "async",
+        "label": "Payment settlement callbacks",
+        "protocol": "webhook",
+        "operation": "POST /callbacks/payment"
+      },
+      {
+        "relationshipId": "rel-orders-publishes-order-created",
+        "sourceComponentId": "shop-platform.orders",
+        "targetComponentId": "shop-platform.events.order-created",
+        "kind": "nats_topic",
+        "label": "publishes",
+        "protocol": "NATS",
+        "channel": "orders.order.created"
+      },
+      {
+        "relationshipId": "rel-inventory-publishes-inventory-reserved",
+        "sourceComponentId": "shop-platform.inventory",
+        "targetComponentId": "shop-platform.events.inventory-reserved",
+        "kind": "nats_topic",
+        "label": "publishes",
+        "protocol": "NATS",
+        "channel": "inventory.item.reserved"
+      },
+      {
+        "relationshipId": "rel-inventory-consumes-order-created",
+        "sourceComponentId": "shop-platform.events.order-created",
+        "targetComponentId": "shop-platform.inventory",
+        "kind": "nats_topic",
+        "label": "consumes",
+        "protocol": "NATS",
+        "channel": "orders.order.created"
+      },
+      {
+        "relationshipId": "rel-pricing-shared-money-dependency",
+        "sourceComponentId": "shop-platform.orders.domain.pricing",
+        "targetComponentId": "shop-platform.shared-money",
+        "kind": "dependency",
+        "label": "Money value objects"
+      }
+    ]
+  }
+}

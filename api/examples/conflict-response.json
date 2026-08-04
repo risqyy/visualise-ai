@@ -1,0 +1,8 @@
+{
+  "type": "https://visualise-ai.local/problems/client-event-id-conflict",
+  "title": "Client event id conflict",
+  "status": 409,
+  "detail": "clientEventId \"3f2504e0-4f89-41d3-9a0c-0305e82c3301\" was already accepted at position 42 for project \"visualise-ai\" with different content. Idempotent retries must resend the identical event.",
+  "code": "client_event_id_conflict",
+  "instance": "/api/v1/events"
+}

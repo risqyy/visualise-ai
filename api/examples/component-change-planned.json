@@ -1,0 +1,28 @@
+{
+  "schemaVersion": "1.0",
+  "clientEventId": "0f8fad5b-d9cb-469f-a165-70867728950e",
+  "projectId": "visualise-ai",
+  "runId": "run-2026-08-04-0001",
+  "agentId": "subagent-architecture-mapper",
+  "parentAgentId": "orchestrator-root",
+  "occurredAt": "2026-08-04T09:34:12Z",
+  "type": "component.change_planned",
+  "payload": {
+    "changeId": "change-2026-08-04-0007",
+    "operation": "add",
+    "component": {
+      "componentId": "shop-platform.orders.domain.tax",
+      "name": "Tax Calculation",
+      "kind": "module",
+      "parentComponentId": "shop-platform.orders.domain",
+      "description": "Extracts VAT handling out of the pricing module so both can evolve separately.",
+      "technology": {
+        "language": "Go",
+        "runtime": "Go",
+        "version": "1.24"
+      },
+      "tags": ["pricing", "tax"]
+    },
+    "rationale": "Pricing currently mixes discount and VAT rules, which makes country-specific tax rates hard to test."
+  }
+}

@@ -1,0 +1,16 @@
+{
+  "schemaVersion": "1.0",
+  "clientEventId": "3f2504e0-4f89-41d3-9a0c-0305e82c3301",
+  "projectId": "visualise-ai",
+  "runId": "run-2026-08-04-0001",
+  "agentId": "orchestrator-root",
+  "parentAgentId": null,
+  "occurredAt": "2026-08-04T09:12:00Z",
+  "type": "agent.started",
+  "payload": {
+    "role": "orchestrator",
+    "displayName": "Root Orchestrator",
+    "assignedTask": "Deliver the v0 agent project cockpit and delegate the work packages.",
+    "capabilities": ["planning", "delegation", "review"]
+  }
+}

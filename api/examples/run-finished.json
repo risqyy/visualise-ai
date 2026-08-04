@@ -1,0 +1,14 @@
+{
+  "schemaVersion": "1.0",
+  "clientEventId": "e3b0c442-98fc-4c14-9afb-f4c8996fb924",
+  "projectId": "visualise-ai",
+  "runId": "run-2026-08-04-0001",
+  "agentId": "orchestrator-root",
+  "parentAgentId": null,
+  "occurredAt": "2026-08-04T11:18:00Z",
+  "type": "run.finished",
+  "payload": {
+    "outcome": "completed",
+    "summary": "VAT handling extracted into its own module, diff and review feedback reported, architecture model updated."
+  }
+}
