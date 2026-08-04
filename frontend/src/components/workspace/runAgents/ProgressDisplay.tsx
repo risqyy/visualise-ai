@@ -37,7 +37,7 @@ export function ReportedProgress({ progress, reportedBy, testId }: ReportedProgr
       <p
         data-testid={testId}
         data-progress-form="none"
-        className="text-muted-foreground text-2xs"
+        className="text-muted-foreground text-xs"
       >
         Kein Fortschritt gemeldet
       </p>
@@ -98,7 +98,7 @@ function CountedProgress({
           />
         ))}
       </div>
-      <p className="text-muted-foreground text-2xs">
+      <p className="text-muted-foreground text-xs">
         <span className="text-foreground font-medium">{statement.percent} %</span>{' '}
         {statement.subject} · {statement.derivation}
       </p>
@@ -130,7 +130,7 @@ function ClaimedProgress({
       data-progress-form="claim"
       data-progress-scope={statement.scope}
       data-progress-basis={statement.basis}
-      className="border-border/70 text-muted-foreground rounded-md border border-dashed px-2 py-1 text-2xs"
+      className="border-border/70 text-muted-foreground rounded-md border border-dashed px-2 py-1 text-xs"
     >
       <p>
         <span data-claim-marker="" aria-hidden="true" className="font-mono">
@@ -200,7 +200,7 @@ export function CompletedStepsMeter({
           ))}
         </div>
       )}
-      <p className="text-muted-foreground text-2xs">
+      <p className="text-muted-foreground text-xs">
         {completion.done} von {completion.total} Schritten abgeschlossen
       </p>
     </div>

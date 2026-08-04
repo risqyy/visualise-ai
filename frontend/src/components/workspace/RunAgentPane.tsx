@@ -45,6 +45,10 @@ export interface RunAgentPaneProps {
  *    (ADR 0003), so an `agent.progress_reported` refetches this run's agent list
  *    and nothing else. Selection and collapse state live outside the cache, so a
  *    refetch cannot move them.
+ * 5. **Density never removes anything.** Long reported texts are clipped by CSS
+ *    and stay complete in the DOM, and a compact agent row is one keystroke away
+ *    from its full detail. What a row shows first follows the agent's *own*
+ *    reported status — never elapsed time (#39, ADR 0014).
  */
 export function RunAgentPane({ projectId, runId }: RunAgentPaneProps) {
   const runs = useRuns(projectId)
@@ -106,9 +110,9 @@ export function RunAgentPane({ projectId, runId }: RunAgentPaneProps) {
                 skeletonRows={2}
               >
                 {run.data && (
-                  <dl className="space-y-0.5 text-2xs">
+                  <dl className="space-y-0.5 text-xs">
                     <Row label="Run">
-                      <span className="font-mono">{run.data.run.runId}</span>
+                      <span className="pane-meta">{run.data.run.runId}</span>
                     </Row>
                     <Row label="Zustand">
                       <span
@@ -125,16 +129,22 @@ export function RunAgentPane({ projectId, runId }: RunAgentPaneProps) {
                       </span>
                     </Row>
                     <Row label="Beginn">
-                      <span className="font-mono">
+                      <span className="pane-meta">
                         {formatTimestamp(run.data.run.startedAt)}
                       </span>
                     </Row>
                     <Row label="Ende">
-                      <span className="font-mono">
-                        {run.data.run.finishedAt
-                          ? formatTimestamp(run.data.run.finishedAt)
-                          : 'kein Ende gemeldet'}
-                      </span>
+                      {/*
+                        A timestamp is metadata and may be 11 px; "nothing was
+                        reported" is a sentence and is not (#39).
+                      */}
+                      {run.data.run.finishedAt ? (
+                        <span className="pane-meta">
+                          {formatTimestamp(run.data.run.finishedAt)}
+                        </span>
+                      ) : (
+                        <span className="text-muted-foreground">kein Ende gemeldet</span>
+                      )}
                     </Row>
                     <Row label="Umfang">
                       {counted(run.data.run.counts.agents, COUNT_LABELS.agent)} ·{' '}
@@ -153,7 +163,7 @@ export function RunAgentPane({ projectId, runId }: RunAgentPaneProps) {
             <div className="flex items-center justify-between gap-2">
               <span className="pane-heading">Agenthierarchie</span>
               {agents.isSuccess && (
-                <Badge variant="outline" className="text-2xs font-normal">
+                <Badge variant="outline" className="font-normal">
                   {agentList.length} gemeldet
                 </Badge>
               )}
@@ -224,7 +234,7 @@ function Section({
             <span className="pane-heading">{title}</span>
           </Button>
         </CollapsibleTrigger>
-        {count && <span className="text-muted-foreground text-2xs">{count}</span>}
+        {count && <span className="text-muted-foreground text-xs">{count}</span>}
       </div>
       <CollapsibleContent className="pt-1">{children}</CollapsibleContent>
     </Collapsible>

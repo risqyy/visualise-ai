@@ -47,6 +47,23 @@ export const AGENT_STATUS_LABEL: Record<ReportedStatus, string> = {
   done: 'fertig',
 }
 
+/**
+ * Second, colour-independent channel for a reported agent status.
+ *
+ * Same rule as `PLAN_STEP_STATE_GLYPH` and `src/state/workStates.ts` (ADR 0003):
+ * the information has to survive greyscale, so every status is carried by a
+ * glyph **and** its label, never by a hue alone. The glyphs are neutral marks,
+ * not verdicts — `blocked` gets the same kind of geometric symbol as `working`.
+ */
+export const AGENT_STATUS_GLYPH: Record<ReportedStatus, string> = {
+  '': '–',
+  working: '▶',
+  waiting: '⋯',
+  blocked: '⊘',
+  idle: '○',
+  done: '●',
+}
+
 export const OUTCOME_LABEL: Record<Outcome, string> = {
   completed: 'abgeschlossen',
   failed: 'fehlgeschlagen',
@@ -70,6 +87,83 @@ export const PLAN_STEP_STATE_GLYPH: Record<PlanStepState, string> = {
   in_progress: '◐',
   done: '●',
   skipped: '⊘',
+}
+
+// ---------------------------------------------------------------------------
+// How much of a row to paint: read off the reported status, never off a clock
+// ---------------------------------------------------------------------------
+
+/**
+ * Whether an agent's **own last reported status** names work that is still
+ * going on.
+ *
+ * This is the input for the pane's default density (#39): a row whose agent
+ * reported ongoing work opens with its details, every other row starts compact.
+ * Three properties make that a rendering decision rather than a verdict:
+ *
+ * * **No clock is consulted.** `lastEventAt`, `startedAt` and the current time
+ *   are not read here and are not compared anywhere in this module (ADR 0011).
+ *   An agent that reported `working` an hour ago is `ongoing`, exactly like one
+ *   that reported it a second ago — because that is what it reported.
+ * * **The mapping is the reported vocabulary, nothing else.** `working`,
+ *   `waiting` and `blocked` are the three statuses that describe work in flight;
+ *   `done` and `idle` are what an agent says when it is not working. A reported
+ *   `finishedOutcome` wins over the status field, because an outcome is the
+ *   later and more specific statement.
+ * * **Nothing is hidden.** A compact row still shows the agent, its status, its
+ *   role and its assigned task, and one keystroke opens the rest. Density is
+ *   about what is painted first, never about what is available.
+ *
+ * `unreported` is kept apart from `settled` on purpose: "the agent said it is
+ * idle" and "the agent never said anything" are different statements, and the
+ * row labels them differently.
+ */
+export type ReportedWorkState = 'ongoing' | 'settled' | 'unreported'
+
+/** The reported statuses that describe work still in flight. */
+const ONGOING_STATUSES: ReadonlySet<ReportedStatus> = new Set<ReportedStatus>([
+  'working',
+  'waiting',
+  'blocked',
+])
+
+export function reportedWorkState(
+  agent: Pick<RunAgent, 'status' | 'finishedOutcome'>,
+): ReportedWorkState {
+  if (agent.finishedOutcome !== null) return 'settled'
+  if (agent.status === '') return 'unreported'
+  return ONGOING_STATUSES.has(agent.status) ? 'ongoing' : 'settled'
+}
+
+/**
+ * How often each status was reported across a list of agents, in the fixed
+ * order of the vocabulary.
+ *
+ * A count of reported values — the same kind of statement as `run.counts` — and
+ * deliberately not a percentage, not a share and not an aggregate of the agents'
+ * own progress numbers. ADR 0011 forbids the latter; counting how many agents
+ * reported which word is a fact about the log.
+ */
+const STATUS_TALLY_ORDER: readonly ReportedStatus[] = [
+  'working',
+  'waiting',
+  'blocked',
+  'idle',
+  'done',
+  '',
+]
+
+export function statusTally(
+  agents: readonly Pick<RunAgent, 'status'>[],
+): { status: ReportedStatus; count: number }[] {
+  const counts = new Map<ReportedStatus, number>()
+  for (const agent of agents) {
+    counts.set(agent.status, (counts.get(agent.status) ?? 0) + 1)
+  }
+
+  return STATUS_TALLY_ORDER.filter((status) => (counts.get(status) ?? 0) > 0).map(
+    (status) => ({ status, count: counts.get(status) as number }),
+  )
 }
 
 // ---------------------------------------------------------------------------
