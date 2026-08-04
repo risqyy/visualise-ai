@@ -7,6 +7,7 @@ import { vi } from 'vitest'
 
 import { DEFAULT_LANGUAGE, type Language, createI18n } from '@/i18n'
 import { createAppRouter } from '@/routes/router'
+import { useUiStore } from '@/state/uiStore'
 
 import { createFakeFetch } from './fixtures'
 
@@ -17,6 +18,17 @@ export interface RenderAppOptions {
   language?: Language
   /** A prepared instance, for tests that need to observe its events. */
   i18n?: I18n
+  /**
+   * Starts with every architecture container open, i.e. in the state the user
+   * reaches with "Gesamtes Modell einpassen".
+   *
+   * A project otherwise opens on its top levels with deeper containers
+   * collapsed (ADR 0017), which is the right default but the wrong starting
+   * point for a test about edge bundling, overlays or selection on a component
+   * four levels down. Those tests set this and keep asserting exactly what they
+   * asserted before the progressive disclosure existed.
+   */
+  expandAllComponents?: boolean
 }
 
 /**
@@ -27,6 +39,10 @@ export interface RenderAppOptions {
  */
 export function renderApp(initialPath: string, options: RenderAppOptions = {}) {
   vi.stubGlobal('fetch', options.fetchImpl ?? createFakeFetch())
+
+  if (options.expandAllComponents) {
+    useUiStore.getState().setCollapsedComponentIds([])
+  }
 
   const queryClient = new QueryClient({
     defaultOptions: { queries: { retry: false, gcTime: 0, staleTime: 0 } },

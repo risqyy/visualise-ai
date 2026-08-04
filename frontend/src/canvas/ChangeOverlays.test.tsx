@@ -65,9 +65,17 @@ function architectureFetch(initial: ArchitectureResponse) {
   }
 }
 
+/**
+ * Every container open: the proposals and ghosts these tests assert on sit two
+ * levels down, and the progressive disclosure of #34 is not what is under test
+ * here. See `renderApp`'s `expandAllComponents`.
+ */
 function renderCanvas(url = WORKSPACE_URL, initial = nestedArchitectureResponse) {
   const architecture = architectureFetch(initial)
-  const app = renderApp(url, { fetchImpl: architecture.fetchImpl })
+  const app = renderApp(url, {
+    fetchImpl: architecture.fetchImpl,
+    expandAllComponents: true,
+  })
   return { ...app, ...architecture }
 }
 

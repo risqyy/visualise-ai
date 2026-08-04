@@ -1,13 +1,17 @@
 import { describe, expect, it } from 'vitest'
 
 import {
+  FIT_VIEW_PADDING,
   INITIAL_CAMERA_POLICY,
   MIN_FIT_VIEWPORT,
   onLayoutReady,
   onProjectChanged,
   onUserFitRequest,
+  viewportForBounds,
   type CameraPolicyInput,
 } from './cameraPolicy'
+import { MIN_LEGIBLE_FONT_SIZE_PX, MIN_READABLE_ZOOM } from './detailLevel'
+import { LEAF_NODE_SIZE } from './graphProjection'
 
 /** A settled 1920 × 1080 workspace: the centre pane is ~1036 × 933. */
 const SURFACE = { width: 1036, height: 933 }
@@ -119,5 +123,80 @@ describe('camera policy', () => {
     expect(onLayoutReady(switched, input({ projectId: 'project-b' })).fit).toBe(
       'initial-model',
     )
+  })
+})
+
+describe('where the camera goes', () => {
+  /** The layout of `visualise-ai-self`, all 28 components expanded. */
+  const WHOLE_MODEL = { x: 0, y: 0, width: 4684, height: 1263 }
+  /** The same model on its system and container level, everything else closed. */
+  const TOP_LEVELS = { x: 0, y: 0, width: 1944, height: 518 }
+
+  it('centres a model that fits, exactly like a plain fit does', () => {
+    const bounds = { x: 0, y: 0, width: 600, height: 400 }
+    const viewport = viewportForBounds(bounds, SURFACE, { minZoom: 0.12 })
+
+    // Small model, so the fit is capped at 1 rather than blown up.
+    expect(viewport.zoom).toBe(1)
+    expect(viewport.x).toBeCloseTo(SURFACE.width / 2 - 300, 5)
+    expect(viewport.y).toBeCloseTo(SURFACE.height / 2 - 200, 5)
+  })
+
+  it('never opens a large model below the readable zoom', () => {
+    const automatic = viewportForBounds(TOP_LEVELS, SURFACE, {
+      minZoom: MIN_READABLE_ZOOM,
+      overflow: 'start',
+    })
+
+    // Fitting all of it would need 0.48; the floor wins.
+    expect(automatic.zoom).toBe(MIN_READABLE_ZOOM)
+    expect(LEAF_NODE_SIZE.width * automatic.zoom).toBeGreaterThan(170)
+    expect(13 * automatic.zoom).toBeGreaterThanOrEqual(MIN_LEGIBLE_FONT_SIZE_PX)
+  })
+
+  it('holds the floor however many components there are', () => {
+    for (const width of [2_000, 20_000, 200_000]) {
+      const viewport = viewportForBounds({ x: 0, y: 0, width, height: width / 4 }, SURFACE, {
+        minZoom: MIN_READABLE_ZOOM,
+        overflow: 'start',
+      })
+      expect(viewport.zoom).toBe(MIN_READABLE_ZOOM)
+    }
+  })
+
+  it('anchors an oversized model at its top-left corner rather than its middle', () => {
+    const anchored = viewportForBounds(TOP_LEVELS, SURFACE, {
+      minZoom: MIN_READABLE_ZOOM,
+      overflow: 'start',
+    })
+    const centred = viewportForBounds(TOP_LEVELS, SURFACE, {
+      minZoom: MIN_READABLE_ZOOM,
+    })
+
+    // The layout runs left to right with the callers first, so its beginning is
+    // where the picture is read from. Centring would start in mid-sentence.
+    const gap = (SURFACE.width * FIT_VIEW_PADDING) / (2 * (1 + FIT_VIEW_PADDING))
+    expect(anchored.x).toBeCloseTo(gap, 5)
+    expect(centred.x).toBeLessThan(0)
+
+    // The height fits at this zoom, so that axis is centred either way.
+    expect(anchored.y).toBeCloseTo(centred.y, 5)
+  })
+
+  it('lets an explicit request zoom out as far as the whole model needs', () => {
+    const overview = viewportForBounds(WHOLE_MODEL, SURFACE, { minZoom: 0.12 })
+
+    // This is the number the issue complains about — and it is fine here,
+    // because the user asked to see everything at once.
+    expect(overview.zoom).toBeCloseTo(0.2, 2)
+    expect(overview.zoom).toBeLessThan(MIN_READABLE_ZOOM)
+  })
+
+  it('never returns a zoom outside the canvas limits', () => {
+    const clamped = viewportForBounds({ x: 0, y: 0, width: 10, height: 10 }, SURFACE, {
+      minZoom: MIN_READABLE_ZOOM,
+      maxZoom: 1,
+    })
+    expect(clamped.zoom).toBe(1)
   })
 })

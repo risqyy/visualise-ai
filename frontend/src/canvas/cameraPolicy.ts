@@ -121,3 +121,101 @@ export function onProjectChanged(
 ): CameraPolicyState {
   return state.fittedProjectId === projectId ? state : INITIAL_CAMERA_POLICY
 }
+
+// ---------------------------------------------------------------------------
+// Where the camera goes when it is allowed to move
+// ---------------------------------------------------------------------------
+
+/** Bounding box of the laid-out graph, in flow coordinates. */
+export interface LayoutBounds {
+  x: number
+  y: number
+  width: number
+  height: number
+}
+
+export interface CameraViewport {
+  x: number
+  y: number
+  zoom: number
+}
+
+/** Share of the surface kept free around the model. */
+export const FIT_VIEW_PADDING = 0.1
+/** Never zoom *in* to fit: a two-component model must not fill the screen. */
+export const FIT_VIEW_MAX_ZOOM = 1
+
+export interface ViewportOptions {
+  /**
+   * Smallest zoom the result may use. The automatic first camera passes the
+   * readable zoom here, an explicit "fit the whole model" passes the canvas
+   * minimum — that difference *is* the readability rule.
+   */
+  minZoom: number
+  maxZoom?: number
+  padding?: number
+  /**
+   * How to place a model that does not fit at `minZoom`. `center` keeps the
+   * middle of the model on screen, `start` puts its top-left corner there.
+   *
+   * The initial camera uses `start`: the layout runs left to right with the
+   * callers first (ADR 0008), so its top-left corner is where an architecture
+   * is read from. Landing in the geometric middle of a model that does not fit
+   * drops the reader somewhere in the middle of a sentence.
+   */
+  overflow?: 'center' | 'start'
+}
+
+/**
+ * The viewport that shows `bounds` on a surface of `surface`.
+ *
+ * Deliberately computed here rather than taken from React Flow's
+ * `getViewportForBounds`: the camera has to be a pure function of the ELK
+ * layout (ADR 0008), and the two rules this canvas adds — a floor under the
+ * zoom and an anchored overflow — are exactly the two things that function does
+ * not do. With `minZoom` at the canvas minimum and `overflow: 'center'` it
+ * reproduces React Flow's result.
+ */
+export function viewportForBounds(
+  bounds: LayoutBounds,
+  surface: ViewportSize,
+  options: ViewportOptions,
+): CameraViewport {
+  const padding = options.padding ?? FIT_VIEW_PADDING
+  const maxZoom = options.maxZoom ?? FIT_VIEW_MAX_ZOOM
+  const overflow = options.overflow ?? 'center'
+
+  const fitZoom = Math.min(
+    surface.width / (bounds.width * (1 + padding)),
+    surface.height / (bounds.height * (1 + padding)),
+  )
+  const zoom = clamp(fitZoom, Math.min(options.minZoom, maxZoom), maxZoom)
+
+  return {
+    x: axisOffset(surface.width, bounds.x, bounds.width, zoom, padding, overflow),
+    y: axisOffset(surface.height, bounds.y, bounds.height, zoom, padding, overflow),
+    zoom,
+  }
+}
+
+function axisOffset(
+  surfaceSize: number,
+  boundsStart: number,
+  boundsSize: number,
+  zoom: number,
+  padding: number,
+  overflow: 'center' | 'start',
+): number {
+  const scaled = boundsSize * zoom
+  // The same gap `padding` would leave on each side of a model that fits, so an
+  // anchored model is inset exactly as far as a centred one.
+  const gap = (surfaceSize * padding) / (2 * (1 + padding))
+  if (overflow === 'start' && scaled + 2 * gap > surfaceSize) {
+    return gap - boundsStart * zoom
+  }
+  return surfaceSize / 2 - (boundsStart + boundsSize / 2) * zoom
+}
+
+function clamp(value: number, min: number, max: number): number {
+  return Math.min(Math.max(value, min), max)
+}

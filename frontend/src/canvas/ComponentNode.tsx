@@ -1,6 +1,8 @@
 import { Handle, Position, type NodeProps } from '@xyflow/react'
-import { memo } from 'react'
+import { ChevronDown, ChevronRight } from 'lucide-react'
+import { memo, use } from 'react'
 
+import type { ComponentId } from '@/api/types'
 import { cn } from '@/lib/utils'
 import { COUNT_LABELS, counted } from '@/lib/plural'
 import { WORK_STATE_BY_ID } from '@/state/workStates'
@@ -8,8 +10,9 @@ import { WORK_STATE_BY_ID } from '@/state/workStates'
 import { ChangeOverlayMark } from './ChangeOverlayMark'
 import type { ChangeOverlay } from './changeOverlays'
 import { componentKindStyle, componentTags, technologyParts } from './componentKinds'
-import { showsTags, showsTechnology } from './detailLevel'
+import { DISCLOSURE_LABELS, showsTags, showsTechnology } from './detailLevel'
 import { HANDLE_IDS, type ArchitectureNode } from './graphProjection'
+import { CanvasNodeActionsContext } from './nodeActions'
 import { useDetailLevel } from './useDetailLevel'
 
 /**
@@ -54,6 +57,46 @@ function overlayBoxProps(overlay: ChangeOverlay | null, applied: boolean) {
       'data-agent-count': String(overlay.agentIds.length),
     } as Record<string, string>,
   }
+}
+
+interface DisclosureToggleProps {
+  componentId: ComponentId
+  collapsed: boolean
+  /** Components hidden behind this container right now. */
+  hiddenCount: number
+}
+
+/**
+ * Expands or collapses one container.
+ *
+ * `nodrag`/`nopan` stop React Flow from turning the press into a node drag or a
+ * canvas pan, and `stopPropagation` keeps it from also selecting the node —
+ * opening a container and choosing one are two different intents.
+ */
+function DisclosureToggle({ componentId, collapsed, hiddenCount }: DisclosureToggleProps) {
+  const { toggleCollapsed } = use(CanvasNodeActionsContext)
+  const Icon = collapsed ? ChevronRight : ChevronDown
+  const label = collapsed
+    ? `${DISCLOSURE_LABELS.expand} (${counted(hiddenCount, COUNT_LABELS.component)})`
+    : DISCLOSURE_LABELS.collapse
+
+  return (
+    <button
+      type="button"
+      className="nodrag nopan text-muted-foreground hover:text-foreground hover:bg-secondary/70 focus-visible:ring-ring -m-0.5 flex shrink-0 items-center gap-0.5 rounded-sm p-0.5 focus-visible:ring-2 focus-visible:outline-none"
+      title={label}
+      aria-label={label}
+      aria-expanded={!collapsed}
+      data-testid={`node-disclosure-${componentId}`}
+      onPointerDown={(event) => event.stopPropagation()}
+      onClick={(event) => {
+        event.stopPropagation()
+        toggleCollapsed(componentId, !collapsed)
+      }}
+    >
+      <Icon className="size-3.5" aria-hidden="true" />
+    </button>
+  )
 }
 
 /** Invisible, non-interactive connection points. v0 is read-only. */
@@ -182,17 +225,24 @@ export const CompoundNode = memo(function CompoundNode({
   selected,
 }: NodeProps<ArchitectureNode>) {
   const level = useDetailLevel()
-  const { component, childCount, overlay, applied } = data
+  const { component, childCount, overlay, applied, collapsed, hiddenDescendantCount } =
+    data
   const kind = componentKindStyle(component.kind)
   const Icon = kind.icon
   const technology = technologyParts(component.technology)
   const box = overlayBoxProps(overlay, applied)
+  const hiddenCount = hiddenDescendantCount ?? 0
 
   return (
     <div
       className={cn(
         'border-border/90 bg-card/35 h-full w-full rounded-lg border',
         'transition-[border-color,opacity] duration-150',
+        // Closed, the container carries what is behind it as a stacked edge —
+        // "there is more inside" without a second box and without a size that
+        // depends on the contents.
+        collapsed &&
+          'bg-card/95 shadow-[4px_4px_0_-1px_var(--card),4px_4px_0_var(--border)]',
         box.className,
         selected && 'ring-ring border-ring/70 ring-2',
       )}
@@ -202,11 +252,28 @@ export const CompoundNode = memo(function CompoundNode({
       data-detail-level={level}
       data-compound="true"
       data-selected={selected ? 'true' : 'false'}
+      {...(collapsed
+        ? {
+            'data-collapsed': 'true',
+            'data-hidden-count': String(hiddenCount),
+            ...(data.overlayRolledUp ? { 'data-overlay-rolled-up': 'true' } : {}),
+          }
+        : {})}
       {...box.attributes}
     >
       {/* Header row. The ELK padding reserves exactly this height at the top of
           the container, so it never overlaps a child. */}
-      <div className="border-border/70 flex h-10 items-center gap-1.5 border-b px-2.5">
+      <div
+        className={cn(
+          'border-border/70 flex h-10 items-center gap-1.5 px-2.5',
+          !collapsed && 'border-b',
+        )}
+      >
+        <DisclosureToggle
+          componentId={component.componentId}
+          collapsed={collapsed === true}
+          hiddenCount={collapsed ? hiddenCount : childCount}
+        />
         <Icon className="text-muted-foreground size-3.5 shrink-0" aria-hidden="true" />
         <span
           className="text-foreground min-w-0 flex-1 truncate text-[13px] leading-tight font-medium"
@@ -215,7 +282,11 @@ export const CompoundNode = memo(function CompoundNode({
         >
           {component.name}
         </span>
-        {showsTechnology(level) && technology.length > 0 && (
+        {/* A closed container is only as wide as a leaf, so the metadata moves
+            out of the header — squeezed between a technology string and two
+            badges, the name is the first thing to lose its space, and the name
+            is the one thing that has to stay readable. */}
+        {!collapsed && showsTechnology(level) && technology.length > 0 && (
           <span
             className="text-muted-foreground max-w-40 truncate font-mono text-[10px]"
             data-testid="node-technology"
@@ -224,11 +295,25 @@ export const CompoundNode = memo(function CompoundNode({
           </span>
         )}
         {overlay && <ChangeOverlayMark overlay={overlay} />}
-        <span className="text-muted-foreground shrink-0 text-[10px]">
-          {counted(childCount, COUNT_LABELS.child)}
-        </span>
+        {!collapsed && (
+          <span className="text-muted-foreground shrink-0 text-[10px]">
+            {counted(childCount, COUNT_LABELS.child)}
+          </span>
+        )}
         <KindBadge label={kind.label} />
       </div>
+
+      {collapsed && (
+        <div className="flex flex-col gap-1 px-2.5 pt-1.5">
+          <p
+            className="text-muted-foreground text-[10px] leading-tight"
+            data-testid="node-hidden-count"
+          >
+            {counted(hiddenCount, COUNT_LABELS.component)} eingeklappt
+          </p>
+          {showsTechnology(level) && <TechnologyRow parts={technology} />}
+        </div>
+      )}
 
       <NodeHandles />
     </div>

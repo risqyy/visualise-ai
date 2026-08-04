@@ -7,7 +7,6 @@ import {
   ReactFlow,
   ReactFlowProvider,
   getNodesBounds,
-  getViewportForBounds,
   useReactFlow,
   useStore,
   useStoreApi,
@@ -15,7 +14,7 @@ import {
   type OnNodeDrag,
   type Viewport,
 } from '@xyflow/react'
-import { Map, MapPinOff, Maximize2, RotateCcw, TriangleAlert } from 'lucide-react'
+import { Layers2, Map, MapPinOff, Maximize2, RotateCcw, TriangleAlert } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
 import '@xyflow/react/dist/style.css'
@@ -31,11 +30,14 @@ import {
   onLayoutReady,
   onProjectChanged,
   onUserFitRequest,
+  viewportForBounds,
   type CameraPolicyState,
 } from './cameraPolicy'
 import {
   DETAIL_LEVEL_DESCRIPTIONS,
   DETAIL_LEVEL_LABELS,
+  DISCLOSURE_LABELS,
+  MIN_READABLE_ZOOM,
   detailLevelForZoom,
 } from './detailLevel'
 import { ARCHITECTURE_EDGE_TYPES, ARCHITECTURE_NODE_TYPES } from './flowRegistry'
@@ -45,6 +47,7 @@ import {
   type ArchitectureEdge,
   type ArchitectureModel,
 } from './graphProjection'
+import { CanvasNodeActionsContext, type CanvasNodeActions } from './nodeActions'
 import {
   applyTemporaryPositions,
   routesInvalidatedByDrag,
@@ -68,16 +71,26 @@ import {
  *    pick a drag up as a domain change.
  * 3. **The camera is the user's.** `fitView` runs on the first model of a
  *    project and on an explicit click, never because data arrived.
+ * 4. **The first picture is readable.** The automatic camera never goes below
+ *    `MIN_READABLE_ZOOM`, and a project opens on its top levels with deeper
+ *    containers collapsed (`collapse.ts`). Both are undone by an explicit
+ *    "Gesamtes Modell einpassen", never by anything the data does.
  */
 
 const MIN_ZOOM = 0.12
 const MAX_ZOOM = 2.5
-/** Never zoom *in* to fit: a two-component model must not fill the screen. */
-const FIT_VIEW_MAX_ZOOM = 1
-const FIT_VIEW_PADDING = 0.1
 
 const NODE_TYPES = ARCHITECTURE_NODE_TYPES
 const EDGE_TYPES = ARCHITECTURE_EDGE_TYPES
+
+/**
+ * Why the camera is being moved.
+ *
+ * `initial` is the one movement the user did not ask for, so it is the one that
+ * has to stay readable; `user` is an explicit request for the whole model and
+ * may zoom out as far as the model needs.
+ */
+type FitMode = 'initial' | 'user'
 
 export interface ArchitectureCanvasProps {
   projectId: ProjectId
@@ -100,7 +113,18 @@ function ArchitectureCanvasInner({
   selectedComponentId,
   onSelectComponent,
 }: ArchitectureCanvasProps) {
-  const graph = useArchitectureGraph(model)
+  const collapsedComponentIds = useUiStore((state) => state.collapsedComponentIds)
+  const setCollapsedComponentIds = useUiStore((state) => state.setCollapsedComponentIds)
+  const setComponentCollapsed = useUiStore((state) => state.setComponentCollapsed)
+
+  const graph = useArchitectureGraph(model, {
+    collapsedComponentIds,
+    // A deep link is a statement about *what to look at*. Opening the
+    // containers on the way to it changes what is drawn, not where the camera
+    // is — so a link into a component four levels down arrives, and the camera
+    // policy is untouched by it.
+    revealComponentId: selectedComponentId ?? null,
+  })
   const flow = useReactFlow()
   const storeApi = useStoreApi()
 
@@ -135,41 +159,79 @@ function ArchitectureCanvasInner({
     [graph.nodes, nodePositions, selectedComponentId],
   )
   /**
-   * Fits the whole model into the viewport.
+   * Puts the currently drawn graph under the camera.
    *
    * The viewport is computed and applied explicitly instead of going through
    * `instance.fitView()`: that call schedules itself through React Flow's node
    * change queue, which a fully controlled graph without `onNodesChange` never
    * drains. Computing it here also makes the result a pure function of the ELK
    * layout — the same model always ends up under the same camera.
+   *
+   * The two modes are the whole readability rule. `initial` may not zoom below
+   * `MIN_READABLE_ZOOM` and anchors an oversized model at its top-left corner;
+   * `user` fits whatever is there, however small that turns out, because the
+   * user asked for the overview.
    */
-  const fitView = useCallback(() => {
-    setFitViewCount((count) => count + 1)
+  const fitView = useCallback(
+    (mode: FitMode) => {
+      setFitViewCount((count) => count + 1)
 
-    const { width, height, nodeLookup } = storeApi.getState()
-    if (nodeLookup.size === 0) return
+      const { width, height, nodeLookup } = storeApi.getState()
+      if (nodeLookup.size === 0) return
 
-    const bounds = getNodesBounds([...nodeLookup.values()], { nodeLookup })
-    if (width <= 0 || height <= 0 || bounds.width <= 0 || bounds.height <= 0) return
+      const bounds = getNodesBounds([...nodeLookup.values()], { nodeLookup })
+      if (width <= 0 || height <= 0 || bounds.width <= 0 || bounds.height <= 0) return
 
-    const viewport = getViewportForBounds(
-      bounds,
-      width,
-      height,
-      MIN_ZOOM,
-      FIT_VIEW_MAX_ZOOM,
-      FIT_VIEW_PADDING,
-    )
-    void flow.setViewport(viewport)
-    setCamera(viewport)
-    setDetailLevel(detailLevelForZoom(viewport.zoom))
-  }, [flow, storeApi, setCamera])
+      const viewport = viewportForBounds(
+        bounds,
+        { width, height },
+        mode === 'initial'
+          ? { minZoom: MIN_READABLE_ZOOM, overflow: 'start' }
+          : { minZoom: MIN_ZOOM },
+      )
+      void flow.setViewport(viewport)
+      setCamera(viewport)
+      setDetailLevel(detailLevelForZoom(viewport.zoom))
+    },
+    [flow, storeApi, setCamera],
+  )
 
-  // Switching projects makes the next model an initial one again.
+  /**
+   * A fit the user asked for, held until the layout it is about exists.
+   *
+   * Expanding or collapsing containers changes the ELK input, so at the moment
+   * of the click the bounds the camera needs have not been computed yet. A ref
+   * rather than state: the parked request changes nothing on screen, and the
+   * effect that redeems it already re-runs when the new layout lands.
+   */
+  const pendingFitRef = useRef<FitMode | null>(null)
+
+  /** Fits now if the graph is already the right one, otherwise after re-layout. */
+  const requestFit = useCallback(
+    (mode: FitMode, afterRelayout: boolean) => {
+      if (afterRelayout) {
+        pendingFitRef.current = mode
+        return
+      }
+      policyRef.current = onUserFitRequest(policyRef.current).state
+      fitView(mode)
+    },
+    [fitView],
+  )
+
+  // Switching projects makes the next model an initial one again — including
+  // its disclosure: the containers the user opened in project A say nothing
+  // about project B. Only a real *change* resets it; a remount of the canvas
+  // must not throw away what the user opened.
+  const disclosedProjectRef = useRef<ProjectId | null>(null)
   useEffect(() => {
     policyRef.current = onProjectChanged(policyRef.current, projectId)
     clearExpandedEdges()
-  }, [projectId, clearExpandedEdges])
+    if (disclosedProjectRef.current !== null && disclosedProjectRef.current !== projectId) {
+      setCollapsedComponentIds(null)
+    }
+    disclosedProjectRef.current = projectId
+  }, [projectId, clearExpandedEdges, setCollapsedComponentIds])
 
   // The only automatic camera movement in the whole cockpit: the first laid-out
   // model of a project, plus a resize of the surface while it is still settling
@@ -185,8 +247,32 @@ function ArchitectureCanvasInner({
     })
     policyRef.current = decision.state
     if (decision.fit === null) return
-    fitView()
+    fitView('initial')
   }, [projectId, graph.nodes.length, surfaceWidth, surfaceHeight, fitView])
+
+  // The initial disclosure, written down once it has been applied.
+  //
+  // Until this runs the collapsed set is a *derivation* (`initialCollapsedIds`
+  // minus the path to a deep-linked component), and a derivation cannot be
+  // toggled: opening one container would have to know which others were closed.
+  // Materialising it makes every later expand and collapse a plain edit of an
+  // explicit list. It writes the set the canvas is already showing, so it
+  // changes no picture and triggers no re-layout.
+  useEffect(() => {
+    if (collapsedComponentIds !== null || graph.nodes.length === 0) return
+    setCollapsedComponentIds(graph.collapsedIds)
+  }, [collapsedComponentIds, graph.nodes.length, graph.collapsedIds, setCollapsedComponentIds])
+
+  // Redeems a parked fit once the layout it was asked about has landed. It goes
+  // through `onUserFitRequest`, so it stays an explicit movement and never
+  // becomes a second automatic one.
+  useEffect(() => {
+    const pending = pendingFitRef.current
+    if (pending === null || graph.isRelayouting || graph.nodes.length === 0) return
+    pendingFitRef.current = null
+    policyRef.current = onUserFitRequest(policyRef.current).state
+    fitView(pending)
+  }, [graph.isRelayouting, graph.nodes.length, graph.signature, fitView])
 
   const edges = useMemo<ArchitectureEdge[]>(() => {
     const invalidated = routesInvalidatedByDrag(graph.edges, nodePositions)
@@ -233,8 +319,55 @@ function ArchitectureCanvasInner({
     [setCamera],
   )
 
+  /**
+   * Opens or closes one container.
+   *
+   * Closing one that holds the current selection moves the selection up to it.
+   * The selection lives in the URL and drives the inspector, so leaving it on a
+   * component that is no longer drawn would put the three out of step — and
+   * re-opening the container just to keep a hidden selection alive would make
+   * the collapse impossible.
+   */
+  const onToggleCollapsed = useCallback<CanvasNodeActions['toggleCollapsed']>(
+    (componentId, collapsed) => {
+      if (
+        collapsed &&
+        selectedComponentId !== undefined &&
+        selectedComponentId !== componentId &&
+        graph.ancestorsOf(selectedComponentId).includes(componentId)
+      ) {
+        onSelectComponent(componentId)
+      }
+      setComponentCollapsed(componentId, collapsed)
+    },
+    [graph, selectedComponentId, onSelectComponent, setComponentCollapsed],
+  )
+
+  const nodeActions = useMemo<CanvasNodeActions>(
+    () => ({ toggleCollapsed: onToggleCollapsed }),
+    [onToggleCollapsed],
+  )
+
+  /** "Gesamtes Modell einpassen": everything open, everything on screen. */
+  const onShowWholeModel = useCallback(() => {
+    const willRelayout = graph.collapsedIds.length > 0
+    if (willRelayout) setCollapsedComponentIds([])
+    requestFit('user', willRelayout)
+  }, [graph.collapsedIds.length, requestFit, setCollapsedComponentIds])
+
+  /** Back to the picture the project opened with. */
+  const onBackToOverview = useCallback(() => {
+    const target = graph.initialCollapsedIds
+    const willRelayout =
+      target.length !== graph.collapsedIds.length ||
+      target.some((componentId, index) => graph.collapsedIds[index] !== componentId)
+    if (willRelayout) setCollapsedComponentIds(target)
+    requestFit('initial', willRelayout)
+  }, [graph.initialCollapsedIds, graph.collapsedIds, requestFit, setCollapsedComponentIds])
+
   const hasTemporaryPositions = Object.keys(nodePositions).length > 0
   const problemCount = diagnosticsCount(graph.diagnostics)
+  const hiddenCount = graph.hiddenComponentIds.size
 
   // The applied model and the overlay are counted separately on purpose: a
   // planned change must become visible on the canvas **without** changing what
@@ -250,182 +383,226 @@ function ArchitectureCanvasInner({
       data-edge-count={graph.appliedEdgeCount}
       data-overlay-node-count={graph.overlayNodeCount}
       data-overlay-edge-count={graph.overlayEdgeCount}
+      data-visible-node-count={graph.visibleNodeCount}
+      data-hidden-node-count={hiddenCount}
+      data-collapsed-count={graph.collapsedIds.length}
       data-layouting={graph.isRelayouting ? 'true' : 'false'}
     >
       <EdgeMarkerDefs />
-      <ReactFlow
-        nodes={nodes}
-        edges={edges}
-        nodeTypes={NODE_TYPES}
-        edgeTypes={EDGE_TYPES}
-        defaultViewport={initialViewport}
-        minZoom={MIN_ZOOM}
-        maxZoom={MAX_ZOOM}
-        onNodeClick={onNodeClick}
-        onNodeDragStop={onNodeDragStop}
-        onMoveStart={onMoveStart}
-        onMove={onMove}
-        onMoveEnd={onMoveEnd}
-        nodesDraggable
-        nodesConnectable={false}
-        edgesReconnectable={false}
-        elementsSelectable
-        // Selection is owned by the URL, so React Flow must not manage its own.
-        selectNodesOnDrag={false}
-        multiSelectionKeyCode={null}
-        deleteKeyCode={null}
-        proOptions={{ hideAttribution: false }}
-        attributionPosition="bottom-left"
-        className="bg-canvas"
-        aria-label="Interaktiver Architekturgraph"
-      >
-        <Background
-          variant={BackgroundVariant.Dots}
-          gap={28}
-          size={1}
-          color="var(--canvas-grid)"
-        />
-        <Controls
-          showInteractive={false}
-          // The built-in fit control is replaced by "Einpassen" in the toolbar,
-          // which goes through the camera policy instead of around it.
-          showFitView={false}
-          position="bottom-right"
-          className="!border-border !bg-card/90 !shadow-none [&>button]:!border-border [&>button]:!bg-card [&>button]:!fill-current [&>button]:!text-foreground"
-        />
-        {minimapVisible && (
-          <MiniMap
-            position="top-right"
-            pannable
-            zoomable
-            ariaLabel="Übersichtskarte der Architektur"
-            className="!border-border !bg-card/80 !m-2 !rounded-md !border"
-            style={{ width: 168, height: 112 }}
-            maskColor="color-mix(in oklab, var(--background) 72%, transparent)"
-            nodeColor={(node) =>
-              node.type === COMPOUND_NODE_TYPE
-                ? 'var(--graphite-700)'
-                : 'var(--graphite-400)'
-            }
-            nodeStrokeWidth={0}
+      <CanvasNodeActionsContext value={nodeActions}>
+        <ReactFlow
+          nodes={nodes}
+          edges={edges}
+          nodeTypes={NODE_TYPES}
+          edgeTypes={EDGE_TYPES}
+          defaultViewport={initialViewport}
+          minZoom={MIN_ZOOM}
+          maxZoom={MAX_ZOOM}
+          onNodeClick={onNodeClick}
+          onNodeDragStop={onNodeDragStop}
+          onMoveStart={onMoveStart}
+          onMove={onMove}
+          onMoveEnd={onMoveEnd}
+          nodesDraggable
+          nodesConnectable={false}
+          edgesReconnectable={false}
+          elementsSelectable
+          // Selection is owned by the URL, so React Flow must not manage its own.
+          selectNodesOnDrag={false}
+          multiSelectionKeyCode={null}
+          deleteKeyCode={null}
+          proOptions={{ hideAttribution: false }}
+          attributionPosition="bottom-left"
+          className="bg-canvas"
+          aria-label="Interaktiver Architekturgraph"
+        >
+          <Background
+            variant={BackgroundVariant.Dots}
+            gap={28}
+            size={1}
+            color="var(--canvas-grid)"
           />
-        )}
+          <Controls
+            showInteractive={false}
+            // The built-in fit control is replaced by "Einpassen" in the toolbar,
+            // which goes through the camera policy instead of around it.
+            showFitView={false}
+            position="bottom-right"
+            className="!border-border !bg-card/90 !shadow-none [&>button]:!border-border [&>button]:!bg-card [&>button]:!fill-current [&>button]:!text-foreground"
+          />
+          {minimapVisible && (
+            <MiniMap
+              position="top-right"
+              pannable
+              zoomable
+              ariaLabel="Übersichtskarte der Architektur"
+              className="!border-border !bg-card/80 !m-2 !rounded-md !border"
+              style={{ width: 168, height: 112 }}
+              maskColor="color-mix(in oklab, var(--background) 72%, transparent)"
+              nodeColor={(node) =>
+                node.type === COMPOUND_NODE_TYPE
+                  ? 'var(--graphite-700)'
+                  : 'var(--graphite-400)'
+              }
+              nodeStrokeWidth={0}
+            />
+          )}
 
-        <Panel position="top-left" className="!m-2">
-          <div className="border-border bg-card/90 flex items-center gap-1 rounded-md border px-1 py-1 backdrop-blur-sm">
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="h-7 gap-1.5 px-2 text-xs"
-                  onClick={() => {
-                    policyRef.current = onUserFitRequest(policyRef.current).state
-                    fitView()
-                  }}
-                  data-testid="canvas-fit-view"
-                >
-                  <Maximize2 aria-hidden="true" />
-                  Einpassen
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent>
-                Ansicht auf das gesamte Modell einpassen. Die Kamera bewegt sich sonst nur
-                beim ersten Laden — nie durch eintreffende Ereignisse.
-              </TooltipContent>
-            </Tooltip>
-
-            {hasTemporaryPositions && (
+          <Panel position="top-left" className="!m-2">
+            {/* Wraps rather than overflows: the centre pane can be resized down
+                to a few hundred pixels, and a toolbar that runs past its edge
+                takes its own controls out of reach. */}
+            <div className="border-border bg-card/90 flex max-w-[min(100%,44rem)] flex-wrap items-center gap-1 rounded-md border px-1 py-1 backdrop-blur-sm">
               <Tooltip>
                 <TooltipTrigger asChild>
                   <Button
                     variant="ghost"
                     size="sm"
                     className="h-7 gap-1.5 px-2 text-xs"
-                    onClick={clearNodePositions}
-                    data-testid="canvas-reset-positions"
+                    onClick={onShowWholeModel}
+                    data-testid="canvas-fit-view"
                   >
-                    <RotateCcw aria-hidden="true" />
-                    Positionen zurücksetzen
+                    <Maximize2 aria-hidden="true" />
+                    {DISCLOSURE_LABELS.fitWholeModel}
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent className="max-w-80">
+                  {DISCLOSURE_LABELS.fitWholeModelHint} Die Kamera bewegt sich sonst nur beim
+                  ersten Laden — nie durch eintreffende Ereignisse.
+                </TooltipContent>
+              </Tooltip>
+
+              {graph.initialCollapsedIds.length > 0 && (
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-7 gap-1.5 px-2 text-xs"
+                      onClick={onBackToOverview}
+                      data-testid="canvas-back-to-overview"
+                    >
+                      <Layers2 aria-hidden="true" />
+                      {DISCLOSURE_LABELS.backToOverview}
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent className="max-w-80">
+                    {DISCLOSURE_LABELS.backToOverviewHint}
+                  </TooltipContent>
+                </Tooltip>
+              )}
+
+              {hasTemporaryPositions && (
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-7 gap-1.5 px-2 text-xs"
+                      onClick={clearNodePositions}
+                      data-testid="canvas-reset-positions"
+                    >
+                      <RotateCcw aria-hidden="true" />
+                      Positionen zurücksetzen
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    Verschobene Knoten zurück auf das berechnete Layout. Verschiebungen sind
+                    ohnehin nur lokal und ändern das Architekturmodell nicht.
+                  </TooltipContent>
+                </Tooltip>
+              )}
+
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="size-7"
+                    onClick={() => setMinimapVisible(!minimapVisible)}
+                    aria-pressed={minimapVisible}
+                    data-testid="canvas-toggle-minimap"
+                  >
+                    {minimapVisible ? (
+                      <Map aria-hidden="true" />
+                    ) : (
+                      <MapPinOff aria-hidden="true" />
+                    )}
+                    <span className="sr-only">
+                      Übersichtskarte {minimapVisible ? 'ausblenden' : 'einblenden'}
+                    </span>
                   </Button>
                 </TooltipTrigger>
                 <TooltipContent>
-                  Verschobene Knoten zurück auf das berechnete Layout. Verschiebungen sind
-                  ohnehin nur lokal und ändern das Architekturmodell nicht.
+                  Übersichtskarte {minimapVisible ? 'ausblenden' : 'einblenden'}
                 </TooltipContent>
               </Tooltip>
-            )}
 
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="size-7"
-                  onClick={() => setMinimapVisible(!minimapVisible)}
-                  aria-pressed={minimapVisible}
-                  data-testid="canvas-toggle-minimap"
-                >
-                  {minimapVisible ? (
-                    <Map aria-hidden="true" />
-                  ) : (
-                    <MapPinOff aria-hidden="true" />
-                  )}
-                  <span className="sr-only">
-                    Übersichtskarte {minimapVisible ? 'ausblenden' : 'einblenden'}
-                  </span>
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent>
-                Übersichtskarte {minimapVisible ? 'ausblenden' : 'einblenden'}
-              </TooltipContent>
-            </Tooltip>
+              <span className="bg-border mx-0.5 h-4 w-px" aria-hidden="true" />
 
-            <span className="bg-border mx-0.5 h-4 w-px" aria-hidden="true" />
-
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <span
-                  className="text-muted-foreground px-1 text-[11px] whitespace-nowrap"
-                  data-testid="canvas-detail-level"
-                >
-                  Detailstufe: {DETAIL_LEVEL_LABELS[detailLevel]}
-                </span>
-              </TooltipTrigger>
-              <TooltipContent>{DETAIL_LEVEL_DESCRIPTIONS[detailLevel]}</TooltipContent>
-            </Tooltip>
-
-            {problemCount > 0 && (
               <Tooltip>
                 <TooltipTrigger asChild>
                   <span
-                    className="text-state-planned flex items-center gap-1 px-1 text-[11px]"
-                    data-testid="canvas-diagnostics"
+                    className="text-muted-foreground px-1 text-[11px] whitespace-nowrap"
+                    data-testid="canvas-detail-level"
                   >
-                    <TriangleAlert className="size-3.5" aria-hidden="true" />
-                    {problemCount} unstimmige Angaben
+                    Detailstufe: {DETAIL_LEVEL_LABELS[detailLevel]}
                   </span>
                 </TooltipTrigger>
-                <TooltipContent className="max-w-80">
-                  <DiagnosticsSummary graph={graph} />
-                </TooltipContent>
+                <TooltipContent>{DETAIL_LEVEL_DESCRIPTIONS[detailLevel]}</TooltipContent>
               </Tooltip>
-            )}
-          </div>
-        </Panel>
 
-        {graph.isRelayouting && (
-          <Panel position="top-center" className="!m-2">
-            <span
-              className="border-border bg-card/90 text-muted-foreground rounded-md border px-2 py-1 text-[11px]"
-              role="status"
-              data-testid="canvas-layouting"
-            >
-              Layout wird berechnet…
-            </span>
+              {hiddenCount > 0 && (
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <span
+                      className="text-muted-foreground px-1 text-[11px] whitespace-nowrap"
+                      data-testid="canvas-visibility"
+                    >
+                      {DISCLOSURE_LABELS.visibility(
+                        graph.visibleNodeCount,
+                        graph.visibleNodeCount + hiddenCount,
+                      )}
+                    </span>
+                  </TooltipTrigger>
+                  <TooltipContent className="max-w-80">
+                    {DISCLOSURE_LABELS.visibilityHint}
+                  </TooltipContent>
+                </Tooltip>
+              )}
+
+              {problemCount > 0 && (
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <span
+                      className="text-state-planned flex items-center gap-1 px-1 text-[11px]"
+                      data-testid="canvas-diagnostics"
+                    >
+                      <TriangleAlert className="size-3.5" aria-hidden="true" />
+                      {problemCount} unstimmige Angaben
+                    </span>
+                  </TooltipTrigger>
+                  <TooltipContent className="max-w-80">
+                    <DiagnosticsSummary graph={graph} />
+                  </TooltipContent>
+                </Tooltip>
+              )}
+            </div>
           </Panel>
-        )}
-      </ReactFlow>
+
+          {graph.isRelayouting && (
+            <Panel position="top-center" className="!m-2">
+              <span
+                className="border-border bg-card/90 text-muted-foreground rounded-md border px-2 py-1 text-[11px]"
+                role="status"
+                data-testid="canvas-layouting"
+              >
+                Layout wird berechnet…
+              </span>
+            </Panel>
+          )}
+        </ReactFlow>
+      </CanvasNodeActionsContext>
     </div>
   )
 }

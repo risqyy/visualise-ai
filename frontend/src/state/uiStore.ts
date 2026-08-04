@@ -162,6 +162,20 @@ export interface UiState {
    * looking at the graph — the bundle itself is a rendering, never a merge.
    */
   expandedEdgeIds: string[]
+  /**
+   * Architecture containers whose children are not drawn.
+   *
+   * `null` means "the canvas has not disclosed this project yet" and makes it
+   * apply its initial rule (`initialCollapsedIds`). From the first user action
+   * on it the array is authoritative, including the empty array — "the user
+   * opened everything" is a different statement from "nothing was decided yet".
+   *
+   * Transient like the camera and the selection, and for the same reason: it
+   * describes a concrete architecture snapshot, and restoring it into a model
+   * whose hierarchy has meanwhile changed would hide components the user never
+   * chose to hide.
+   */
+  collapsedComponentIds: string[] | null
   /** `false` hides the canvas minimap. */
   minimapVisible: boolean
   deepFocus: DeepFocusTarget | null
@@ -187,6 +201,8 @@ export interface UiState {
 
   toggleEdgeExpanded: (edgeId: string) => void
   clearExpandedEdges: () => void
+  setCollapsedComponentIds: (componentIds: string[] | null) => void
+  setComponentCollapsed: (componentId: string, collapsed: boolean) => void
   setMinimapVisible: (visible: boolean) => void
 
   setAgentCollapsed: (agentId: string, collapsed: boolean) => void
@@ -203,6 +219,7 @@ const transientDefaults = {
   selectedRelationshipId: null,
   hoveredComponentId: null,
   expandedEdgeIds: [],
+  collapsedComponentIds: null,
   deepFocus: null,
   paneStateBeforeDeepFocus: null,
 } satisfies Partial<UiState>
@@ -243,6 +260,18 @@ export const useUiStore = create<UiState>()(
             : [...s.expandedEdgeIds, edgeId],
         })),
       clearExpandedEdges: () => set({ expandedEdgeIds: [] }),
+      setCollapsedComponentIds: (collapsedComponentIds) =>
+        set({
+          collapsedComponentIds:
+            collapsedComponentIds === null ? null : [...collapsedComponentIds].sort(),
+        }),
+      setComponentCollapsed: (componentId, collapsed) =>
+        set((s) => {
+          const current = new Set(s.collapsedComponentIds ?? [])
+          if (collapsed) current.add(componentId)
+          else current.delete(componentId)
+          return { collapsedComponentIds: [...current].sort() }
+        }),
       setMinimapVisible: (minimapVisible) => set({ minimapVisible }),
 
       setAgentCollapsed: (agentId, collapsed) =>

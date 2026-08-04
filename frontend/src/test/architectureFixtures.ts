@@ -315,6 +315,137 @@ export const grownArchitectureResponse: ArchitectureResponse = {
 }
 
 // ---------------------------------------------------------------------------
+// A model that does not fit on a screen
+// ---------------------------------------------------------------------------
+
+/**
+ * A deliberately large snapshot: **32 components over four hierarchy levels**.
+ *
+ * The acceptance criterion of #34 asks for at least 30 nodes, because that is
+ * the size at which fitting everything into the centre pane drops the zoom far
+ * below anything readable. The shape is generated rather than written out so
+ * the intent stays visible: one system, four services, two modules each, two
+ * leaves per module, plus two shared stores and one external client.
+ *
+ * Generated deterministically — same ids, same order, same relationships on
+ * every run — so it can be used in the determinism assertions too.
+ */
+function buildLargeModel(): { components: Component[]; relationships: Relationship[] } {
+  const components: Component[] = [
+    { componentId: 'mesh', name: 'Mesh Platform', kind: 'system', parentComponentId: null },
+    { componentId: 'edge.client', name: 'Edge Client', kind: 'external', parentComponentId: null },
+    { componentId: 'mesh.db', name: 'Mesh Store', kind: 'datastore', parentComponentId: 'mesh' },
+    { componentId: 'mesh.queue', name: 'Mesh Queue', kind: 'queue', parentComponentId: 'mesh' },
+  ]
+  const relationships: Relationship[] = [
+    {
+      relationshipId: 'lr-000',
+      sourceComponentId: 'edge.client',
+      targetComponentId: 'mesh',
+      kind: 'http',
+      protocol: 'HTTP/2',
+      operation: 'GET /',
+    },
+  ]
+
+  for (let service = 1; service <= 4; service += 1) {
+    const serviceId = `mesh.s${service}`
+    components.push({
+      componentId: serviceId,
+      name: `Service ${service}`,
+      kind: 'service',
+      parentComponentId: 'mesh',
+      technology: { language: 'Go' },
+    })
+    for (const module of ['a', 'b']) {
+      const moduleId = `${serviceId}.${module}`
+      components.push({
+        componentId: moduleId,
+        name: `Modul ${service}${module.toUpperCase()}`,
+        kind: 'module',
+        parentComponentId: serviceId,
+      })
+      for (let leaf = 1; leaf <= 2; leaf += 1) {
+        const leafId = `${moduleId}.l${leaf}`
+        components.push({
+          componentId: leafId,
+          name: `Baustein ${service}${module.toUpperCase()}${leaf}`,
+          kind: 'module',
+          parentComponentId: moduleId,
+          technology: { language: 'Go' },
+        })
+        relationships.push({
+          relationshipId: `lr-${service}${module}${leaf}`,
+          sourceComponentId: leafId,
+          targetComponentId: leaf === 1 ? 'mesh.db' : 'mesh.queue',
+          kind: leaf === 1 ? 'data' : 'async',
+          protocol: leaf === 1 ? 'SQL' : 'NATS',
+          ...(leaf === 1 ? { operation: 'SELECT' } : { channel: `mesh.s${service}` }),
+        })
+      }
+    }
+  }
+
+  return { components, relationships }
+}
+
+const LARGE_MODEL = buildLargeModel()
+
+/** A component of the large model four levels down; used for deep-link tests. */
+export const LARGE_DEEP_COMPONENT_ID = 'mesh.s1.a.l1'
+/** Its ancestors, root first — the containers a deep link has to open. */
+export const LARGE_DEEP_ANCESTORS = ['mesh', 'mesh.s1', 'mesh.s1.a'] as const
+
+export const LARGE_COMPONENTS: AppliedComponent[] = LARGE_MODEL.components.map(
+  (component, index) => appliedComponent(component, { position: index + 1 }),
+)
+
+export const LARGE_RELATIONSHIPS: AppliedRelationship[] = LARGE_MODEL.relationships.map(
+  (relationship, index) =>
+    appliedRelationship(relationship, {
+      position: LARGE_MODEL.components.length + index + 1,
+    }),
+)
+
+export const largeArchitectureResponse: ArchitectureResponse = {
+  projectPosition: 90,
+  components: LARGE_COMPONENTS,
+  relationships: LARGE_RELATIONSHIPS,
+  activeChanges: [],
+}
+
+/** The large model with one more leaf — a real structural live update. */
+export const largeGrownArchitectureResponse: ArchitectureResponse = {
+  projectPosition: 91,
+  components: [
+    ...LARGE_COMPONENTS,
+    appliedComponent(
+      {
+        componentId: 'mesh.s1.a.l3',
+        name: 'Baustein 1A3',
+        kind: 'module',
+        parentComponentId: 'mesh.s1.a',
+      },
+      { position: 200 },
+    ),
+  ],
+  relationships: [
+    ...LARGE_RELATIONSHIPS,
+    appliedRelationship(
+      {
+        relationshipId: 'lr-1a3',
+        sourceComponentId: 'mesh.s1.a.l3',
+        targetComponentId: 'mesh.db',
+        kind: 'data',
+        protocol: 'SQL',
+      },
+      { position: 201 },
+    ),
+  ],
+  activeChanges: [],
+}
+
+// ---------------------------------------------------------------------------
 // Change proposals
 // ---------------------------------------------------------------------------
 
