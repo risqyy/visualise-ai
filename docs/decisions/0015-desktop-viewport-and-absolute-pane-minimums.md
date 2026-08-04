@@ -1,4 +1,4 @@
-# 14. The real viewport, absolute pane minimums and one place where sideways scrolling is allowed
+# 15. The real viewport, absolute pane minimums and one place where sideways scrolling is allowed
 
 - **Status:** accepted
 - **Date:** 2026-08-04
