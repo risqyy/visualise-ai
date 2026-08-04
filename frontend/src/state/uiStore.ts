@@ -44,9 +44,13 @@ export type PaneId = (typeof PANE_IDS)[keyof typeof PANE_IDS]
 export type PaneLayout = Record<string, number>
 
 /**
- * Default split at the mandatory acceptance resolution of 1920 × 1080:
- * 346 px | 1037 px | 537 px. The centre stays the dominant area — three times
- * the left pane and twice the inspector.
+ * Default split, as a share of the window.
+ *
+ * At the mandatory acceptance resolution of 1920 × 1080 this is
+ * 345 px | 1036 px | 537 px, and because the shares are relative it keeps the
+ * same proportions at every supported width: the architecture surface is always
+ * ~54 % — wider than the two side panes together — which is the product rule
+ * that it stays the visually dominant area (ADR 0008).
  */
 export const DEFAULT_PANE_LAYOUT: PaneLayout = {
   [PANE_IDS.left]: 18,
@@ -58,9 +62,62 @@ export const DEFAULT_PANE_LAYOUT: PaneLayout = {
 export const COLLAPSED_PANE_SIZE = 3
 
 /**
+ * Narrowest window the cockpit is designed for.
+ *
+ * The mandatory acceptance surface stays 1920 × 1080 (epic #1). 1280 is what a
+ * 1920 px window turns into at 150 % browser zoom and what a half-screen split
+ * on a 2560 px display gives — both are normal desktop situations and neither
+ * may make a pane unusable (issue #41).
+ */
+export const MIN_SUPPORTED_WIDTH = 1280
+
+/**
+ * Pane minimums in **CSS pixels**, not in percent.
+ *
+ * A percentage minimum shrinks with the window, which is exactly the wrong
+ * behaviour: the content a pane has to show does not get narrower because the
+ * window did. `react-resizable-panels` reads a bare number as pixels, so these
+ * are absolute floors that hold at 1280 as well as at 1920 — for the initial
+ * split, for a dragged separator and for a window resize alike.
+ *
+ * Each number is derived from what the pane has to fit, not from taste:
+ *
+ * * **left, 260 px** — a run row is a 20-character monospace id plus its state
+ *   badge, and the agent tree indents four levels before it truncates.
+ * * **centre, 500 px** — the canvas toolbar (`Einpassen`, minimap toggle,
+ *   detail level) is ~300 px and the minimap is 168 px in the opposite corner;
+ *   below ~500 px the two would overlap and the graph would have no room left.
+ * * **right, 340 px** — a unified diff is two 40 px line-number gutters plus a
+ *   code column that is worth reading before it starts scrolling sideways.
+ *
+ * They add up to 1100 px and therefore fit into {@link MIN_SUPPORTED_WIDTH}
+ * with room to spare; `paneSizing.test.ts` asserts that as an invariant.
+ */
+export const PANE_MIN_WIDTH_PX: Record<PaneId, number> = {
+  [PANE_IDS.left]: 260,
+  [PANE_IDS.center]: 500,
+  [PANE_IDS.right]: 340,
+}
+
+/**
+ * Pane maximums, as a share of the window.
+ *
+ * Only the two side panes are capped, and they are capped so the architecture
+ * surface cannot be squeezed out of the middle by dragging. The inspector's
+ * 60 % is what the deep-focus split (56 %) needs — that mode deliberately
+ * enlarges the inspector and is the one documented exception to "the canvas is
+ * the widest pane" (ADR 0008); the canvas stays visible throughout.
+ */
+export const PANE_MAX_WIDTH: Record<'left' | 'right', string> = {
+  left: '32%',
+  right: '60%',
+}
+
+/**
  * Deep-focus split: the inspector grows over the canvas and the run pane folds
  * into its rail, but the canvas keeps ~41 % of the width — roughly 790 px at
- * 1920 — so the architecture context never disappears.
+ * 1920 and still ~525 px at 1280 — so the architecture context never
+ * disappears and never falls below its pixel minimum.
  */
 export const DEEP_FOCUS_PANE_LAYOUT: PaneLayout = {
   [PANE_IDS.left]: COLLAPSED_PANE_SIZE,

@@ -16,6 +16,8 @@ import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip
 import {
   COLLAPSED_PANE_SIZE,
   PANE_IDS,
+  PANE_MAX_WIDTH,
+  PANE_MIN_WIDTH_PX,
   useUiStore,
   type PaneLayout,
 } from '@/state/uiStore'
@@ -37,6 +39,17 @@ export interface WorkspaceLayoutProps {
  *
  * Both side panes are independently collapsible. A collapsed pane keeps a thin
  * rail with its expand control, so the pane never disappears without a way back.
+ *
+ * The **shares** are relative and the **minimums are absolute** (issue #41).
+ * That split is deliberate: the proportions are what keeps the architecture
+ * surface dominant at every width, while a percentage minimum would shrink with
+ * the window and let a pane become unusable at 1280 — the width a 1920 px
+ * window has at 150 % browser zoom. The numbers live in `state/uiStore.ts`
+ * next to the layout they constrain.
+ *
+ * Nothing here scrolls. The group is exactly one viewport tall and each pane
+ * owns its own scroll region, which is what keeps the page itself free of a
+ * scrollbar in either direction.
  */
 export function WorkspaceLayout({ left, center, right }: WorkspaceLayoutProps) {
   const layout = useUiStore((state) => state.layout)
@@ -72,8 +85,8 @@ export function WorkspaceLayout({ left, center, right }: WorkspaceLayoutProps) {
         id={PANE_IDS.left}
         collapsible
         collapsedSize={`${COLLAPSED_PANE_SIZE}%`}
-        minSize="12%"
-        maxSize="32%"
+        minSize={PANE_MIN_WIDTH_PX[PANE_IDS.left]}
+        maxSize={PANE_MAX_WIDTH.left}
         panelRef={leftPanelRef}
         className="min-w-0"
         onResize={() => syncCollapsed(leftPanelRef, leftCollapsed, setLeftCollapsed)}
@@ -91,7 +104,11 @@ export function WorkspaceLayout({ left, center, right }: WorkspaceLayoutProps) {
 
       <ResizableHandle withHandle aria-label="Breite des Run- und Agent-Bereichs" />
 
-      <ResizablePanel id={PANE_IDS.center} minSize="30%" className="min-w-0">
+      <ResizablePanel
+        id={PANE_IDS.center}
+        minSize={PANE_MIN_WIDTH_PX[PANE_IDS.center]}
+        className="min-w-0"
+      >
         {center}
       </ResizablePanel>
 
@@ -101,8 +118,8 @@ export function WorkspaceLayout({ left, center, right }: WorkspaceLayoutProps) {
         id={PANE_IDS.right}
         collapsible
         collapsedSize={`${COLLAPSED_PANE_SIZE}%`}
-        minSize="16%"
-        maxSize="60%"
+        minSize={PANE_MIN_WIDTH_PX[PANE_IDS.right]}
+        maxSize={PANE_MAX_WIDTH.right}
         panelRef={rightPanelRef}
         className="min-w-0"
         onResize={() => syncCollapsed(rightPanelRef, rightCollapsed, setRightCollapsed)}
