@@ -7,9 +7,12 @@ name: E2E acceptance
 # 1920 × 1080. A failure here blocks the v0 release — see
 # `docs/decisions/0013-mandatory-end-to-end-acceptance.md`.
 
+# `push` is limited to the default branch on purpose: with `branches: ['**']` a
+# branch that has an open pull request would run this expensive job twice for
+# the same commit.
 on:
   push:
-    branches: ['**']
+    branches: [main]
   pull_request:
   workflow_dispatch:
 

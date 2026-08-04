@@ -5,9 +5,11 @@ name: CI
 # acceptance run (issue #14) lives in `e2e.yml` because it needs Docker, a build
 # of every service and a real browser.
 
+# `push` is limited to the default branch on purpose: with `branches: ['**']` a
+# branch that has an open pull request is built twice for the same commit.
 on:
   push:
-    branches: ['**']
+    branches: [main]
   pull_request:
   workflow_dispatch:
 
