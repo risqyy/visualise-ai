@@ -1,4 +1,5 @@
 import type {
+  ActiveChange,
   AppliedComponent,
   AppliedRelationship,
   ArchitectureResponse,
@@ -311,6 +312,72 @@ export const grownArchitectureResponse: ArchitectureResponse = {
     ),
   ],
   activeChanges: [],
+}
+
+// ---------------------------------------------------------------------------
+// Change proposals
+// ---------------------------------------------------------------------------
+
+/** The component the overlay tests propose adding. Not in the applied model. */
+export const SHIPPING_COMPONENT: Component = {
+  componentId: 'platform.core.shipping',
+  name: 'Shipping',
+  kind: 'module',
+  parentComponentId: 'platform.core',
+  description: 'Versandabwicklung.',
+  technology: { language: 'Go' },
+  tags: ['domain'],
+}
+
+/** The relationship the overlay tests propose adding, next to the applied ones. */
+export const SHIPPING_BUS_RELATIONSHIP: Relationship = {
+  relationshipId: 'r-09',
+  sourceComponentId: 'platform.core.shipping',
+  targetComponentId: 'platform.bus',
+  kind: 'nats_topic',
+  protocol: 'NATS',
+  channel: 'shipping.dispatched',
+  operation: 'publish',
+  label: '',
+}
+
+/**
+ * A pending proposal as the read API returns it.
+ *
+ * `snapshot` carries the reported descriptor verbatim, exactly as the contract
+ * specifies — that is what lets the canvas draw a proposal for a component the
+ * applied model does not contain, without a second lookup.
+ */
+export function activeChange(overrides: Partial<ActiveChange> = {}): ActiveChange {
+  return {
+    changeId: 'change-0001',
+    targetKind: 'component',
+    targetId: SHIPPING_COMPONENT.componentId,
+    operation: 'add',
+    state: 'planned',
+    runId: 'run-2026-08-04-0001',
+    agentId: 'subagent-architecture-mapper',
+    plannedAt: '2026-08-04T09:10:00Z',
+    appliedAt: null,
+    retractedAt: null,
+    snapshot: SHIPPING_COMPONENT as unknown as Record<string, unknown>,
+    position: 50,
+    ...overrides,
+  }
+}
+
+/** The nested model with a list of pending proposals on top of it. */
+export function architectureWithChanges(
+  changes: readonly ActiveChange[],
+  overrides: Partial<ArchitectureResponse> = {},
+): ArchitectureResponse {
+  return {
+    projectPosition: 60,
+    components: NESTED_COMPONENTS,
+    relationships: NESTED_RELATIONSHIPS,
+    activeChanges: [...changes],
+    ...overrides,
+  }
 }
 
 /** Shuffles deterministically, so a re-ordered input list is reproducible. */

@@ -236,14 +236,20 @@ function ArchitectureCanvasInner({
   const hasTemporaryPositions = Object.keys(nodePositions).length > 0
   const problemCount = diagnosticsCount(graph.diagnostics)
 
+  // The applied model and the overlay are counted separately on purpose: a
+  // planned change must become visible on the canvas **without** changing what
+  // the applied model contains, and these two numbers are how that stays
+  // checkable from the outside.
   return (
     <div
       className="relative h-full w-full min-w-0"
       data-testid="architecture-canvas"
       data-fit-view-count={fitViewCount}
       data-detail-level={detailLevel}
-      data-node-count={nodes.length}
-      data-edge-count={edges.length}
+      data-node-count={graph.appliedNodeCount}
+      data-edge-count={graph.appliedEdgeCount}
+      data-overlay-node-count={graph.overlayNodeCount}
+      data-overlay-edge-count={graph.overlayEdgeCount}
       data-layouting={graph.isRelayouting ? 'true' : 'false'}
     >
       <EdgeMarkerDefs />

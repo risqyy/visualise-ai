@@ -4,7 +4,10 @@ import { memo, type ReactNode } from 'react'
 import type { Relationship } from '@/api/types'
 import { cn } from '@/lib/utils'
 import { useUiStore } from '@/state/uiStore'
+import { WORK_STATE_BY_ID } from '@/state/workStates'
 
+import { ChangeOverlayMark } from './ChangeOverlayMark'
+import { dominantOverlay, type ChangeOverlay } from './changeOverlays'
 import { unfoldsBundles } from './detailLevel'
 import {
   fallbackRoute,
@@ -49,11 +52,19 @@ interface EdgeRouteProps {
   interactive: boolean
   testId?: string
   kind?: string
+  /** Reported work state of this line, if any. */
+  overlay?: ChangeOverlay | null
 }
 
 /**
  * One drawn line. The wide transparent path underneath is the hit area: a 1.5 px
  * line is not a pointer target.
+ *
+ * A line that carries a work state gets **two** colour-independent markers on
+ * top of the state colour: a second path underneath drawn in the state's own
+ * dash pattern, and the label badge next to it. The line keeps its kind pattern,
+ * because that pattern is what identifies the *kind* — the two encodings must
+ * not fight over the same channel.
  */
 function EdgeRoute({
   points,
@@ -63,9 +74,12 @@ function EdgeRoute({
   interactive,
   testId,
   kind,
+  overlay = null,
 }: EdgeRouteProps) {
   const path = roundedPolylinePath(points)
   if (path === '') return null
+
+  const state = overlay ? WORK_STATE_BY_ID[overlay.state] : null
 
   return (
     <>
@@ -78,21 +92,39 @@ function EdgeRoute({
           className="react-flow__edge-interaction"
         />
       )}
+      {state && (
+        <path
+          d={path}
+          fill="none"
+          stroke={`var(${state.colorVar})`}
+          strokeWidth={5}
+          strokeOpacity={0.35}
+          strokeDasharray={
+            state.strokeDasharray === '0' ? undefined : state.strokeDasharray
+          }
+          strokeLinecap="round"
+          data-testid={testId ? `${testId}-state` : undefined}
+          data-work-state={overlay?.state}
+          data-state-dasharray={state.strokeDasharray}
+        />
+      )}
       <path
         d={path}
         fill="none"
-        stroke="currentColor"
+        stroke={state ? `var(${state.colorVar})` : 'currentColor'}
         strokeWidth={emphasised ? 2.25 : 1.5}
         strokeDasharray={strokeDasharray === '0' ? undefined : strokeDasharray}
         strokeLinecap="round"
         markerEnd={markerUrl(marker, emphasised)}
         className={cn(
-          'transition-colors',
-          emphasised ? 'text-ring' : 'text-muted-foreground',
+          'transition-colors duration-150',
+          !state && (emphasised ? 'text-ring' : 'text-muted-foreground'),
         )}
         data-testid={testId}
         data-relationship-kind={kind}
         data-dasharray={strokeDasharray}
+        data-work-state={overlay?.state}
+        data-presence={overlay?.presence}
       />
     </>
   )
@@ -148,6 +180,32 @@ function EdgeBadge({
   )
 }
 
+/**
+ * The work state of an edge, anchored to a point on its route.
+ *
+ * Positioned away from the kind badge so both stay readable: the kind badge
+ * sits at the middle of the line, the state mark closer to the target.
+ */
+function EdgeOverlayMark({
+  point,
+  overlay,
+}: {
+  point: LayoutPoint
+  overlay: ChangeOverlay
+}) {
+  return (
+    <span
+      style={{
+        position: 'absolute',
+        transform: `translate(-50%, -50%) translate(${point.x}px, ${point.y}px)`,
+      }}
+      className="pointer-events-auto"
+    >
+      <ChangeOverlayMark overlay={overlay} />
+    </span>
+  )
+}
+
 export const RelationshipEdge = memo(function RelationshipEdge({
   id,
   data,
@@ -172,10 +230,12 @@ export const RelationshipEdge = memo(function RelationshipEdge({
   const route: LayoutPoint[] =
     data.route ?? fallbackRoute({ x: sourceX, y: sourceY }, { x: targetX, y: targetY })
 
+  const overlays = data.overlays ?? {}
   const bundled = resolved.length > 1
   const unfolded = bundled && (unfoldsBundles(level) || expandedEdgeIds.includes(id))
 
   if (!bundled || !unfolded) {
+    const edgeOverlay = dominantOverlay(Object.values(overlays))
     const kinds = [...new Set(resolved.map((entry) => entry.relationship.kind))]
     const onlyKind = kinds.length === 1 ? kinds[0] : null
     const style = onlyKind ? RELATIONSHIP_KIND_STYLE_BY_ID[onlyKind] : null
@@ -204,9 +264,13 @@ export const RelationshipEdge = memo(function RelationshipEdge({
           emphasised={emphasised}
           interactive
           testId={`edge-path-${id}`}
+          overlay={edgeOverlay}
           {...(onlyKind ? { kind: onlyKind } : {})}
         />
         <EdgeLabelRenderer>
+          {edgeOverlay && (
+            <EdgeOverlayMark point={pointAtRatio(route, 0.74)} overlay={edgeOverlay} />
+          )}
           {bundled ? (
             <EdgeBadge
               point={badgePoint}
@@ -259,10 +323,23 @@ export const RelationshipEdge = memo(function RelationshipEdge({
             interactive={false}
             testId={`edge-path-${entry.relationship.relationshipId}`}
             kind={entry.relationship.kind}
+            overlay={overlays[entry.relationship.relationshipId] ?? null}
           />
         )
       })}
       <EdgeLabelRenderer>
+        {resolved.map((entry) => {
+          const overlay = overlays[entry.relationship.relationshipId]
+          if (!overlay) return null
+          const fanned = fanRoute(route, fanOffset(entry.index, entry.total))
+          return (
+            <EdgeOverlayMark
+              key={`state-${entry.relationship.relationshipId}`}
+              point={pointAtRatio(fanned, 0.74)}
+              overlay={overlay}
+            />
+          )
+        })}
         {resolved.map((entry) => {
           const style = RELATIONSHIP_KIND_STYLE_BY_ID[entry.relationship.kind]
           const fanned = fanRoute(route, fanOffset(entry.index, entry.total))

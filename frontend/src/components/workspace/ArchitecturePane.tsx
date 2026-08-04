@@ -3,8 +3,10 @@ import { useMemo } from 'react'
 import { useArchitecture } from '@/api/queries'
 import type { ComponentId, ProjectId } from '@/api/types'
 import { ArchitectureCanvas } from '@/canvas/ArchitectureCanvas'
+import { useChangeOverlays } from '@/canvas/useChangeOverlays'
 import { AsyncState } from '@/components/AsyncState'
 import { StatusLegend } from '@/components/StatusLegend'
+import { ChangeCounter } from '@/components/workspace/ChangeCounter'
 import { PaneHeader } from '@/components/workspace/PaneHeader'
 import { RelationshipLegend } from '@/components/workspace/RelationshipLegend'
 import { Badge } from '@/components/ui/badge'
@@ -32,19 +34,22 @@ export function ArchitecturePane({
   onSelectComponent,
 }: ArchitecturePaneProps) {
   const architecture = useArchitecture(projectId)
+  const overlay = useChangeOverlays(projectId, architecture.data)
 
   const componentCount = architecture.data?.components.length ?? 0
   const relationshipCount = architecture.data?.relationships.length ?? 0
-  const activeChangeCount = architecture.data?.activeChanges.length ?? 0
 
   // Kept stable across refetches: TanStack Query's structural sharing returns
   // the same arrays when nothing changed, so the canvas does not re-layout.
+  // The overlay travels alongside the applied model, never inside it — a
+  // proposal must not turn into a component of the reported architecture.
   const model = useMemo(
     () => ({
       components: architecture.data?.components ?? [],
       relationships: architecture.data?.relationships ?? [],
+      overlay,
     }),
-    [architecture.data?.components, architecture.data?.relationships],
+    [architecture.data?.components, architecture.data?.relationships, overlay],
   )
 
   return (
@@ -58,15 +63,14 @@ export function ArchitecturePane({
         subtitle={projectId}
         actions={
           architecture.isSuccess && (
-            <div className="flex items-center gap-1">
+            <div className="flex items-center gap-2">
+              <ChangeCounter counts={overlay.counts} />
+              <span className="bg-border h-4 w-px" aria-hidden="true" />
               <Badge variant="outline" className="text-2xs font-normal">
                 {componentCount} Komponenten
               </Badge>
               <Badge variant="outline" className="text-2xs font-normal">
                 {relationshipCount} Beziehungen
-              </Badge>
-              <Badge variant="outline" className="text-2xs font-normal">
-                {activeChangeCount} aktive Änderungen
               </Badge>
             </div>
           )
