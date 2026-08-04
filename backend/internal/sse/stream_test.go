@@ -1,6 +1,7 @@
 package sse_test
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"fmt"
@@ -68,16 +69,20 @@ func TestLiveEventReachesTheStream(t *testing.T) {
 	if event.ReceivedAt.IsZero() || event.OccurredAt.IsZero() {
 		t.Errorf("streamed envelope carries no timestamps: %+v", event)
 	}
-	// The payload travels as reported. A live frame carries the ingested
-	// document and a replayed one the canonical form the store wrote, so the two
-	// may differ in key order — which JSON does not distinguish — but never in
-	// content.
 	assertPayload(t, event.Payload, map[string]any{"status": "working", "note": "Rewriting Total()."})
 
-	// The same event, replayed, carries the same payload.
+	// A live frame and the same event replayed from the log must be
+	// byte-identical, not merely equivalent. Both publish the canonical form
+	// the store wrote, so a client may deduplicate or hash frames without
+	// having to normalise object key order first.
 	replayed := h.connect(streamPath("live-project")+"?lastEventPosition="+strconv.FormatInt(position-1, 10), nil)
 	_, fromLog := replayed.nextEvent()
 	assertPayload(t, fromLog.Payload, map[string]any{"status": "working", "note": "Rewriting Total()."})
+
+	if !bytes.Equal(event.Payload, fromLog.Payload) {
+		t.Errorf("live and replayed payloads differ byte for byte:\n  live:     %s\n  replayed: %s",
+			event.Payload, fromLog.Payload)
+	}
 }
 
 // TestReplayDeliversTheMissingPositions is the reconnect case of the contract:
