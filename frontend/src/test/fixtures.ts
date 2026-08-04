@@ -1,16 +1,16 @@
 import type {
-  Agent,
-  AgentsResponse,
+  AgentListResponse,
+  AppliedComponent,
   ArchitectureResponse,
-  Component,
   ComponentHistoryResponse,
   ComponentInspectorResponse,
   EventType,
-  PlansResponse,
+  PlanListResponse,
+  ProjectListResponse,
   ProjectResponse,
-  ProjectsResponse,
+  RunAgent,
+  RunListResponse,
   RunResponse,
-  RunsResponse,
   StreamedEvent,
   StreamedEventOf,
 } from '@/api/types'
@@ -25,17 +25,29 @@ import type {
 export const PROJECT_ID = 'visualise-ai'
 export const RUN_ID = 'run-2026-08-04-0001'
 
-export function component(overrides: Partial<Component> = {}): Component {
+export function component(overrides: Partial<AppliedComponent> = {}): AppliedComponent {
   return {
     componentId: 'shop-platform.orders.domain',
     name: 'Orders Domain',
     kind: 'module',
     parentComponentId: null,
+    description: '',
+    technology: {},
+    tags: [],
+    appliedAt: '2026-08-04T09:05:00Z',
+    appliedByAgentId: 'orchestrator-root',
+    appliedRunId: RUN_ID,
+    position: 7,
     ...overrides,
   }
 }
 
-export function agent(overrides: Partial<Agent> = {}): Agent {
+/**
+ * `RunAgent` reports "nothing was reported" as an empty string, not as `null`,
+ * and carries no `capabilities`, no `summary` and no `statusReportedAt` — those
+ * live on the events, not on the projection.
+ */
+export function agent(overrides: Partial<RunAgent> = {}): RunAgent {
   return {
     agentId: 'orchestrator-root',
     runId: RUN_ID,
@@ -43,15 +55,13 @@ export function agent(overrides: Partial<Agent> = {}): Agent {
     role: 'orchestrator',
     displayName: 'Orchestrator',
     assignedTask: 'Koordiniert den Run.',
-    capabilities: [],
     status: 'working',
-    statusNote: null,
-    statusReportedAt: '2026-08-04T09:12:00Z',
+    statusNote: '',
     progress: null,
-    outcome: null,
-    summary: null,
+    finishedOutcome: null,
     startedAt: '2026-08-04T09:00:00Z',
     lastEventAt: '2026-08-04T09:12:00Z',
+    position: 12,
     ...overrides,
   }
 }
@@ -78,15 +88,15 @@ export function streamedEvent<T extends EventType>(
   } as StreamedEvent
 }
 
-export const projectsResponse: ProjectsResponse = {
+export const projectsResponse: ProjectListResponse = {
   projectPosition: 42,
   projects: [
     {
       projectId: PROJECT_ID,
-      name: 'Visualise AI',
-      currentRunId: RUN_ID,
-      runCount: 1,
+      firstSeenAt: '2026-08-04T09:00:00Z',
       lastEventAt: '2026-08-04T09:12:00Z',
+      lastPosition: 42,
+      currentRunId: RUN_ID,
     },
   ],
 }
@@ -95,14 +105,17 @@ export const projectResponse: ProjectResponse = {
   projectPosition: 42,
   project: {
     projectId: PROJECT_ID,
-    name: 'Visualise AI',
-    currentRunId: RUN_ID,
-    runCount: 1,
+    firstSeenAt: '2026-08-04T09:00:00Z',
     lastEventAt: '2026-08-04T09:12:00Z',
-    description: null,
-    firstEventAt: '2026-08-04T09:00:00Z',
-    componentCount: 1,
-    relationshipCount: 0,
+    lastPosition: 42,
+    currentRunId: RUN_ID,
+    counts: {
+      runs: 1,
+      openRuns: 1,
+      components: 1,
+      relationships: 0,
+      activeChanges: 0,
+    },
   },
 }
 
@@ -113,18 +126,18 @@ export const architectureResponse: ArchitectureResponse = {
   activeChanges: [],
 }
 
-export const runsResponse: RunsResponse = {
+export const runsResponse: RunListResponse = {
   projectPosition: 42,
   runs: [
     {
       runId: RUN_ID,
-      projectId: PROJECT_ID,
+      rootAgentId: 'orchestrator-root',
       startedAt: '2026-08-04T09:00:00Z',
-      lastEventAt: '2026-08-04T09:12:00Z',
-      outcome: null,
       finishedAt: null,
-      orchestratorAgentId: 'orchestrator-root',
-      agentCount: 1,
+      outcome: null,
+      isOpen: true,
+      isCurrent: true,
+      position: 42,
     },
   ],
   nextCursor: null,
@@ -132,23 +145,28 @@ export const runsResponse: RunsResponse = {
 
 export const runResponse: RunResponse = {
   projectPosition: 42,
-  run: { ...runsResponse.runs[0]!, summary: null },
+  run: {
+    ...runsResponse.runs[0]!,
+    counts: { agents: 1, plans: 0, workSteps: 0 },
+  },
 }
 
-export const agentsResponse: AgentsResponse = {
+export const agentsResponse: AgentListResponse = {
   projectPosition: 42,
   agents: [agent()],
 }
 
-export const plansResponse: PlansResponse = { projectPosition: 42, plans: [] }
+export const plansResponse: PlanListResponse = { projectPosition: 42, plans: [] }
 
 export const inspectorResponse: ComponentInspectorResponse = {
   projectPosition: 42,
+  runId: RUN_ID,
   component: component(),
   responsibleAgent: agent(),
   currentWorkStep: null,
   feedback: [],
   diffs: [],
+  nextDiffCursor: null,
   risks: [],
   problems: [],
   activeChanges: [],

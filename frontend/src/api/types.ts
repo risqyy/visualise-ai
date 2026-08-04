@@ -1,46 +1,99 @@
 /**
  * Domain and read-model types of the cockpit.
  *
- * Everything here is derived by hand from `api/openapi.yaml` — there is
- * deliberately **no code generation step**, so the Docker build stays a plain
- * `npm ci && npm run build` with no generator in between.
+ * **Nothing in this file describes a shape.** Every type below is an alias for a
+ * schema of `api/openapi.yaml`, resolved through the generated module
+ * `./generated/contract.ts`. The contract is the authority; when a name here
+ * differs from a name there, this file is wrong.
  *
- * Two groups live in this file:
+ * This indirection exists so the rest of the app writes `ActiveChange` instead
+ * of `components['schemas']['ActiveChange']`, and so a renamed schema shows up
+ * as a compile error in exactly one place.
  *
- * 1. Types that appear verbatim in the event contract (`Component`,
- *    `Relationship`, `PlanStep`, `Technology`, every event payload and the
- *    streamed envelope). They must stay byte-compatible with the contract.
- * 2. Read models (`ProjectSummary`, `Agent`, `Plan`, `ActiveChange`, …). The
- *    read API projects the event log into these shapes; it is specified in the
- *    issue and implemented server-side in #8. They are folds over the events of
- *    group 1 and never introduce information the contract cannot carry.
+ * Why the aliases are not hand-written any more: they were, and they drifted.
+ * `ActiveChange` alone had a `target`/`componentId`/`relationshipId` triple the
+ * contract never had (`targetKind`/`targetId`), lacked `snapshot`, and was
+ * missing the `retracted` state. See
+ * `docs/decisions/0009-generated-frontend-contract-types.md`.
  *
- * Nothing in the cockpit is inferred: a field is `null` when no agent reported
- * it, never a guess.
+ * Two vocabularies live in the contract and must not be confused:
+ *
+ * * **Event descriptors** — `Component`, `Relationship`, `PlanStep`, every
+ *   `*Payload`: what an agent reports.
+ * * **Read models** — `AppliedComponent`, `AppliedRelationship`, `RunAgent`,
+ *   `RunPlan`, `ActiveChange`, …: what the read API projects out of the log.
+ *   They carry provenance (`appliedAt`, `appliedByAgentId`, `position`) that an
+ *   event descriptor does not have, and they report "nothing was reported" as an
+ *   empty string or `null` rather than by omitting the field.
  */
+
+import type { components } from './generated/contract'
+
+type Schemas = components['schemas']
 
 // ---------------------------------------------------------------------------
 // Primitive identifiers (contract)
 // ---------------------------------------------------------------------------
 
 /** Stable project slug, e.g. `visualise-ai`. */
-export type ProjectId = string
+export type ProjectId = Schemas['ProjectId']
 /** Identifier of one agent run inside a project. */
-export type RunId = string
+export type RunId = Schemas['RunId']
 /** Identifier of a reporting agent, unique within a run. */
-export type AgentId = string
+export type AgentId = Schemas['AgentId']
 /** Identifier of an architecture component, stable across snapshots. */
-export type ComponentId = string
+export type ComponentId = Schemas['ComponentId']
 /** Opaque agent-assigned identifier (plan, work step, feedback, diff, risk, …). */
-export type Identifier = string
+export type Identifier = Schemas['Identifier']
 /** RFC 4122 UUID. */
-export type Uuid = string
+export type Uuid = Schemas['Uuid']
 /** RFC 3339 timestamp, UTC. */
-export type Timestamp = string
+export type Timestamp = Schemas['Timestamp']
 /** Repository-relative POSIX file path. */
-export type RepositoryFilePath = string
+export type RepositoryFilePath = Schemas['RepositoryFilePath']
+/** Contract version an event was reported under. */
+export type SchemaVersion = Schemas['SchemaVersion']
+/** Opaque continuation token of a paged read endpoint. */
+export type Cursor = Schemas['Cursor']
+/** Project position a read response was taken at. */
+export type ProjectPosition = Schemas['ProjectPosition']
+/** Project position of the event that last wrote a read-model row. */
+export type AppliedPosition = Schemas['AppliedPosition']
 
-/** The closed v0 event catalogue. */
+// ---------------------------------------------------------------------------
+// Closed vocabularies (contract)
+// ---------------------------------------------------------------------------
+
+export type EventType = Schemas['EventType']
+export type ChangeOperation = Schemas['ChangeOperation']
+export type Outcome = Schemas['Outcome']
+export type PlanStepState = Schemas['PlanStepState']
+
+/**
+ * The enums below are declared inline in the contract rather than as named
+ * schemas, so they are read off the schema that owns them instead of being
+ * re-typed here.
+ */
+export type ComponentKind = Schemas['Component']['kind']
+export type RelationshipKind = Schemas['Relationship']['kind']
+export type AgentRole = Schemas['AgentStartedPayload']['role']
+export type AgentStatus = Schemas['AgentStatusReportedPayload']['status']
+export type ProgressScope = Schemas['AgentProgressReportedPayload']['scope']
+export type ProgressBasis = Schemas['AgentProgressReportedPayload']['basis']
+export type RiskSeverity = Schemas['RiskReportedPayload']['severity']
+
+/**
+ * The closed v0 event catalogue as a runtime value.
+ *
+ * The SSE client needs the list at runtime — the server sets `event:` to the
+ * event type, so a `message` listener never fires and every type has to be
+ * subscribed individually. Types are erased at runtime, so this one list cannot
+ * be generated away.
+ *
+ * `EventTypeCatalogueIsComplete` below is the compile-time proof that it still
+ * covers the contract enum: adding a type to `api/openapi.yaml` without adding
+ * it here fails `tsc`.
+ */
 export const EVENT_TYPES = [
   'agent.started',
   'agent.status_reported',
@@ -62,530 +115,160 @@ export const EVENT_TYPES = [
   'correction.issued',
   'retraction.issued',
   'run.finished',
-] as const
-
-export type EventType = (typeof EVENT_TYPES)[number]
-
-export type ChangeOperation = 'add' | 'modify' | 'remove'
-export type Outcome = 'completed' | 'failed' | 'cancelled'
-export type PlanStepState = 'pending' | 'in_progress' | 'done' | 'skipped'
-export type AgentRole = 'orchestrator' | 'subagent'
-export type AgentStatus = 'working' | 'waiting' | 'blocked' | 'idle' | 'done'
-export type ProgressScope = 'own_task' | 'overall_estimate'
-export type ProgressBasis = 'reported_estimate' | 'completed_steps'
-export type RiskSeverity = 'low' | 'medium' | 'high'
-export type ComponentKind =
-  | 'system'
-  | 'service'
-  | 'module'
-  | 'datastore'
-  | 'queue'
-  | 'topic'
-  | 'ui'
-  | 'external'
-  | 'library'
-export type RelationshipKind =
-  | 'http'
-  | 'grpc'
-  | 'data'
-  | 'async'
-  | 'nats_topic'
-  | 'dependency'
-
-// ---------------------------------------------------------------------------
-// Architecture model (contract)
-// ---------------------------------------------------------------------------
-
-export interface Technology {
-  language?: string
-  framework?: string
-  runtime?: string
-  version?: string
-}
+] as const satisfies readonly EventType[]
 
 /**
- * One node of the application architecture. The hierarchy is expressed
- * exclusively through `parentComponentId`; dotted ids are a convention only.
+ * Errors with "does not satisfy the constraint `never`" and names the event
+ * types the contract has and `EVENT_TYPES` does not.
  */
-export interface Component {
-  componentId: ComponentId
-  name: string
-  kind: ComponentKind
-  parentComponentId: ComponentId | null
-  description?: string
-  technology?: Technology
-  tags?: string[]
-}
+type NoneLeftOver<T extends never> = T
+export type EventTypeCatalogueIsComplete = NoneLeftOver<
+  Exclude<EventType, (typeof EVENT_TYPES)[number]>
+>
 
+// ---------------------------------------------------------------------------
+// Architecture model as an agent reports it (contract)
+// ---------------------------------------------------------------------------
+
+export type Technology = Schemas['Technology']
 /**
- * A typed, directed edge. Every NATS topic is its own relationship — topics are
- * never merged server-side into one aggregated messaging edge.
+ * One node of the architecture **as reported**. The read API answers with
+ * `AppliedComponent`; this shape appears in event payloads and in
+ * `ActiveChange.snapshot`.
  */
-export interface Relationship {
-  relationshipId: Identifier
-  sourceComponentId: ComponentId
-  targetComponentId: ComponentId
-  kind: RelationshipKind
-  label?: string
-  protocol?: string
-  operation?: string
-  channel?: string
-}
-
-export interface PlanStep {
-  stepId: Identifier
-  order: number
-  title: string
-  state: PlanStepState
-  componentIds?: ComponentId[]
-}
+export type Component = Schemas['Component']
+/** A typed, directed edge as reported. The read API answers `AppliedRelationship`. */
+export type Relationship = Schemas['Relationship']
+export type PlanStep = Schemas['PlanStep']
 
 // ---------------------------------------------------------------------------
 // Event payloads (contract)
 // ---------------------------------------------------------------------------
 
-export interface AgentStartedPayload {
-  role: AgentRole
-  displayName: string
-  assignedTask: string
-  capabilities?: string[]
-}
-
-export interface AgentStatusReportedPayload {
-  status: AgentStatus
-  note?: string
-}
-
-export interface AgentProgressReportedPayload {
-  percent: number
-  scope: ProgressScope
-  basis: ProgressBasis
-  note?: string
-}
-
-export interface AgentFinishedPayload {
-  outcome: Outcome
-  summary?: string
-}
-
-export interface PlanPublishedPayload {
-  planId: Identifier
-  revision: number
-  steps: PlanStep[]
-}
-
-export interface PlanStepUpdatedPayload {
-  planId: Identifier
-  stepId: Identifier
-  state: PlanStepState
-  note?: string
-}
-
-export interface WorkStepStartedPayload {
-  workStepId: Identifier
-  title: string
-  componentIds: ComponentId[]
-  planStepId?: Identifier
-}
-
-export interface WorkStepCompletedPayload {
-  workStepId: Identifier
-  summary?: string
-}
-
-export interface FeedbackPublishedPayload {
-  feedbackId: Identifier
-  componentIds: ComponentId[]
-  format: 'markdown'
-  body: string
-  title?: string
-}
-
-export interface ArchitectureSnapshotPublishedPayload {
-  snapshotId: Identifier
-  components: Component[]
-  relationships: Relationship[]
-}
-
-export interface ComponentChangePlannedPayload {
-  changeId: Identifier
-  operation: ChangeOperation
-  component: Component
-  rationale?: string
-}
-
-export interface ComponentChangeAppliedPayload {
-  changeId?: Identifier
-  operation: ChangeOperation
-  component: Component
-}
-
-export interface RelationshipChangePlannedPayload {
-  changeId: Identifier
-  operation: ChangeOperation
-  relationship: Relationship
-  rationale?: string
-}
-
-export interface RelationshipChangeAppliedPayload {
-  changeId?: Identifier
-  operation: ChangeOperation
-  relationship: Relationship
-}
-
-export interface DiffReportedPayload {
-  diffId: Identifier
-  changeId?: Identifier
-  componentIds: ComponentId[]
-  filePath: RepositoryFilePath
-  unifiedDiff: string
-}
-
-export interface RiskReportedPayload {
-  riskId: Identifier
-  componentIds: ComponentId[]
-  title: string
-  detail?: string
-  severity: RiskSeverity
-}
-
-export interface ProblemReportedPayload {
-  problemId: Identifier
-  componentIds: ComponentId[]
-  title: string
-  detail?: string
-}
-
-export interface CorrectionIssuedPayload {
-  correctsClientEventId: Uuid
-  reason: string
-  correctedType: EventType
-  correctedPayload: Record<string, unknown>
-}
-
-export interface RetractionIssuedPayload {
-  retractsClientEventId: Uuid
-  reason: string
-}
-
-export interface RunFinishedPayload {
-  outcome: Outcome
-  summary?: string
-}
-
-/** Maps every event type to its payload schema. */
-export interface EventPayloadMap {
-  'agent.started': AgentStartedPayload
-  'agent.status_reported': AgentStatusReportedPayload
-  'agent.progress_reported': AgentProgressReportedPayload
-  'agent.finished': AgentFinishedPayload
-  'plan.published': PlanPublishedPayload
-  'plan.step_updated': PlanStepUpdatedPayload
-  'work.step_started': WorkStepStartedPayload
-  'work.step_completed': WorkStepCompletedPayload
-  'feedback.published': FeedbackPublishedPayload
-  'architecture.snapshot_published': ArchitectureSnapshotPublishedPayload
-  'component.change_planned': ComponentChangePlannedPayload
-  'component.change_applied': ComponentChangeAppliedPayload
-  'relationship.change_planned': RelationshipChangePlannedPayload
-  'relationship.change_applied': RelationshipChangeAppliedPayload
-  'diff.reported': DiffReportedPayload
-  'risk.reported': RiskReportedPayload
-  'problem.reported': ProblemReportedPayload
-  'correction.issued': CorrectionIssuedPayload
-  'retraction.issued': RetractionIssuedPayload
-  'run.finished': RunFinishedPayload
-}
+export type AgentStartedPayload = Schemas['AgentStartedPayload']
+export type AgentStatusReportedPayload = Schemas['AgentStatusReportedPayload']
+export type AgentProgressReportedPayload = Schemas['AgentProgressReportedPayload']
+export type AgentFinishedPayload = Schemas['AgentFinishedPayload']
+export type PlanPublishedPayload = Schemas['PlanPublishedPayload']
+export type PlanStepUpdatedPayload = Schemas['PlanStepUpdatedPayload']
+export type WorkStepStartedPayload = Schemas['WorkStepStartedPayload']
+export type WorkStepCompletedPayload = Schemas['WorkStepCompletedPayload']
+export type FeedbackPublishedPayload = Schemas['FeedbackPublishedPayload']
+export type ArchitectureSnapshotPublishedPayload =
+  Schemas['ArchitectureSnapshotPublishedPayload']
+export type ComponentChangePlannedPayload = Schemas['ComponentChangePlannedPayload']
+export type ComponentChangeAppliedPayload = Schemas['ComponentChangeAppliedPayload']
+export type RelationshipChangePlannedPayload = Schemas['RelationshipChangePlannedPayload']
+export type RelationshipChangeAppliedPayload = Schemas['RelationshipChangeAppliedPayload']
+export type DiffReportedPayload = Schemas['DiffReportedPayload']
+export type RiskReportedPayload = Schemas['RiskReportedPayload']
+export type ProblemReportedPayload = Schemas['ProblemReportedPayload']
+export type CorrectionIssuedPayload = Schemas['CorrectionIssuedPayload']
+export type RetractionIssuedPayload = Schemas['RetractionIssuedPayload']
+export type RunFinishedPayload = Schemas['RunFinishedPayload']
 
 // ---------------------------------------------------------------------------
 // Streamed events (contract, SSE)
 // ---------------------------------------------------------------------------
 
 /** Server-assigned metadata every streamed event carries. */
-export interface StreamedEventMeta {
-  schemaVersion: '1.0'
-  clientEventId: Uuid
-  projectId: ProjectId
-  runId: RunId
-  agentId: AgentId
-  parentAgentId?: AgentId | null
-  occurredAt: Timestamp
-  /** Strictly increasing per project. Cursor for SSE replay. */
-  position: number
-  serverEventId: Uuid
-  receivedAt: Timestamp
-}
-
-/** One event of the closed catalogue as carried by a single SSE `data:` line. */
-export type StreamedEventOf<T extends EventType> = StreamedEventMeta & {
-  type: T
-  payload: EventPayloadMap[T]
-}
+export type StreamedEventEnvelope = Schemas['StreamedEventEnvelope']
 
 /** Discriminated union over the whole catalogue, keyed by `type`. */
-export type StreamedEvent = {
-  [T in EventType]: StreamedEventOf<T>
-}[EventType]
+export type StreamedEvent = Schemas['StreamedEvent']
+
+/** One event of the closed catalogue, narrowed to a single `type`. */
+export type StreamedEventOf<T extends EventType> = Extract<StreamedEvent, { type: T }>
+
+/** Maps every event type to its payload schema. */
+export type EventPayloadMap = {
+  [T in EventType]: StreamedEventOf<T>['payload']
+}
 
 // ---------------------------------------------------------------------------
 // Read models (projections of the event log, served by the read API)
 // ---------------------------------------------------------------------------
 
-/**
- * Server-side project position every read response carries. It is the same
- * counter the SSE stream uses as `id:`, so an HTTP snapshot and the live stream
- * can be reconciled deterministically.
- */
-export interface PositionedResponse {
-  projectPosition: number
-}
+export type ProjectSummary = Schemas['ProjectSummary']
+export type ProjectCounts = Schemas['ProjectCounts']
+export type ProjectDetail = Schemas['ProjectDetail']
 
-export interface ProjectSummary {
-  projectId: ProjectId
-  name: string
-  /** Most recent run, or `null` while a project has not reported one yet. */
-  currentRunId: RunId | null
-  runCount: number
-  lastEventAt: Timestamp | null
-}
-
-export interface ProjectDetail extends ProjectSummary {
-  description: string | null
-  firstEventAt: Timestamp | null
-  componentCount: number
-  relationshipCount: number
-}
-
-export interface RunSummary {
-  runId: RunId
-  projectId: ProjectId
-  startedAt: Timestamp
-  lastEventAt: Timestamp
-  /** `null` while no `run.finished` was reported — never inferred from silence. */
-  outcome: Outcome | null
-  finishedAt: Timestamp | null
-  orchestratorAgentId: AgentId | null
-  agentCount: number
-}
-
-export interface RunDetail extends RunSummary {
-  summary: string | null
-}
-
-export interface AgentProgress {
-  percent: number
-  scope: ProgressScope
-  basis: ProgressBasis
-  note: string | null
-  reportedAt: Timestamp
-}
+/** One node of the **applied** architecture model, with its provenance. */
+export type AppliedComponent = Schemas['AppliedComponent']
+/** One edge of the **applied** architecture model, with its provenance. */
+export type AppliedRelationship = Schemas['AppliedRelationship']
 
 /**
- * One agent of a run. The tree is flat with `parentAgentId`; the left pane
- * builds the hierarchy from it (#11).
+ * A pending change proposal.
+ *
+ * `snapshot` carries the reported `Component` or `Relationship` descriptor
+ * verbatim — selected by `targetKind` — so the canvas can draw a proposal
+ * without a second lookup. The contract types it as a free-form object; narrow
+ * it with `changeSnapshot()` below rather than casting at the use site.
  */
-export interface Agent {
-  agentId: AgentId
-  runId: RunId
-  parentAgentId: AgentId | null
-  role: AgentRole
-  displayName: string
-  assignedTask: string
-  capabilities: string[]
-  /** Last explicitly reported status; `null` until the agent reported one. */
-  status: AgentStatus | null
-  statusNote: string | null
-  statusReportedAt: Timestamp | null
-  progress: AgentProgress | null
-  outcome: Outcome | null
-  summary: string | null
-  startedAt: Timestamp
-  lastEventAt: Timestamp
-}
+export type ActiveChange = Schemas['ActiveChange']
 
-export interface PlanRevision {
-  revision: number
-  publishedAt: Timestamp
-  publishedByAgentId: AgentId
-  steps: PlanStep[]
-}
+export type RunSummary = Schemas['RunSummary']
+export type RunCounts = Schemas['RunCounts']
+export type RunDetail = Schemas['RunDetail']
 
-/** Plans are append-only: a changed plan is a new revision of the same plan. */
-export interface Plan {
-  planId: Identifier
-  runId: RunId
-  agentId: AgentId
-  currentRevision: number
-  revisions: PlanRevision[]
-}
+export type AgentProgress = Schemas['AgentProgress']
+/** One node of the agent tree of a run. */
+export type RunAgent = Schemas['RunAgent']
 
-export interface WorkStep {
-  workStepId: Identifier
-  runId: RunId
-  agentId: AgentId
-  title: string
-  componentIds: ComponentId[]
-  planStepId: Identifier | null
-  startedAt: Timestamp
-  completedAt: Timestamp | null
-  summary: string | null
-}
+export type RunPlanStep = Schemas['RunPlanStep']
+export type RunPlanRevision = Schemas['RunPlanRevision']
+export type RunPlan = Schemas['RunPlan']
 
-/**
- * A component or relationship change that is currently visible on the canvas —
- * either only planned, or applied recently enough to still be highlighted.
- * Drives the work-state overlay (#10); `src/state/workStates.ts` owns the
- * mapping to a visual state.
- */
-export interface ActiveChange {
-  changeId: Identifier | null
-  target: 'component' | 'relationship'
-  state: 'planned' | 'applied'
-  operation: ChangeOperation
-  componentId: ComponentId | null
-  relationshipId: Identifier | null
-  runId: RunId
-  agentId: AgentId
-  rationale: string | null
-  reportedAt: Timestamp
-}
-
-export interface Feedback {
-  feedbackId: Identifier
-  runId: RunId
-  agentId: AgentId
-  componentIds: ComponentId[]
-  format: 'markdown'
-  /** Untrusted markdown — rendered sanitised by the inspector (#12). */
-  body: string
-  title: string | null
-  publishedAt: Timestamp
-  retracted: boolean
-  correctedAt: Timestamp | null
-}
-
-export interface Diff {
-  diffId: Identifier
-  changeId: Identifier | null
-  runId: RunId
-  agentId: AgentId
-  componentIds: ComponentId[]
-  filePath: RepositoryFilePath
-  unifiedDiff: string
-  reportedAt: Timestamp
-  retracted: boolean
-}
-
-export interface Risk {
-  riskId: Identifier
-  runId: RunId
-  agentId: AgentId
-  componentIds: ComponentId[]
-  title: string
-  detail: string | null
-  severity: RiskSeverity
-  reportedAt: Timestamp
-  retracted: boolean
-}
-
-export interface ReportedProblem {
-  problemId: Identifier
-  runId: RunId
-  agentId: AgentId
-  componentIds: ComponentId[]
-  title: string
-  detail: string | null
-  reportedAt: Timestamp
-  retracted: boolean
-}
-
-/**
- * One entry of the component history. Corrections and retractions stay visible
- * as their own entries; nothing is overwritten.
- */
-export interface HistoryEntry {
-  position: number
-  eventType: EventType
-  runId: RunId
-  agentId: AgentId
-  occurredAt: Timestamp
-  receivedAt: Timestamp
-  title: string
-  retracted: boolean
-  correctsPosition: number | null
-}
+export type InspectorWorkStep = Schemas['InspectorWorkStep']
+export type FeedbackEntry = Schemas['FeedbackEntry']
+export type ReportedDiff = Schemas['ReportedDiff']
+export type ReportedRisk = Schemas['ReportedRisk']
+export type ReportedProblem = Schemas['ReportedProblem']
+export type ComponentHistoryEntry = Schemas['ComponentHistoryEntry']
 
 // ---------------------------------------------------------------------------
 // Read API responses
 // ---------------------------------------------------------------------------
 
-export interface ProjectsResponse extends PositionedResponse {
-  projects: ProjectSummary[]
-}
-
-export interface ProjectResponse extends PositionedResponse {
-  project: ProjectDetail
-}
-
-export interface ArchitectureResponse extends PositionedResponse {
-  components: Component[]
-  relationships: Relationship[]
-  activeChanges: ActiveChange[]
-}
-
-export interface RunsResponse extends PositionedResponse {
-  runs: RunSummary[]
-  nextCursor: string | null
-}
-
-export interface RunResponse extends PositionedResponse {
-  run: RunDetail
-}
-
-export interface AgentsResponse extends PositionedResponse {
-  agents: Agent[]
-}
-
-export interface PlansResponse extends PositionedResponse {
-  plans: Plan[]
-}
-
-export interface ComponentInspectorResponse extends PositionedResponse {
-  component: Component
-  responsibleAgent: Agent | null
-  currentWorkStep: WorkStep | null
-  feedback: Feedback[]
-  diffs: Diff[]
-  risks: Risk[]
-  problems: ReportedProblem[]
-  activeChanges: ActiveChange[]
-}
-
-export interface ComponentHistoryResponse extends PositionedResponse {
-  entries: HistoryEntry[]
-  nextCursor: string | null
-}
+export type ProjectListResponse = Schemas['ProjectListResponse']
+export type ProjectResponse = Schemas['ProjectResponse']
+export type ArchitectureResponse = Schemas['ArchitectureResponse']
+export type RunListResponse = Schemas['RunListResponse']
+export type RunResponse = Schemas['RunResponse']
+export type AgentListResponse = Schemas['AgentListResponse']
+export type PlanListResponse = Schemas['PlanListResponse']
+export type ComponentInspectorResponse = Schemas['ComponentInspectorResponse']
+export type ComponentHistoryResponse = Schemas['ComponentHistoryResponse']
 
 // ---------------------------------------------------------------------------
 // RFC 9457 problem details
 // ---------------------------------------------------------------------------
 
-export interface Problem {
-  type: string
-  title: string
-  status: number
-  detail: string
-  code: string
-  instance?: string
-}
+export type Problem = Schemas['Problem']
+export type ValidationError = Schemas['ValidationError']
+export type ValidationProblem = Schemas['ValidationProblem']
 
-export interface ValidationErrorDetail {
-  /** RFC 6901 JSON Pointer into the rejected body. */
-  field: string
-  code: string
-  message: string
-}
+// ---------------------------------------------------------------------------
+// Local narrowing helpers — no shape of their own
+// ---------------------------------------------------------------------------
 
-export interface ValidationProblem extends Problem {
-  errors: ValidationErrorDetail[]
+/**
+ * Narrows `ActiveChange.snapshot` to the descriptor `targetKind` announces.
+ *
+ * The contract deliberately types `snapshot` as a free-form object: it stores
+ * what the agent reported, unchanged. `targetKind` is the discriminator, so this
+ * is a projection of the contract's own rule, not an added assumption. Returns
+ * `null` when the snapshot is not an object at all, so a malformed row degrades
+ * to "nothing was reported" instead of throwing.
+ */
+export function changeSnapshot(change: ActiveChange & { targetKind: 'component' }): Component | null
+export function changeSnapshot(
+  change: ActiveChange & { targetKind: 'relationship' },
+): Relationship | null
+export function changeSnapshot(change: ActiveChange): Component | Relationship | null
+export function changeSnapshot(change: ActiveChange): Component | Relationship | null {
+  const snapshot = change.snapshot
+  if (typeof snapshot !== 'object' || snapshot === null) return null
+  return snapshot as Component | Relationship
 }

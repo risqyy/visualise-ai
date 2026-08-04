@@ -1,6 +1,11 @@
 import type { Edge, Node, NodeHandle, Position } from '@xyflow/react'
 
-import type { Component, ComponentId, Identifier, Relationship } from '@/api/types'
+import type {
+  AppliedComponent,
+  AppliedRelationship,
+  ComponentId,
+  Identifier,
+} from '@/api/types'
 
 import { relationshipDiscriminator, relationshipDisplayName } from './relationshipKinds'
 
@@ -81,7 +86,7 @@ export function nodeHandles(width: number, height: number): NodeHandle[] {
 }
 
 export interface ComponentNodeData extends Record<string, unknown> {
-  component: Component
+  component: AppliedComponent
   /** 0 for a root component, 1 for its children, and so on. */
   depth: number
   /** Number of direct children rendered inside this node. */
@@ -100,7 +105,7 @@ export interface RelationshipEdgeData extends Record<string, unknown> {
    * `relationshipId`. Always at least one entry — this is the list the UI
    * resolves a bundle back into.
    */
-  relationships: Relationship[]
+  relationships: AppliedRelationship[]
   /** `true` when more than one relationship shares this pair of components. */
   bundled: boolean
   /**
@@ -199,8 +204,8 @@ export function diagnosticsCount(diagnostics: ProjectionDiagnostics): number {
 // ---------------------------------------------------------------------------
 
 export interface ArchitectureModel {
-  components: readonly Component[]
-  relationships: readonly Relationship[]
+  components: readonly AppliedComponent[]
+  relationships: readonly AppliedRelationship[]
 }
 
 export interface ArchitectureProjection {
@@ -210,7 +215,7 @@ export interface ArchitectureProjection {
   edges: ArchitectureEdge[]
   diagnostics: ProjectionDiagnostics
   /** Components by id, for lookups that would otherwise re-scan the list. */
-  componentsById: Map<ComponentId, Component>
+  componentsById: Map<ComponentId, AppliedComponent>
 }
 
 export const EMPTY_DIAGNOSTICS: ProjectionDiagnostics = {
@@ -246,7 +251,7 @@ export function projectArchitecture(model: ArchitectureModel): ArchitectureProje
   }
 
   // ---- 1. canonical component index ---------------------------------------
-  const componentsById = new Map<ComponentId, Component>()
+  const componentsById = new Map<ComponentId, AppliedComponent>()
   const sortedComponents = [...model.components].sort((a, b) =>
     compareIds(a.componentId, b.componentId),
   )
@@ -263,8 +268,11 @@ export function projectArchitecture(model: ArchitectureModel): ArchitectureProje
   // ---- 2. resolve parents, cutting links that point nowhere ---------------
   const parentOf = new Map<ComponentId, ComponentId | null>()
   for (const [componentId, component] of componentsById) {
+    // The contract types `parentComponentId` as `ComponentId | null` and always
+    // sends the field; `ComponentId` has `minLength: 1`, so "no parent" is
+    // `null` and never an empty string. There is nothing else to guard against.
     const parentId = component.parentComponentId
-    if (parentId === null || parentId === undefined || parentId === '') {
+    if (parentId === null) {
       parentOf.set(componentId, null)
       continue
     }
@@ -365,7 +373,7 @@ export function projectArchitecture(model: ArchitectureModel): ArchitectureProje
   }
 
   // ---- 6. relationships -> bundled edges ----------------------------------
-  const relationshipsById = new Map<Identifier, Relationship>()
+  const relationshipsById = new Map<Identifier, AppliedRelationship>()
   const sortedRelationships = [...model.relationships].sort((a, b) =>
     compareIds(a.relationshipId, b.relationshipId),
   )
@@ -379,7 +387,7 @@ export function projectArchitecture(model: ArchitectureModel): ArchitectureProje
     relationshipsById.set(relationship.relationshipId, relationship)
   }
 
-  const bundles = new Map<string, Relationship[]>()
+  const bundles = new Map<string, AppliedRelationship[]>()
   for (const relationship of relationshipsById.values()) {
     const { sourceComponentId, targetComponentId, relationshipId } = relationship
 
@@ -413,8 +421,8 @@ export function projectArchitecture(model: ArchitectureModel): ArchitectureProje
     .sort(compareIds)
     .map((edgeId) => {
       // Non-null: the key came from this very map.
-      const relationships = bundles.get(edgeId) as Relationship[]
-      const first = relationships[0] as Relationship
+      const relationships = bundles.get(edgeId) as AppliedRelationship[]
+      const first = relationships[0] as AppliedRelationship
       return {
         id: edgeId,
         type: RELATIONSHIP_EDGE_TYPE,
@@ -439,7 +447,7 @@ export function projectArchitecture(model: ArchitectureModel): ArchitectureProje
 // ---------------------------------------------------------------------------
 
 export interface ResolvedRelationship {
-  relationship: Relationship
+  relationship: AppliedRelationship
   /** Index within the bundle, used for the fan-out offset. */
   index: number
   /** Number of relationships in the bundle this one belongs to. */
@@ -468,7 +476,7 @@ export function resolveEdgeBundle(edge: ArchitectureEdge): ResolvedRelationship[
 
 /** Same as `resolveEdgeBundle`, for callers that already hold the list. */
 export function resolveRelationships(
-  relationships: readonly Relationship[],
+  relationships: readonly AppliedRelationship[],
 ): ResolvedRelationship[] {
   return relationships.map((relationship, index) => ({
     relationship,

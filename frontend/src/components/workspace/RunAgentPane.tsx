@@ -166,8 +166,13 @@ function RunLink({
         ) : (
           <>ohne Terminalereignis</>
         )}
+        {/*
+          `RunSummary` carries no agent count — only `RunDetail.counts` does, and
+          the list endpoint does not return it. The root agent is what the
+          summary actually reports.
+        */}
         <span aria-hidden="true">·</span>
-        {run.agentCount} Agents
+        {run.rootAgentId ?? 'kein Root-Agent gemeldet'}
       </span>
     </Link>
   )

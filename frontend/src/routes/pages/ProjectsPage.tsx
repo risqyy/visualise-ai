@@ -40,14 +40,17 @@ export function ProjectsPage() {
                       className="border-border bg-card hover:bg-accent focus-visible:ring-ring flex items-center gap-3 rounded-lg border px-4 py-3 focus-visible:ring-2 focus-visible:outline-none"
                     >
                       <span className="min-w-0 flex-1">
-                        <span className="block truncate font-medium">{project.name}</span>
-                        <span className="text-muted-foreground block truncate font-mono text-xs">
+                        {/*
+                          The contract knows no display name for a project: a
+                          project is its slug. Nothing is invented here.
+                        */}
+                        <span className="block truncate font-mono font-medium">
                           {project.projectId}
                         </span>
+                        <span className="text-muted-foreground block truncate text-xs">
+                          zuletzt gemeldet {project.lastEventAt}
+                        </span>
                       </span>
-                      <Badge variant="outline" className="text-2xs font-normal">
-                        {project.runCount} Runs
-                      </Badge>
                       <Badge variant="outline" className="text-2xs font-normal">
                         {project.currentRunId ?? 'kein aktueller Run'}
                       </Badge>

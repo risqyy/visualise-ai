@@ -1,4 +1,6 @@
 import type {
+  AppliedComponent,
+  AppliedRelationship,
   ArchitectureResponse,
   Component,
   Relationship,
@@ -19,10 +21,68 @@ import type {
  *   is the case that must be bundled visually and stay individually resolvable,
  * * fields that the read API reports as empty strings rather than omitting them.
  *
+ * The rows below are written as the *reported* descriptors (`Component`,
+ * `Relationship`) and lifted into the read-model shapes the architecture
+ * endpoint actually answers with (`AppliedComponent`, `AppliedRelationship`) by
+ * `appliedComponent` / `appliedRelationship`. Those two builders are the single
+ * place that fills in the provenance and the empty-string defaults the contract
+ * requires, so a fixture can never accidentally describe a shape the read API
+ * does not serve.
+ *
  * It is test data only and never reaches application code.
  */
 
-export const NESTED_COMPONENTS: Component[] = [
+const APPLIED_AT = '2026-08-04T09:05:00Z'
+const APPLIED_BY_AGENT_ID = 'orchestrator-root'
+const APPLIED_RUN_ID = 'run-2026-08-04-0001'
+
+type Provenance = Partial<
+  Pick<AppliedComponent, 'appliedAt' | 'appliedByAgentId' | 'appliedRunId' | 'position'>
+>
+
+/**
+ * Lifts a reported component into the applied read model.
+ *
+ * The read API never omits an optional field — it reports "not reported" as an
+ * empty string, an empty object or an empty array.
+ */
+export function appliedComponent(
+  reported: Component,
+  provenance: Provenance = {},
+): AppliedComponent {
+  return {
+    appliedAt: APPLIED_AT,
+    appliedByAgentId: APPLIED_BY_AGENT_ID,
+    appliedRunId: APPLIED_RUN_ID,
+    position: 1,
+    ...provenance,
+    ...reported,
+    description: reported.description ?? '',
+    technology: reported.technology ?? {},
+    tags: reported.tags ?? [],
+  }
+}
+
+/** Lifts a reported relationship into the applied read model. */
+export function appliedRelationship(
+  reported: Relationship,
+  provenance: Provenance = {},
+): AppliedRelationship {
+  return {
+    appliedAt: APPLIED_AT,
+    appliedByAgentId: APPLIED_BY_AGENT_ID,
+    appliedRunId: APPLIED_RUN_ID,
+    position: 1,
+    ...provenance,
+    ...reported,
+    label: reported.label ?? '',
+    protocol: reported.protocol ?? '',
+    operation: reported.operation ?? '',
+    channel: reported.channel ?? '',
+  }
+}
+
+const REPORTED_COMPONENTS: Component[] = [
   {
     componentId: 'platform',
     name: 'Shop Platform',
@@ -110,7 +170,11 @@ export const NESTED_COMPONENTS: Component[] = [
   },
 ]
 
-export const NESTED_RELATIONSHIPS: Relationship[] = [
+export const NESTED_COMPONENTS: AppliedComponent[] = REPORTED_COMPONENTS.map(
+  (component, index) => appliedComponent(component, { position: index + 1 }),
+)
+
+const REPORTED_RELATIONSHIPS: Relationship[] = [
   {
     relationshipId: 'r-01',
     sourceComponentId: 'platform.api.http.router',
@@ -184,6 +248,11 @@ export const NESTED_RELATIONSHIPS: Relationship[] = [
   },
 ]
 
+export const NESTED_RELATIONSHIPS: AppliedRelationship[] = REPORTED_RELATIONSHIPS.map(
+  (relationship, index) =>
+    appliedRelationship(relationship, { position: REPORTED_COMPONENTS.length + index + 1 }),
+)
+
 /** The three topics that share the `orders → bus` node pair. */
 export const BUNDLED_TOPIC_CHANNELS = [
   'orders.cancelled',
@@ -215,25 +284,31 @@ export const grownArchitectureResponse: ArchitectureResponse = {
   projectPosition: 43,
   components: [
     ...NESTED_COMPONENTS,
-    {
-      componentId: 'platform.core.shipping',
-      name: 'Shipping',
-      kind: 'module',
-      parentComponentId: 'platform.core',
-      technology: { language: 'Go' },
-      tags: ['domain'],
-    },
+    appliedComponent(
+      {
+        componentId: 'platform.core.shipping',
+        name: 'Shipping',
+        kind: 'module',
+        parentComponentId: 'platform.core',
+        technology: { language: 'Go' },
+        tags: ['domain'],
+      },
+      { position: 43 },
+    ),
   ],
   relationships: [
     ...NESTED_RELATIONSHIPS,
-    {
-      relationshipId: 'r-09',
-      sourceComponentId: 'platform.core.shipping',
-      targetComponentId: 'platform.bus',
-      kind: 'nats_topic',
-      protocol: 'NATS',
-      channel: 'shipping.dispatched',
-    },
+    appliedRelationship(
+      {
+        relationshipId: 'r-09',
+        sourceComponentId: 'platform.core.shipping',
+        targetComponentId: 'platform.bus',
+        kind: 'nats_topic',
+        protocol: 'NATS',
+        channel: 'shipping.dispatched',
+      },
+      { position: 43 },
+    ),
   ],
   activeChanges: [],
 }

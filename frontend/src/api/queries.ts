@@ -8,18 +8,18 @@ import {
 import { fetchJson } from './fetchJson'
 import { queryKeys } from './queryKeys'
 import type {
-  AgentsResponse,
+  AgentListResponse,
   ArchitectureResponse,
   ComponentHistoryResponse,
   ComponentId,
   ComponentInspectorResponse,
-  PlansResponse,
+  PlanListResponse,
   ProjectId,
+  ProjectListResponse,
   ProjectResponse,
-  ProjectsResponse,
   RunId,
+  RunListResponse,
   RunResponse,
-  RunsResponse,
 } from './types'
 
 /** Page size used for the two cursor-paged endpoints. */
@@ -32,7 +32,7 @@ export const PAGE_SIZE = 50
 export function projectsQuery() {
   return queryOptions({
     queryKey: queryKeys.projects(),
-    queryFn: ({ signal }) => fetchJson<ProjectsResponse>('/projects', { signal }),
+    queryFn: ({ signal }) => fetchJson<ProjectListResponse>('/projects', { signal }),
   })
 }
 
@@ -61,12 +61,12 @@ export function runsQuery(projectId: ProjectId, limit = PAGE_SIZE) {
   return infiniteQueryOptions({
     queryKey: queryKeys.runs(projectId),
     queryFn: ({ signal, pageParam }) =>
-      fetchJson<RunsResponse>(`/projects/${encodeURIComponent(projectId)}/runs`, {
+      fetchJson<RunListResponse>(`/projects/${encodeURIComponent(projectId)}/runs`, {
         signal,
         query: { limit, cursor: pageParam },
       }),
     initialPageParam: null as string | null,
-    getNextPageParam: (lastPage: RunsResponse) => lastPage.nextCursor,
+    getNextPageParam: (lastPage: RunListResponse) => lastPage.nextCursor,
   })
 }
 
@@ -85,7 +85,7 @@ export function agentsQuery(projectId: ProjectId, runId: RunId) {
   return queryOptions({
     queryKey: queryKeys.agents(projectId, runId),
     queryFn: ({ signal }) =>
-      fetchJson<AgentsResponse>(
+      fetchJson<AgentListResponse>(
         `/projects/${encodeURIComponent(projectId)}/runs/${encodeURIComponent(runId)}/agents`,
         { signal },
       ),
@@ -96,7 +96,7 @@ export function plansQuery(projectId: ProjectId, runId: RunId) {
   return queryOptions({
     queryKey: queryKeys.plans(projectId, runId),
     queryFn: ({ signal }) =>
-      fetchJson<PlansResponse>(
+      fetchJson<PlanListResponse>(
         `/projects/${encodeURIComponent(projectId)}/runs/${encodeURIComponent(runId)}/plans`,
         { signal },
       ),
