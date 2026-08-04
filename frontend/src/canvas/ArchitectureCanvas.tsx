@@ -15,7 +15,16 @@ import {
   type Viewport,
 } from '@xyflow/react'
 import { Layers2, Map, MapPinOff, Maximize2, RotateCcw, TriangleAlert } from 'lucide-react'
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import {
+  useCallback,
+  useEffect,
+  useId,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+  type KeyboardEvent as ReactKeyboardEvent,
+} from 'react'
 
 import '@xyflow/react/dist/style.css'
 
@@ -33,6 +42,13 @@ import {
   viewportForBounds,
   type CameraPolicyState,
 } from './cameraPolicy'
+import {
+  CANVAS_A11Y_TEXT,
+  CANVAS_ARIA_LABEL_CONFIG,
+  componentNamesById,
+  withEdgeAccessibility,
+  withNodeAccessibility,
+} from './canvasAccessibility'
 import {
   DETAIL_LEVEL_DESCRIPTIONS,
   DETAIL_LEVEL_LABELS,
@@ -53,6 +69,7 @@ import {
   routesInvalidatedByDrag,
   useArchitectureGraph,
 } from './useArchitectureGraph'
+import { useCanvasCountText } from './useCanvasCountText'
 
 /**
  * The interactive architecture canvas.
@@ -75,6 +92,11 @@ import {
  *    `MIN_READABLE_ZOOM`, and a project opens on its top levels with deeper
  *    containers collapsed (`collapse.ts`). Both are undone by an explicit
  *    "Gesamtes Modell einpassen", never by anything the data does.
+ *
+ * The accessible surface — names, roles and states of the nodes and edges —
+ * lives in `./canvasAccessibility`; this component only wires it up, owns the
+ * keyboard activation and publishes the live zoom so the focus ring can stay a
+ * constant width inside the CSS transform (see `--vai-canvas-zoom`).
  */
 
 const MIN_ZOOM = 0.12
@@ -82,6 +104,18 @@ const MAX_ZOOM = 2.5
 
 const NODE_TYPES = ARCHITECTURE_NODE_TYPES
 const EDGE_TYPES = ARCHITECTURE_EDGE_TYPES
+
+/**
+ * Arrow keys reach React Flow's node handler, which announces "Moved selected
+ * node …" over an aria-live region. Nothing moves: the graph is fully
+ * controlled and has no `onNodesChange`, so the position change is dropped. The
+ * canvas therefore stops the keys before that announcement can be made — a
+ * screen reader must never be told about a change that did not happen.
+ */
+const ARROW_KEYS = new Set(['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'])
+
+/** Keys that activate the focused node or edge. */
+const ACTIVATION_KEYS = new Set(['Enter', ' '])
 
 /**
  * Why the camera is being moved.
@@ -113,6 +147,9 @@ function ArchitectureCanvasInner({
   selectedComponentId,
   onSelectComponent,
 }: ArchitectureCanvasProps) {
+  // Counts the nouns the accessible names carry, in the reader's language
+  // (#40). Stable per language, so it does not invalidate the label memos.
+  const countText = useCanvasCountText()
   const collapsedComponentIds = useUiStore((state) => state.collapsedComponentIds)
   const setCollapsedComponentIds = useUiStore((state) => state.setCollapsedComponentIds)
   const setComponentCollapsed = useUiStore((state) => state.setComponentCollapsed)
@@ -136,6 +173,9 @@ function ArchitectureCanvasInner({
   const minimapVisible = useUiStore((state) => state.minimapVisible)
   const setMinimapVisible = useUiStore((state) => state.setMinimapVisible)
   const clearExpandedEdges = useUiStore((state) => state.clearExpandedEdges)
+  const toggleEdgeExpanded = useUiStore((state) => state.toggleEdgeExpanded)
+  const selectedRelationshipId = useUiStore((state) => state.selectedRelationshipId)
+  const setSelectedRelationshipId = useUiStore((state) => state.setSelectedRelationshipId)
 
   // The size of the drawing surface, as React Flow measures it. Subscribing
   // here is what lets the initial fit wait for the three panes to settle
@@ -146,6 +186,12 @@ function ArchitectureCanvasInner({
   const [detailLevel, setDetailLevel] = useState(() => detailLevelForZoom(camera.zoom))
   const [fitViewCount, setFitViewCount] = useState(0)
   const policyRef = useRef<CameraPolicyState>(INITIAL_CAMERA_POLICY)
+  // The drawing surface itself. Used to publish the live zoom to CSS, nothing
+  // else — the camera stays React Flow's.
+  const surfaceRef = useRef<HTMLDivElement | null>(null)
+  // Id of the visually hidden description every screen reader gets when it
+  // enters the graph.
+  const instructionsId = `architecture-graph-instructions-${useId()}`
   // Flipped by the first pan or zoom that came from a real input event. From
   // then on the camera is the user's and nothing but "Einpassen" touches it.
   const userMovedCameraRef = useRef(false)
@@ -153,11 +199,42 @@ function ArchitectureCanvasInner({
   // camera change never re-mounts the flow.
   const [initialViewport] = useState<Viewport>(() => useUiStore.getState().camera)
 
+  // `graph.nodes` is already what `collapse.ts` left visible, so the accessible
+  // names describe exactly the boxes that are drawn — a component behind a
+  // closed container is not a tab stop and is not named as one.
   const nodes = useMemo(
     () =>
-      applyTemporaryPositions(graph.nodes, nodePositions, selectedComponentId ?? null),
-    [graph.nodes, nodePositions, selectedComponentId],
+      withNodeAccessibility(
+        applyTemporaryPositions(graph.nodes, nodePositions, selectedComponentId ?? null),
+        countText,
+      ),
+    [graph.nodes, nodePositions, selectedComponentId, countText],
   )
+
+  /**
+   * Publishes the live zoom as a CSS custom property on the surface.
+   *
+   * The canvas draws inside a CSS transform, so every length inside it is
+   * multiplied by the zoom: a 2 px focus ring is 0.4 px at zoom 0.2, which is
+   * no ring at all. The stylesheet divides the ring width by this value, which
+   * makes the rendered ring the same number of CSS pixels at every zoom level.
+   *
+   * Written imperatively on purpose. The wrapper carries no `style` prop, so
+   * React never overwrites the property, and publishing it does not cost a
+   * render on every frame of a pan.
+   */
+  const publishZoom = useCallback((zoom: number) => {
+    const surface = surfaceRef.current
+    if (!surface) return
+    const safe = Number.isFinite(zoom) && zoom > 0 ? zoom : 1
+    surface.style.setProperty('--vai-canvas-zoom', String(safe))
+    surface.setAttribute('data-canvas-zoom', safe.toFixed(4))
+  }, [])
+
+  useLayoutEffect(() => {
+    publishZoom(useUiStore.getState().camera.zoom)
+  }, [publishZoom])
+
   /**
    * Puts the currently drawn graph under the camera.
    *
@@ -198,8 +275,9 @@ function ArchitectureCanvasInner({
       void flow.setViewport(viewport)
       setCamera(viewport)
       setDetailLevel(detailLevelForZoom(viewport.zoom))
+      publishZoom(viewport.zoom)
     },
-    [flow, storeApi, setCamera],
+    [flow, storeApi, setCamera, publishZoom],
   )
 
   /**
@@ -301,14 +379,22 @@ function ArchitectureCanvasInner({
     fitView(pending.mode, pending.focusComponentId)
   }, [graph.isRelayouting, graph.nodes.length, graph.signature, fitView])
 
+  // Endpoint names for the edge labels. Derived from the laid-out graph rather
+  // than from `nodes`, so a selection — which changes nothing an edge says —
+  // does not rebuild every edge. `collapse.ts` lifts a hidden endpoint onto its
+  // nearest *visible* ancestor, so every endpoint of every drawn edge is a node
+  // of `graph.nodes` and no name can fall back to an id.
+  const nodeNames = useMemo(() => componentNamesById(graph.nodes), [graph.nodes])
+
   const edges = useMemo<ArchitectureEdge[]>(() => {
     const invalidated = routesInvalidatedByDrag(graph.edges, nodePositions)
-    return graph.edges.map((edge) => {
+    const routed = graph.edges.map((edge) => {
       const route = invalidated.has(edge.id) ? undefined : graph.routes[edge.id]
       if (!edge.data) return edge
       return { ...edge, data: { ...edge.data, ...(route ? { route } : {}) } }
     })
-  }, [graph.edges, graph.routes, nodePositions])
+    return withEdgeAccessibility(routed, nodeNames, countText)
+  }, [graph.edges, graph.routes, nodePositions, nodeNames, countText])
 
   const onNodeClick = useCallback<NodeMouseHandler>(
     (_event, node) => {
@@ -334,16 +420,107 @@ function ArchitectureCanvasInner({
   const onMove = useCallback(
     (_event: unknown, viewport: Viewport) => {
       setDetailLevel(detailLevelForZoom(viewport.zoom))
+      publishZoom(viewport.zoom)
     },
-    [],
+    [publishZoom],
   )
 
   const onMoveEnd = useCallback(
     (_event: unknown, viewport: Viewport) => {
       setCamera(viewport)
       setDetailLevel(detailLevelForZoom(viewport.zoom))
+      publishZoom(viewport.zoom)
     },
-    [setCamera],
+    [setCamera, publishZoom],
+  )
+
+  /**
+   * Keyboard activation of the focused node or edge.
+   *
+   * Handled in the **capture** phase, one level above React Flow, for two
+   * reasons: it is the only place that runs before React Flow's own node and
+   * edge key handling, and stopping the event there keeps the built-in
+   * behaviour — an internal selection this fully controlled graph drops on the
+   * floor, and an aria-live message about a move that never happens — from
+   * running at all.
+   *
+   * What is left is exactly what the canvas really does: activating a component
+   * writes the `component` search parameter, which is the same path a click
+   * takes, so the URL, the selection and the inspector cannot drift apart.
+   * Activating an edge unfolds a bundle or selects the single relationship —
+   * the same two actions its badges offer to the mouse.
+   *
+   * A real control *inside* a node — the disclosure toggle of a container — is
+   * left alone: it is its own tab stop with its own action, and a container
+   * that could not be opened from the keyboard would be worse than an unnamed
+   * one.
+   */
+  const onSurfaceKeyDownCapture = useCallback(
+    (event: ReactKeyboardEvent<HTMLDivElement>) => {
+      const target = event.target
+      if (!(target instanceof Element)) return
+
+      const nodeElement = target.closest('.react-flow__node')
+      if (nodeElement) {
+        const control = target.closest('button, a[href], input, select, textarea')
+        if (control !== null && nodeElement.contains(control)) return
+
+        const componentId = nodeElement.getAttribute('data-id')
+        if (componentId === null) return
+        if (ACTIVATION_KEYS.has(event.key)) {
+          event.preventDefault()
+          event.stopPropagation()
+          onSelectComponent(componentId === selectedComponentId ? null : componentId)
+          return
+        }
+        if (event.key === 'Escape') {
+          // Only the *selection* is taken back here. With nothing selected the
+          // key travels on, so an Escape from a focused node can still leave
+          // deep focus — one Escape per layer, none of them swallowed.
+          if (selectedComponentId === undefined) return
+          event.preventDefault()
+          event.stopPropagation()
+          onSelectComponent(null)
+          return
+        }
+        // Swallowed, never announced. See ARROW_KEYS.
+        if (ARROW_KEYS.has(event.key)) event.stopPropagation()
+        return
+      }
+
+      const edgeElement = target.closest('.react-flow__edge')
+      if (!edgeElement) return
+      const edgeId = edgeElement.getAttribute('data-id')
+      if (edgeId === null) return
+      if (!ACTIVATION_KEYS.has(event.key) && event.key !== 'Escape') return
+      if (event.key === 'Escape' && selectedRelationshipId === null) return
+
+      event.preventDefault()
+      event.stopPropagation()
+      if (event.key === 'Escape') {
+        setSelectedRelationshipId(null)
+        return
+      }
+      const edge = edges.find((candidate) => candidate.id === edgeId)
+      const relationships = edge?.data?.relationships ?? []
+      if (relationships.length > 1) {
+        toggleEdgeExpanded(edgeId)
+        return
+      }
+      const only = relationships[0]
+      if (!only) return
+      setSelectedRelationshipId(
+        only.relationshipId === selectedRelationshipId ? null : only.relationshipId,
+      )
+    },
+    [
+      edges,
+      onSelectComponent,
+      selectedComponentId,
+      selectedRelationshipId,
+      setSelectedRelationshipId,
+      toggleEdgeExpanded,
+    ],
   )
 
   /**
@@ -402,7 +579,9 @@ function ArchitectureCanvasInner({
   // checkable from the outside.
   return (
     <div
+      ref={surfaceRef}
       className="relative h-full w-full min-w-0"
+      onKeyDownCapture={onSurfaceKeyDownCapture}
       data-testid="architecture-canvas"
       data-fit-view-count={fitViewCount}
       data-detail-level={detailLevel}
@@ -420,6 +599,11 @@ function ArchitectureCanvasInner({
       data-layouting={graph.isRelayouting ? 'true' : 'false'}
     >
       <EdgeMarkerDefs />
+      {/* Read out when a screen reader enters the graph: what is drawn here and
+          how it is operated — including that it cannot be edited. */}
+      <p id={instructionsId} className="sr-only" data-testid="canvas-instructions">
+        {CANVAS_A11Y_TEXT.graphInstructions}
+      </p>
       <CanvasNodeActionsContext value={nodeActions}>
         <ReactFlow
           nodes={nodes}
@@ -445,7 +629,14 @@ function ArchitectureCanvasInner({
           proOptions={{ hideAttribution: false }}
           attributionPosition="bottom-left"
           className="bg-canvas"
-          aria-label="Interaktiver Architekturgraph"
+          // Keyboard focus may bring a node that sits outside the viewport into
+          // view. That is a deliberate exception and the only one: it is
+          // requested by the user's own Tab press, it keeps the zoom, and it is
+          // not a `fitView` — `data-fit-view-count` does not move (ADR 0018).
+          autoPanOnNodeFocus
+          ariaLabelConfig={CANVAS_ARIA_LABEL_CONFIG}
+          aria-label={CANVAS_A11Y_TEXT.graphLabel}
+          aria-describedby={instructionsId}
         >
           <Background
             variant={BackgroundVariant.Dots}

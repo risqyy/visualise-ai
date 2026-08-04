@@ -19,6 +19,8 @@
     "plan_other": "{{count, number}} plans",
     "problem_one": "{{count, number}} problem",
     "problem_other": "{{count, number}} problems",
+    "relationship_one": "{{count, number}} relationship",
+    "relationship_other": "{{count, number}} relationships",
     "revision_one": "{{count, number}} revision",
     "revision_other": "{{count, number}} revisions",
     "risk_one": "{{count, number}} risk",

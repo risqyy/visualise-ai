@@ -53,6 +53,13 @@
   /* ---- canvas ----------------------------------------------------------- */
   --canvas: oklch(0.2 0.004 265);
   --canvas-grid: oklch(0.26 0.005 265);
+  /* Rendered width and offset of the focus ring inside the canvas, in CSS
+     pixels *on screen* — the rules below divide them by the live zoom. */
+  --vai-focus-ring-width: 3px;
+  --vai-focus-ring-offset: 2px;
+  /* Live zoom of the architecture canvas. Published by `ArchitectureCanvas`
+     on the drawing surface; 1 is the honest fallback everywhere else. */
+  --vai-canvas-zoom: 1;
 
   /* ---- v0 work states --------------------------------------------------- */
   /* Phases of work, never a quality judgement. Always paired with a label and
@@ -145,6 +152,38 @@
     outline-style: solid;
     outline-offset: 2px;
   }
+}
+
+/*
+ * Focus indicator inside the architecture canvas.
+ *
+ * Two problems, one rule. First, React Flow's own stylesheet removes the focus
+ * outline of every node and every edge outright
+ * (`.react-flow__node.selectable:focus-visible { outline: none }`), so the tab
+ * stops it creates have no visible focus at all. Second, the canvas draws
+ * inside a CSS transform: whatever ring is put back is multiplied by the zoom,
+ * and at the 0.2 an unzoomed large model opens at, a 2 px ring renders as
+ * 0.4 px — a line that is not there.
+ *
+ * Dividing by `--vai-canvas-zoom`, which the canvas publishes on its surface on
+ * every camera move, makes the *rendered* ring `--vai-focus-ring-width` CSS
+ * pixels wide at every zoom level. The rules sit outside every cascade layer
+ * and carry one class more than React Flow's, so neither layer order nor bundle
+ * order can put the outline back to `none`.
+ */
+.react-flow .react-flow__node:focus-visible,
+.react-flow .react-flow__node.selectable:focus-visible,
+.react-flow .react-flow__edge:focus-visible,
+.react-flow .react-flow__edge.selectable:focus-visible {
+  outline: calc(var(--vai-focus-ring-width) / var(--vai-canvas-zoom, 1)) solid
+    var(--ring);
+  outline-offset: calc(var(--vai-focus-ring-offset) / var(--vai-canvas-zoom, 1));
+}
+
+.react-flow .react-flow__node:focus-visible,
+.react-flow .react-flow__node.selectable:focus-visible {
+  /* Follows the rounded box the node itself draws. */
+  border-radius: calc(var(--radius) - 2px);
 }
 
 @layer components {
