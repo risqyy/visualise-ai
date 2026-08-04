@@ -5,7 +5,7 @@
  * (openapi-typescript). Edit the contract, then regenerate.
  *
  * authority: api/openapi.yaml
- * sha256:    dc6b2426da195c0b6f220a3226c8229f2f575142f5ff5315222e68fd670ce0ee
+ * sha256:    7e96a6f09ee1c901eeeb02dedaa7c0fe1edd94173046ebaf51e286f75684e618
  *
  * `npm run check:contract` — also run by the Vitest suite — fails when this
  * file no longer matches the authority above.
@@ -364,9 +364,12 @@ export interface paths {
         };
         /**
          * Liveness probe (internal)
-         * @description Internal liveness probe of the Go backend container. It reports only that the process
-         *     is running and answering; it never touches PostgreSQL. Not routed through the Nginx
-         *     frontend and therefore not reachable from outside the Compose network.
+         * @description Liveness probe of the Go backend container. It reports only that the process is
+         *     running and answering; it never touches PostgreSQL.
+         *
+         *     Nginx proxies this route, so it answers on the published port as well as inside the
+         *     Compose network. It carries no project data, but like every other route in v0 it is
+         *     unauthenticated — see the trust boundary in `docs/security-and-boundaries.md`.
          */
         get: operations["getLiveness"];
         put?: never;
@@ -386,9 +389,12 @@ export interface paths {
         };
         /**
          * Readiness probe (internal)
-         * @description Internal readiness probe of the Go backend container. It reports whether the backend
-         *     can serve traffic, which includes a reachable PostgreSQL and applied migrations. Not
-         *     routed through the Nginx frontend.
+         * @description Readiness probe of the Go backend container. It reports whether the backend can serve
+         *     traffic, which includes a reachable PostgreSQL and applied migrations.
+         *
+         *     Nginx proxies this route, so it answers on the published port as well as inside the
+         *     Compose network. The Compose healthcheck probes it, which is why a backend that failed
+         *     to start is never routed to as ready.
          */
         get: operations["getReadiness"];
         put?: never;

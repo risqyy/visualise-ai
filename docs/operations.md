@@ -129,6 +129,7 @@ Checkout funktionieren.
 | Variable | Wofür | Default | Wann ändern |
 | --- | --- | --- | --- |
 | `FRONTEND_HTTP_PORT` | Der einzige vom Deployment veröffentlichte Host-Port. Nginx lauscht im Container immer auf 8080; diese Variable bestimmt nur, worauf er auf dem Host abgebildet wird. | `8080` | Bei [Portkonflikten](#portkonflikte) oder wenn mehrere Stacks parallel laufen |
+| `MAX_REQUEST_BODY_SIZE` | Größter Request-Body, den Nginx durchlässt, in Nginx-Notation (`4m`, `16m`). Das ist das Limit des Einstiegspunkts, nicht das des Vertrags. Muss über `MAX_EVENT_BYTES` bleiben. | `4m` | Gemeinsam mit `MAX_EVENT_BYTES` — siehe die Warnung unten |
 | `POSTGRES_USER` | Datenbanknutzer. Geht auch in die vom Compose zusammengesetzte `DATABASE_URL` ein. | `visualise` | Praktisch nie — die Datenbank ist nicht von außen erreichbar |
 | `POSTGRES_PASSWORD` | Passwort dieses Nutzers | `visualise` | Praktisch nie, siehe oben |
 | `POSTGRES_DB` | Name der Datenbank | `visualise` | Praktisch nie |
@@ -144,11 +145,15 @@ Checkout funktionieren.
 `docker-compose.yml` fest gesetzt und ist bewusst nicht in `.env.example`: der
 Container-Port ist Teil der Topologie, nicht der Konfiguration.
 
-> **`MAX_EVENT_BYTES` über 8 MiB anzuheben, genügt allein nicht.** Nginx
-> begrenzt den Request-Body auf dieser Route mit `client_max_body_size 8m`. Ein
-> größeres Event würde vom Backend akzeptiert, aber schon von Nginx mit `413`
-> abgelehnt. Über 8 MiB hinaus muss auch
-> `frontend/nginx/default.conf` angepasst werden.
+> **`MAX_EVENT_BYTES` anzuheben genügt allein nicht.** Nginx steht davor und
+> begrenzt den Request-Body auf `MAX_REQUEST_BODY_SIZE` (Default `4m`). Ein
+> Event darüber wird schon am Einstiegspunkt abgelehnt und erreicht das Backend
+> nie. Hebe beide Werte gemeinsam an und halte `MAX_REQUEST_BODY_SIZE`
+> oberhalb von `MAX_EVENT_BYTES`.
+>
+> Nginx antwortet in diesem Fall ebenfalls mit `application/problem+json` und
+> `code: event_too_large`, damit ein Agent die Ablehnung genauso auswerten kann
+> wie die des Backends.
 
 Alle Werte werden beim Start geprüft. Ein nicht parsbarer oder nicht positiver
 Wert lässt das Backend scheitern, statt still auf den Default zurückzufallen —
