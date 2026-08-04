@@ -14,6 +14,7 @@ import (
 	"github.com/rs/zerolog"
 
 	"github.com/risqyy/visualise-ai/backend/internal/health"
+	"github.com/risqyy/visualise-ai/backend/internal/ingest"
 )
 
 // APIPrefix is the single versioned prefix Nginx proxies to the backend.
@@ -27,6 +28,8 @@ type Options struct {
 	Logger  zerolog.Logger
 	Health  *health.Checker
 	Version string
+	// Ingest serves POST /api/v1/events. Nil leaves the route unregistered.
+	Ingest *ingest.Handler
 }
 
 // New builds the Gin engine.
@@ -43,6 +46,8 @@ func New(opts Options) *gin.Engine {
 	// The versioned API group exists from the start so Nginx, the OpenAPI
 	// contract and the frontend agree on one stable prefix.
 	engine.Group(APIPrefix)
+
+	registerIngestRoutes(engine, opts.Ingest)
 
 	engine.NoRoute(notFoundHandler())
 

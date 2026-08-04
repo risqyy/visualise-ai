@@ -17,6 +17,7 @@ import (
 	"github.com/risqyy/visualise-ai/backend/internal/database"
 	"github.com/risqyy/visualise-ai/backend/internal/health"
 	"github.com/risqyy/visualise-ai/backend/internal/httpapi"
+	"github.com/risqyy/visualise-ai/backend/internal/ingest"
 	"github.com/risqyy/visualise-ai/backend/internal/logging"
 	"github.com/risqyy/visualise-ai/backend/internal/store"
 )
@@ -58,10 +59,23 @@ func run() error {
 		return database.Ping(ctx, db)
 	})
 
+	// The publisher stays a no-op until the SSE broker replaces it; ingestion
+	// does not depend on anyone listening.
+	ingestHandler, err := ingest.NewHandler(ingest.HandlerOptions{
+		Store:         store.New(db),
+		Publisher:     ingest.NopPublisher{},
+		MaxEventBytes: cfg.MaxEventBytes,
+		Logger:        logger,
+	})
+	if err != nil {
+		return err
+	}
+
 	router := httpapi.New(httpapi.Options{
 		Logger:  logger,
 		Health:  checker,
 		Version: version,
+		Ingest:  ingestHandler,
 	})
 
 	server := &http.Server{
