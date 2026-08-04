@@ -1,0 +1,85 @@
+name: visualise-ai
+
+# Three services on one internal network. Only the Nginx frontend publishes a
+# host port; the backend and PostgreSQL are reachable exclusively from inside
+# the Compose network.
+
+services:
+  postgres:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-visualise}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-visualise}
+      POSTGRES_DB: ${POSTGRES_DB:-visualise}
+      # Deterministic collation keeps ordering stable across host platforms.
+      POSTGRES_INITDB_ARGS: "--encoding=UTF8 --locale=C"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    networks:
+      - visualise
+    healthcheck:
+      test:
+        ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-visualise} -d ${POSTGRES_DB:-visualise}"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 10s
+    # No `ports:` on purpose — PostgreSQL stays internal.
+
+  backend:
+    build:
+      context: ./backend
+      args:
+        VERSION: ${BACKEND_VERSION:-dev}
+    restart: unless-stopped
+    environment:
+      HTTP_ADDR: ":8080"
+      LOG_LEVEL: ${BACKEND_LOG_LEVEL:-info}
+      LOG_FORMAT: ${BACKEND_LOG_FORMAT:-json}
+      DATABASE_URL: >-
+        postgres://${POSTGRES_USER:-visualise}:${POSTGRES_PASSWORD:-visualise}@postgres:5432/${POSTGRES_DB:-visualise}?sslmode=disable
+      DATABASE_CONNECT_TIMEOUT: ${DATABASE_CONNECT_TIMEOUT:-60s}
+      MAX_EVENT_BYTES: ${MAX_EVENT_BYTES:-2097152}
+      SHUTDOWN_TIMEOUT: ${SHUTDOWN_TIMEOUT:-15s}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - visualise
+    healthcheck:
+      # Readiness, not liveness: a backend that failed to start never becomes
+      # healthy, so Compose never treats it as ready.
+      test: ["CMD", "wget", "--spider", "-q", "http://127.0.0.1:8080/readyz"]
+      interval: 5s
+      timeout: 3s
+      retries: 3
+      # Covers the startup wait for PostgreSQL: probes that fail inside the
+      # start period do not count towards `retries`.
+      start_period: 60s
+    # No `ports:` on purpose — the backend stays internal.
+
+  frontend:
+    build:
+      context: ./frontend
+    restart: unless-stopped
+    ports:
+      - "${FRONTEND_HTTP_PORT:-8080}:8080"
+    depends_on:
+      backend:
+        condition: service_healthy
+    networks:
+      - visualise
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://127.0.0.1:8080/"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 5s
+
+networks:
+  visualise:
+    driver: bridge
+
+volumes:
+  pgdata:

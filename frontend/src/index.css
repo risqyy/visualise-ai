@@ -1,0 +1,66 @@
+:root {
+  color-scheme: dark;
+  --surface: #101214;
+  --surface-raised: #16191d;
+  --border: #272b31;
+  --text: #e6e8ea;
+  --text-muted: #9aa1a9;
+
+  font-family: ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
+  line-height: 1.5;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  background: var(--surface);
+  color: var(--text);
+  /* The cockpit is a desktop application surface: it must not scroll sideways. */
+  overflow-x: hidden;
+}
+
+.shell {
+  max-width: 72rem;
+  margin: 0 auto;
+  padding: 3rem 2rem;
+}
+
+.lead {
+  color: var(--text-muted);
+  max-width: 60ch;
+}
+
+.panel {
+  margin-top: 2rem;
+  padding: 1.25rem 1.5rem;
+  background: var(--surface-raised);
+  border: 1px solid var(--border);
+  border-radius: 0.75rem;
+}
+
+h1 {
+  font-size: 1.75rem;
+  margin: 0 0 0.5rem;
+}
+
+h2 {
+  font-size: 1rem;
+  margin: 0 0 0.5rem;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+:focus-visible {
+  outline: 2px solid #6ea8fe;
+  outline-offset: 2px;
+}
