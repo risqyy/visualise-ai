@@ -1,116 +1,124 @@
 # Visualise AI — Agent Project Cockpit
 
-Observability cockpit for agent work on a software project. It shows the whole
-application architecture, the running agents and subagents, their reported work
-steps, component-scoped AI feedback and unified diffs.
+Beobachtungs-Cockpit für Agentenarbeit an einem Softwareprojekt. Es zeigt die
+gesamte Anwendungsarchitektur, die laufenden Agents und Subagents, deren
+gemeldete Arbeitsschritte, komponentenbezogenes KI-Feedback und Unified Diffs.
 
-The cockpit **observes**; it never drives the agent. Users cannot prompt from
-inside the application, and the system never judges whether the agent's work is
-right or wrong.
+Das Cockpit **beobachtet**; es steuert den Agenten nie. Nutzer können aus der
+Anwendung heraus nicht prompten, und das System bewertet nie, ob die Arbeit des
+Agenten richtig ist.
 
-> **Trust boundary:** v0 is meant for a local machine or a private network. It
-> has no authentication, no authorisation and no multi-tenancy. Do not expose it
-> to the public internet.
+> **Vertrauensgrenze:** v0 ist für einen lokalen Rechner oder ein privates
+> Netzwerk gedacht. Es gibt keine Authentifizierung, keine Autorisierung und
+> keine Multi-Tenancy. **Nicht ins öffentliche Internet stellen.**
+> Details und die vollständigen Produktgrenzen:
+> [`docs/security-and-boundaries.md`](docs/security-and-boundaries.md).
 
-## Repository layout
+## Dokumentation
 
-| Path              | Contents                                                   |
-| ----------------- | ---------------------------------------------------------- |
-| `backend/`        | Go module: Gin HTTP surface, zerolog, GORM/PostgreSQL       |
-| `frontend/`       | React + TypeScript application, built by Vite               |
-| `frontend/nginx/` | Nginx site config — the only external entry point           |
-| `simulator/`      | Node/TypeScript event simulator — the deterministic demo client |
-| `docker-compose.yml` | `frontend`, `backend` and `postgres` services           |
-| `docs/decisions/` | Architecture decision records                               |
+| Dokument | Inhalt |
+| --- | --- |
+| [`docs/operations.md`](docs/operations.md) | Voraussetzungen, Compose-Start, alle Umgebungsvariablen, Healthchecks, Datenpersistenz, Simulator, End-to-End-Test |
+| [`docs/agent-integration.md`](docs/agent-integration.md) | Eventvertrag in der Praxis: Lifecycle, Idempotenz, Fehlercodes, SSE-Reconnect, eine minimale gültige Sequenz |
+| [`docs/security-and-boundaries.md`](docs/security-and-boundaries.md) | Vertrauensgrenze, Angriffsfläche, v0-Ausschlüsse, `RepositoryProvider`-Grenze |
+| [`api/README.md`](api/README.md) | Der Vertrag selbst: Schemata, Beispiele, Ablehnungs-Fixtures |
+| [`api/openapi.yaml`](api/openapi.yaml) | OpenAPI 3.1 — die maßgebliche Quelle für alle Feldnamen und Formate |
+| [`simulator/README.md`](simulator/README.md) | Flags und Szenarien des Simulators |
+| [`docs/decisions/`](docs/decisions/) | Architecture Decision Records (englisch) |
 
-## Quick start
+## Quick Start
+
+Voraussetzung ist ausschließlich Docker mit Compose v2 (siehe
+[`docs/operations.md`](docs/operations.md#voraussetzungen)).
 
 ```bash
-cp .env.example .env   # optional, defaults work as-is
+cp .env.example .env   # optional, die Defaults funktionieren unverändert
 docker compose up --build
 ```
 
-Then open <http://localhost:8080>.
+Danach <http://localhost:8080> öffnen. Ist Port 8080 belegt, setze
+`FRONTEND_HTTP_PORT` — siehe
+[Portkonflikte](docs/operations.md#portkonflikte).
 
-A fresh database is empty, so the cockpit has nothing to show until an agent
-reports something. The bundled simulator fills it deterministically through the
-public route:
+Eine frische Datenbank ist leer, das Cockpit hat also nichts zu zeigen, bis ein
+Agent etwas meldet. Der mitgelieferte Simulator füllt sie deterministisch über
+die öffentliche Route:
 
 ```bash
 cd simulator
 npm install
-npm run simulate                # or: npm run simulate -- --base http://localhost:8091
+npm run simulate
 ```
 
-See [`simulator/README.md`](simulator/README.md) for the scenarios and flags.
+Danach zeigt <http://localhost:8080/projects/visualise-ai> den vollständigen
+Demo-Run. Details:
+[Demo ausführen](docs/operations.md#demo-ausfuehren).
 
-The full operations and agent-integration guide is delivered separately; this
-file covers the scaffold only.
+## Repository-Struktur
 
-## Network topology
+| Pfad | Inhalt |
+| --- | --- |
+| `api/` | OpenAPI-Vertrag, Beispiel-Payloads, Ablehnungs-Fixtures |
+| `backend/` | Go-Modul: Gin-HTTP-Oberfläche, zerolog, GORM/PostgreSQL |
+| `frontend/` | React- und TypeScript-Anwendung, gebaut mit Vite |
+| `frontend/nginx/` | Nginx-Site-Konfiguration — der einzige externe Einstiegspunkt |
+| `simulator/` | Node/TypeScript-Eventsimulator — der deterministische Demo-Client |
+| `e2e/` | Playwright-Abnahmetest gegen das echte Compose-System |
+| `docker-compose.yml` | Die Services `frontend`, `backend` und `postgres` |
+| `docs/` | Betriebs- und Integrationsdokumentation, Decision Records |
+
+## Netzwerktopologie
 
 ```
-host :8080
+Host :8080
      │
      ▼
 ┌──────────────┐        ┌─────────────┐        ┌──────────────┐
 │  frontend    │ ─────▶ │  backend    │ ─────▶ │  postgres    │
 │  (nginx)     │        │  (go/gin)   │        │              │
-│  published   │        │  internal   │        │  internal    │
+│  published   │        │  intern     │        │  intern      │
 └──────────────┘        └─────────────┘        └──────────────┘
 ```
 
-Nginx serves the production bundle and proxies three kinds of traffic to the
-backend:
+Nginx liefert das Produktions-Bundle aus und proxyt vier Arten von Verkehr an
+das Backend:
 
-| Route                                | Purpose                                  |
-| ------------------------------------ | ---------------------------------------- |
-| `/api/v1/events`                     | agent event ingestion                    |
-| `/api/v1/…`                          | UI read models                           |
-| `/api/v1/projects/{id}/stream`       | SSE live stream, proxied **unbuffered**  |
-| `/healthz`, `/readyz`                | backend probes                           |
+| Route | Zweck |
+| --- | --- |
+| `POST /api/v1/events` | Agent-Event-Ingestion |
+| `GET /api/v1/…` | Read Models für die Oberfläche |
+| `GET /api/v1/projects/{id}/stream` | SSE-Livestream, **ungepuffert** geproxyt |
+| `GET /healthz`, `GET /readyz` | Backend-Probes |
 
-Neither `backend` nor `postgres` publishes a host port.
+Weder `backend` noch `postgres` veröffentlichen einen Host-Port. Warum das eine
+Sicherheitseigenschaft und keine Bequemlichkeit ist, steht in
+[`docs/security-and-boundaries.md`](docs/security-and-boundaries.md#nginx-ist-der-einzige-einstiegspunkt).
 
-## Health and readiness
+## Lokale Entwicklung
 
-- `GET /healthz` — the process is alive. Always `200` while it serves.
-- `GET /readyz` — the backend finished startup **and** PostgreSQL answers.
-  Returns `503` otherwise.
-
-The backend container healthcheck probes `/readyz`, and the frontend container
-starts only once the backend is healthy. A backend that fails to start is
-therefore never routed to as ready.
-
-## Data persistence
-
-PostgreSQL stores its data in the named volume `pgdata`. It survives
-`docker compose down`; use `docker compose down -v` to start from an empty
-database.
-
-## Configuration
-
-All settings are environment variables and documented in
-[`.env.example`](.env.example).
-
-## Local development
+Nur nötig, wenn du am Code arbeitest; für den reinen Betrieb genügt Docker.
 
 ```bash
-# Backend
+# Backend (Go 1.25.7, siehe backend/go.mod)
 cd backend
 go build ./... && go vet ./... && go test ./...
 
-# Frontend
+# Frontend (Node 22, wie im Container-Build)
 cd frontend
 npm ci
 npm run lint && npm run typecheck && npm run test && npm run build
 
-# Simulator
+# Simulator (Node 22)
 cd simulator
 npm ci
 npm run lint && npm run typecheck && npm test
+
+# Vertrag
+cd api
+npm ci
+npm test
 ```
 
-`npm run dev` starts Vite on port 5173 and proxies `/api`, `/healthz` and
-`/readyz` to a backend on `localhost:8080`, so paths match the Compose
-deployment.
+`npm run dev` im `frontend/` startet Vite auf Port 5173 und proxyt `/api`,
+`/healthz` und `/readyz` an ein Backend auf `localhost:8080`, sodass die Pfade
+denen der Compose-Bereitstellung entsprechen.
