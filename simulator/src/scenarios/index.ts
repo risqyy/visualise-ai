@@ -4,6 +4,7 @@ import type { Scenario } from '../types.js'
 import { buildConflictScenario, CONFLICT_RUN_ID } from './conflict.js'
 import { buildFullScenario, FULL_RUN_ID } from './full.js'
 import { buildRetryScenario, RETRY_RUN_ID } from './retry.js'
+import { buildSelfScenario, SELF_RUN_ID } from './self.js'
 
 /**
  * Each scenario has its own default run id, so none of them can be mistaken for
@@ -13,6 +14,7 @@ export const DEFAULT_RUN_IDS = {
   full: FULL_RUN_ID,
   retry: RETRY_RUN_ID,
   conflict: CONFLICT_RUN_ID,
+  self: SELF_RUN_ID,
 } as const
 
 /**
@@ -24,12 +26,17 @@ export const DEFAULT_RUN_IDS = {
  * them apart also gives the project list more than one row to render.
  *
  * Each id is fixed, so repeating a scenario always lands in the same project;
- * `--project` overrides all three.
+ * `--project` overrides all four.
+ *
+ * `self` has its own project for the same reason and one more: it is not a
+ * probe but a second demo, and it must not overwrite the `full` demo the E2E
+ * acceptance run asserts against.
  */
 export const DEFAULT_PROJECT_IDS = {
   full: 'visualise-ai',
   retry: 'visualise-ai-retry',
   conflict: 'visualise-ai-conflict',
+  self: 'visualise-ai-self',
 } as const
 
 export function buildScenario(options: Options): Scenario {
@@ -44,7 +51,9 @@ export function buildScenario(options: Options): Scenario {
       return buildRetryScenario(common)
     case 'conflict':
       return buildConflictScenario(common)
+    case 'self':
+      return buildSelfScenario(common)
   }
 }
 
-export { buildConflictScenario, buildFullScenario, buildRetryScenario }
+export { buildConflictScenario, buildFullScenario, buildRetryScenario, buildSelfScenario }
