@@ -2,6 +2,7 @@ import { Handle, Position, type NodeProps } from '@xyflow/react'
 import { memo } from 'react'
 
 import { cn } from '@/lib/utils'
+import { COUNT_LABELS, counted } from '@/lib/plural'
 import { WORK_STATE_BY_ID } from '@/state/workStates'
 
 import { ChangeOverlayMark } from './ChangeOverlayMark'
@@ -224,7 +225,7 @@ export const CompoundNode = memo(function CompoundNode({
         )}
         {overlay && <ChangeOverlayMark overlay={overlay} />}
         <span className="text-muted-foreground shrink-0 text-[10px]">
-          {childCount} Kinder
+          {counted(childCount, COUNT_LABELS.child)}
         </span>
         <KindBadge label={kind.label} />
       </div>

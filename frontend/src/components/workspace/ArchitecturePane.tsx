@@ -39,6 +39,14 @@ export function ArchitecturePane({
   const componentCount = architecture.data?.components.length ?? 0
   const relationshipCount = architecture.data?.relationships.length ?? 0
 
+  // The legend is a key to what is drawn, so it lists only the kinds actually
+  // reported. Deriving it here keeps the legend and the canvas reading from the
+  // same model instead of from the contract's full catalogue.
+  const presentKinds = useMemo(
+    () => [...new Set((architecture.data?.relationships ?? []).map((r) => r.kind))],
+    [architecture.data?.relationships],
+  )
+
   // Kept stable across refetches: TanStack Query's structural sharing returns
   // the same arrays when nothing changed, so the canvas does not re-layout.
   // The overlay travels alongside the applied model, never inside it — a
@@ -107,7 +115,7 @@ export function ArchitecturePane({
       </div>
 
       <div className="border-border bg-card/80 shrink-0 space-y-1.5 border-t px-3 py-2">
-        <RelationshipLegend />
+        <RelationshipLegend kinds={presentKinds} />
         <StatusLegend />
       </div>
     </section>

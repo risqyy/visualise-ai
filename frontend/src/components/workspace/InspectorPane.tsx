@@ -19,6 +19,7 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Separator } from '@/components/ui/separator'
 import { cn } from '@/lib/utils'
+import { COUNT_LABELS, counted } from '@/lib/plural'
 import type { DeepFocusTarget } from '@/routes/searchParams'
 
 export interface InspectorPaneProps {
@@ -202,16 +203,16 @@ export function InspectorPane({
                   {showSecondary && head && (
                     <div className="flex flex-wrap gap-1">
                       <Badge variant="outline" className="text-2xs font-normal">
-                        {head.feedback.length} Feedback
+                        {counted(head.feedback.length, COUNT_LABELS.feedback)}
                       </Badge>
                       <Badge variant="outline" className="text-2xs font-normal">
-                        {diffs.length} Diffs
+                        {counted(diffs.length, COUNT_LABELS.diff)}
                       </Badge>
                       <Badge variant="outline" className="text-2xs font-normal">
-                        {head.risks.length} Risiken
+                        {counted(head.risks.length, COUNT_LABELS.risk)}
                       </Badge>
                       <Badge variant="outline" className="text-2xs font-normal">
-                        {head.problems.length} Probleme
+                        {counted(head.problems.length, COUNT_LABELS.problem)}
                       </Badge>
                     </div>
                   )}
