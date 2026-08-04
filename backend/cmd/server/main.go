@@ -19,6 +19,7 @@ import (
 	"github.com/risqyy/visualise-ai/backend/internal/httpapi"
 	"github.com/risqyy/visualise-ai/backend/internal/ingest"
 	"github.com/risqyy/visualise-ai/backend/internal/logging"
+	"github.com/risqyy/visualise-ai/backend/internal/readapi"
 	"github.com/risqyy/visualise-ai/backend/internal/store"
 )
 
@@ -76,6 +77,7 @@ func run() error {
 		Health:  checker,
 		Version: version,
 		Ingest:  ingestHandler,
+		Read:    readapi.New(db),
 	})
 
 	server := &http.Server{

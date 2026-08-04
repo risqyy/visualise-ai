@@ -15,6 +15,7 @@ import (
 
 	"github.com/risqyy/visualise-ai/backend/internal/health"
 	"github.com/risqyy/visualise-ai/backend/internal/ingest"
+	"github.com/risqyy/visualise-ai/backend/internal/readapi"
 )
 
 // APIPrefix is the single versioned prefix Nginx proxies to the backend.
@@ -30,6 +31,9 @@ type Options struct {
 	Version string
 	// Ingest serves POST /api/v1/events. Nil leaves the route unregistered.
 	Ingest *ingest.Handler
+	// Read serves the project scoped read models. A nil value leaves the read
+	// routes unmounted, which keeps the probe-only router usable in tests.
+	Read *readapi.Service
 }
 
 // New builds the Gin engine.
@@ -48,6 +52,7 @@ func New(opts Options) *gin.Engine {
 	engine.Group(APIPrefix)
 
 	registerIngestRoutes(engine, opts.Ingest)
+	registerRead(engine, opts.Read, opts.Logger)
 
 	engine.NoRoute(notFoundHandler())
 

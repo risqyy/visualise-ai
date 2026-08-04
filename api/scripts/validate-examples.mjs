@@ -30,6 +30,8 @@ const EXPECTED_SCHEMA = {
   'diff-reported.json': 'IngestEventRequest',
   'correction-issued.json': 'IngestEventRequest',
   'run-finished.json': 'IngestEventRequest',
+  'architecture-read-model.json': 'ArchitectureResponse',
+  'component-inspector.json': 'ComponentInspectorResponse',
   'retry-idempotent-response.json': 'EventAccepted',
   'conflict-response.json': 'Problem',
   'validation-error-response.json': 'ValidationProblem',

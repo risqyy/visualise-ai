@@ -4,7 +4,12 @@
 #   /healthz and /readyz are internal container probes on the Go backend. They answer 200 or,
 #   for readiness, 503 — there is no meaningful client error for a probe. The rule stays
 #   enabled for every externally reachable operation.
+#
+#   GET /api/v1/projects takes no path parameter, no query parameter and no request body.
+#   There is nothing a client can get wrong about it, so any declared 4xx would be a lie.
+#   Every other read operation carries its 400 and 404 and the rule stays enforced for them.
 openapi.yaml:
   operation-4xx-response:
     - '#/paths/~1healthz/get/responses'
     - '#/paths/~1readyz/get/responses'
+    - '#/paths/~1api~1v1~1projects/get/responses'

@@ -1,0 +1,412 @@
+{
+  "projectPosition": 17,
+  "components": [
+    {
+      "componentId": "payment-provider",
+      "name": "Payment Provider",
+      "kind": "external",
+      "parentComponentId": null,
+      "description": "Third-party payment system outside the system boundary.",
+      "technology": {},
+      "tags": [],
+      "appliedAt": "2026-08-04T09:00:05Z",
+      "appliedByAgentId": "subagent-architecture-mapper",
+      "appliedRunId": "run-2026-08-04-0001",
+      "position": 5
+    },
+    {
+      "componentId": "shop-platform",
+      "name": "Shop Platform",
+      "kind": "system",
+      "parentComponentId": null,
+      "description": "The observed application. Root of the component hierarchy.",
+      "technology": {},
+      "tags": [],
+      "appliedAt": "2026-08-04T09:00:05Z",
+      "appliedByAgentId": "subagent-architecture-mapper",
+      "appliedRunId": "run-2026-08-04-0001",
+      "position": 5
+    },
+    {
+      "componentId": "shop-platform.api-gateway",
+      "name": "API Gateway",
+      "kind": "service",
+      "parentComponentId": "shop-platform",
+      "description": "Single external entry point, terminates TLS and fans out to services.",
+      "technology": {
+        "runtime": "Go",
+        "version": "1.24",
+        "language": "Go",
+        "framework": "chi"
+      },
+      "tags": [],
+      "appliedAt": "2026-08-04T09:00:05Z",
+      "appliedByAgentId": "subagent-architecture-mapper",
+      "appliedRunId": "run-2026-08-04-0001",
+      "position": 5
+    },
+    {
+      "componentId": "shop-platform.events",
+      "name": "Event Bus",
+      "kind": "queue",
+      "parentComponentId": "shop-platform",
+      "description": "NATS cluster. Each topic below is modelled as its own component.",
+      "technology": {
+        "runtime": "NATS",
+        "version": "2.10"
+      },
+      "tags": [],
+      "appliedAt": "2026-08-04T09:00:05Z",
+      "appliedByAgentId": "subagent-architecture-mapper",
+      "appliedRunId": "run-2026-08-04-0001",
+      "position": 5
+    },
+    {
+      "componentId": "shop-platform.events.inventory-reserved",
+      "name": "inventory.item.reserved",
+      "kind": "topic",
+      "parentComponentId": "shop-platform.events",
+      "description": "Published once per successful stock reservation.",
+      "technology": {},
+      "tags": [],
+      "appliedAt": "2026-08-04T09:00:05Z",
+      "appliedByAgentId": "subagent-architecture-mapper",
+      "appliedRunId": "run-2026-08-04-0001",
+      "position": 5
+    },
+    {
+      "componentId": "shop-platform.events.order-created",
+      "name": "orders.order.created",
+      "kind": "topic",
+      "parentComponentId": "shop-platform.events",
+      "description": "Published once per accepted order.",
+      "technology": {},
+      "tags": [],
+      "appliedAt": "2026-08-04T09:00:05Z",
+      "appliedByAgentId": "subagent-architecture-mapper",
+      "appliedRunId": "run-2026-08-04-0001",
+      "position": 5
+    },
+    {
+      "componentId": "shop-platform.inventory",
+      "name": "Inventory Service",
+      "kind": "service",
+      "parentComponentId": "shop-platform",
+      "description": "Reserves and releases stock.",
+      "technology": {
+        "runtime": "Go",
+        "version": "1.24",
+        "language": "Go"
+      },
+      "tags": [],
+      "appliedAt": "2026-08-04T09:00:05Z",
+      "appliedByAgentId": "subagent-architecture-mapper",
+      "appliedRunId": "run-2026-08-04-0001",
+      "position": 5
+    },
+    {
+      "componentId": "shop-platform.orders",
+      "name": "Orders Service",
+      "kind": "service",
+      "parentComponentId": "shop-platform",
+      "description": "Owns the order lifecycle.",
+      "technology": {
+        "runtime": "Go",
+        "version": "1.24",
+        "language": "Go"
+      },
+      "tags": [
+        "core-domain"
+      ],
+      "appliedAt": "2026-08-04T09:00:05Z",
+      "appliedByAgentId": "subagent-architecture-mapper",
+      "appliedRunId": "run-2026-08-04-0001",
+      "position": 5
+    },
+    {
+      "componentId": "shop-platform.orders-db",
+      "name": "Orders Database",
+      "kind": "datastore",
+      "parentComponentId": "shop-platform",
+      "description": "Relational store owned exclusively by the orders service.",
+      "technology": {
+        "runtime": "PostgreSQL",
+        "version": "17"
+      },
+      "tags": [],
+      "appliedAt": "2026-08-04T09:00:05Z",
+      "appliedByAgentId": "subagent-architecture-mapper",
+      "appliedRunId": "run-2026-08-04-0001",
+      "position": 5
+    },
+    {
+      "componentId": "shop-platform.orders.api",
+      "name": "Orders API Layer",
+      "kind": "module",
+      "parentComponentId": "shop-platform.orders",
+      "description": "gRPC handlers and request mapping.",
+      "technology": {},
+      "tags": [],
+      "appliedAt": "2026-08-04T09:00:05Z",
+      "appliedByAgentId": "subagent-architecture-mapper",
+      "appliedRunId": "run-2026-08-04-0001",
+      "position": 5
+    },
+    {
+      "componentId": "shop-platform.orders.domain",
+      "name": "Orders Domain Layer",
+      "kind": "module",
+      "parentComponentId": "shop-platform.orders",
+      "description": "Order aggregate, invariants and state machine.",
+      "technology": {},
+      "tags": [],
+      "appliedAt": "2026-08-04T09:00:05Z",
+      "appliedByAgentId": "subagent-architecture-mapper",
+      "appliedRunId": "run-2026-08-04-0001",
+      "position": 5
+    },
+    {
+      "componentId": "shop-platform.orders.domain.pricing",
+      "name": "Pricing",
+      "kind": "module",
+      "parentComponentId": "shop-platform.orders.domain",
+      "description": "Fourth hierarchy level: discount and tax calculation inside the domain layer.",
+      "technology": {},
+      "tags": [
+        "pricing"
+      ],
+      "appliedAt": "2026-08-04T09:00:05Z",
+      "appliedByAgentId": "subagent-architecture-mapper",
+      "appliedRunId": "run-2026-08-04-0001",
+      "position": 5
+    },
+    {
+      "componentId": "shop-platform.orders.domain.tax",
+      "name": "Tax Calculation",
+      "kind": "module",
+      "parentComponentId": "shop-platform.orders.domain",
+      "description": "VAT rules per delivery country, extracted from the pricing module.",
+      "technology": {
+        "runtime": "Go",
+        "version": "1.24",
+        "language": "Go"
+      },
+      "tags": [
+        "pricing",
+        "tax"
+      ],
+      "appliedAt": "2026-08-04T09:00:12Z",
+      "appliedByAgentId": "subagent-architecture-mapper",
+      "appliedRunId": "run-2026-08-04-0001",
+      "position": 12
+    },
+    {
+      "componentId": "shop-platform.orders.persistence",
+      "name": "Orders Persistence Layer",
+      "kind": "module",
+      "parentComponentId": "shop-platform.orders",
+      "description": "Repository implementations and SQL migrations.",
+      "technology": {},
+      "tags": [],
+      "appliedAt": "2026-08-04T09:00:05Z",
+      "appliedByAgentId": "subagent-architecture-mapper",
+      "appliedRunId": "run-2026-08-04-0001",
+      "position": 5
+    },
+    {
+      "componentId": "shop-platform.shared-money",
+      "name": "Shared Money Library",
+      "kind": "library",
+      "parentComponentId": "shop-platform",
+      "description": "Currency and amount value objects shared across services.",
+      "technology": {
+        "language": "Go"
+      },
+      "tags": [],
+      "appliedAt": "2026-08-04T09:00:05Z",
+      "appliedByAgentId": "subagent-architecture-mapper",
+      "appliedRunId": "run-2026-08-04-0001",
+      "position": 5
+    },
+    {
+      "componentId": "shop-platform.storefront",
+      "name": "Storefront",
+      "kind": "ui",
+      "parentComponentId": "shop-platform",
+      "description": "Customer-facing single page application.",
+      "technology": {
+        "runtime": "Browser",
+        "version": "19",
+        "language": "TypeScript",
+        "framework": "React"
+      },
+      "tags": [
+        "frontend",
+        "public"
+      ],
+      "appliedAt": "2026-08-04T09:00:05Z",
+      "appliedByAgentId": "subagent-architecture-mapper",
+      "appliedRunId": "run-2026-08-04-0001",
+      "position": 5
+    }
+  ],
+  "relationships": [
+    {
+      "relationshipId": "rel-gateway-orders-grpc",
+      "sourceComponentId": "shop-platform.api-gateway",
+      "targetComponentId": "shop-platform.orders.api",
+      "kind": "grpc",
+      "label": "Place order",
+      "protocol": "gRPC/HTTP2",
+      "operation": "orders.v1.OrderService/PlaceOrder",
+      "channel": "",
+      "appliedAt": "2026-08-04T09:00:05Z",
+      "appliedByAgentId": "subagent-architecture-mapper",
+      "appliedRunId": "run-2026-08-04-0001",
+      "position": 5
+    },
+    {
+      "relationshipId": "rel-inventory-consumes-order-created",
+      "sourceComponentId": "shop-platform.events.order-created",
+      "targetComponentId": "shop-platform.inventory",
+      "kind": "nats_topic",
+      "label": "consumes",
+      "protocol": "NATS",
+      "operation": "",
+      "channel": "orders.order.created",
+      "appliedAt": "2026-08-04T09:00:05Z",
+      "appliedByAgentId": "subagent-architecture-mapper",
+      "appliedRunId": "run-2026-08-04-0001",
+      "position": 5
+    },
+    {
+      "relationshipId": "rel-inventory-publishes-inventory-reserved",
+      "sourceComponentId": "shop-platform.inventory",
+      "targetComponentId": "shop-platform.events.inventory-reserved",
+      "kind": "nats_topic",
+      "label": "publishes",
+      "protocol": "NATS",
+      "operation": "",
+      "channel": "inventory.item.reserved",
+      "appliedAt": "2026-08-04T09:00:05Z",
+      "appliedByAgentId": "subagent-architecture-mapper",
+      "appliedRunId": "run-2026-08-04-0001",
+      "position": 5
+    },
+    {
+      "relationshipId": "rel-orders-payment-async",
+      "sourceComponentId": "shop-platform.orders",
+      "targetComponentId": "payment-provider",
+      "kind": "async",
+      "label": "Payment settlement callbacks",
+      "protocol": "webhook",
+      "operation": "POST /callbacks/payment",
+      "channel": "",
+      "appliedAt": "2026-08-04T09:00:05Z",
+      "appliedByAgentId": "subagent-architecture-mapper",
+      "appliedRunId": "run-2026-08-04-0001",
+      "position": 5
+    },
+    {
+      "relationshipId": "rel-orders-persistence-data",
+      "sourceComponentId": "shop-platform.orders.persistence",
+      "targetComponentId": "shop-platform.orders-db",
+      "kind": "data",
+      "label": "Order aggregate storage",
+      "protocol": "postgresql",
+      "operation": "SELECT/INSERT/UPDATE orders",
+      "channel": "",
+      "appliedAt": "2026-08-04T09:00:05Z",
+      "appliedByAgentId": "subagent-architecture-mapper",
+      "appliedRunId": "run-2026-08-04-0001",
+      "position": 5
+    },
+    {
+      "relationshipId": "rel-orders-publishes-order-created",
+      "sourceComponentId": "shop-platform.orders",
+      "targetComponentId": "shop-platform.events.order-created",
+      "kind": "nats_topic",
+      "label": "publishes",
+      "protocol": "NATS",
+      "operation": "",
+      "channel": "orders.order.created",
+      "appliedAt": "2026-08-04T09:00:05Z",
+      "appliedByAgentId": "subagent-architecture-mapper",
+      "appliedRunId": "run-2026-08-04-0001",
+      "position": 5
+    },
+    {
+      "relationshipId": "rel-pricing-shared-money-dependency",
+      "sourceComponentId": "shop-platform.orders.domain.pricing",
+      "targetComponentId": "shop-platform.shared-money",
+      "kind": "dependency",
+      "label": "Money value objects",
+      "protocol": "",
+      "operation": "",
+      "channel": "",
+      "appliedAt": "2026-08-04T09:00:05Z",
+      "appliedByAgentId": "subagent-architecture-mapper",
+      "appliedRunId": "run-2026-08-04-0001",
+      "position": 5
+    },
+    {
+      "relationshipId": "rel-storefront-gateway-http",
+      "sourceComponentId": "shop-platform.storefront",
+      "targetComponentId": "shop-platform.api-gateway",
+      "kind": "http",
+      "label": "Browse and place orders",
+      "protocol": "HTTPS",
+      "operation": "GET /orders",
+      "channel": "",
+      "appliedAt": "2026-08-04T09:00:05Z",
+      "appliedByAgentId": "subagent-architecture-mapper",
+      "appliedRunId": "run-2026-08-04-0001",
+      "position": 5
+    }
+  ],
+  "activeChanges": [
+    {
+      "changeId": "change-2026-08-04-0009",
+      "targetKind": "relationship",
+      "targetId": "rel-pricing-tax",
+      "operation": "add",
+      "state": "planned",
+      "runId": "run-2026-08-04-0001",
+      "agentId": "subagent-architecture-mapper",
+      "plannedAt": "2026-08-04T09:00:17Z",
+      "appliedAt": null,
+      "retractedAt": null,
+      "snapshot": {
+        "kind": "dependency",
+        "label": "Delegates VAT calculation",
+        "relationshipId": "rel-pricing-tax",
+        "sourceComponentId": "shop-platform.orders.domain.pricing",
+        "targetComponentId": "shop-platform.orders.domain.tax"
+      },
+      "position": 17
+    },
+    {
+      "changeId": "change-2026-08-04-0008",
+      "targetKind": "component",
+      "targetId": "shop-platform.orders.domain.pricing",
+      "operation": "modify",
+      "state": "planned",
+      "runId": "run-2026-08-04-0001",
+      "agentId": "subagent-architecture-mapper",
+      "plannedAt": "2026-08-04T09:00:16Z",
+      "appliedAt": null,
+      "retractedAt": null,
+      "snapshot": {
+        "kind": "module",
+        "name": "Pricing",
+        "tags": [
+          "pricing"
+        ],
+        "componentId": "shop-platform.orders.domain.pricing",
+        "description": "Discount calculation only; VAT now lives in the tax module.",
+        "parentComponentId": "shop-platform.orders.domain"
+      },
+      "position": 16
+    }
+  ]
+}
