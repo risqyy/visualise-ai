@@ -151,6 +151,13 @@ export const runResponse: RunResponse = {
   },
 }
 
+/**
+ * `GET /runs/current`. The alias is a separate endpoint by contract (ADR 0005),
+ * so the fixture answers it separately instead of letting the run-id route match
+ * the literal `current`.
+ */
+export const currentRunResponse: RunResponse = runResponse
+
 export const agentsResponse: AgentListResponse = {
   projectPosition: 42,
   agents: [agent()],
@@ -191,10 +198,15 @@ export function createFakeFetch(
     const path = url.split('?')[0] ?? url
 
     for (const [pattern, body] of Object.entries(overrides)) {
-      if (path === pattern) return jsonResponse(body)
+      if (path !== pattern) continue
+      // A factory override lets a test answer with a non-200 — the contract's
+      // `404 current_run_not_found` is a state the UI has to render, not a bug.
+      return typeof body === 'function' ? (body as () => Response)() : jsonResponse(body)
     }
 
     if (path === '/api/v1/projects') return jsonResponse(projectsResponse)
+    if (path === `/api/v1/projects/${PROJECT_ID}/runs/current`)
+      return jsonResponse(currentRunResponse)
     if (path === `/api/v1/projects/${PROJECT_ID}`) return jsonResponse(projectResponse)
     if (path === `/api/v1/projects/${PROJECT_ID}/architecture`)
       return jsonResponse(architectureResponse)

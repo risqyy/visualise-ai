@@ -19,6 +19,7 @@ import type { ComponentId, ProjectId, RunId } from './types'
  *         └ 'detail'                            projectDetail()
  *         └ 'architecture'                      architecture()
  *         └ 'runs'                              runs()              paged list
+ *             └ 'current'                       currentRun()        `current` alias
  *         └ 'run', runId                        run()               run scope
  *             └ 'detail'                        runDetail()
  *             └ 'agents'                        agents()
@@ -48,6 +49,16 @@ export const queryKeys = {
   /** Paged run list of a project. */
   runs: (projectId: ProjectId) =>
     [...queryKeys.project(projectId), 'runs'] as const,
+
+  /**
+   * The `current` alias of `GET /runs/{runId}`.
+   *
+   * Nested below `runs` on purpose: `run.finished` already invalidates that
+   * prefix, so closing a run refreshes the current-run pointer without adding
+   * an entry to the event → query-key map.
+   */
+  currentRun: (projectId: ProjectId) =>
+    [...queryKeys.runs(projectId), 'current'] as const,
 
   /** Scope of one run: prefix of run detail, agents and plans. */
   run: (projectId: ProjectId, runId: RunId) =>
