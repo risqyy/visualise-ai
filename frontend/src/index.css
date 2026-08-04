@@ -1,66 +1,159 @@
+@import 'tailwindcss';
+@import 'tw-animate-css';
+
+/*
+ * Graphite design tokens.
+ *
+ * The cockpit is a dark, desktop-only surface: a single graphite ramp carries
+ * the chrome so that the architecture canvas in the centre stays the brightest
+ * and therefore the visually dominant area. Accent hues are reserved for the
+ * four v0 work states (see `src/state/workStates.ts`) — they are never used for
+ * decoration, because in this product colour carries meaning.
+ */
+
+@custom-variant dark (&:is(.dark *));
+
 :root {
   color-scheme: dark;
-  --surface: #101214;
-  --surface-raised: #16191d;
-  --border: #272b31;
-  --text: #e6e8ea;
-  --text-muted: #9aa1a9;
 
-  font-family: ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
-  line-height: 1.5;
+  --radius: 0.625rem;
+
+  /* ---- graphite ramp ---------------------------------------------------- */
+  --graphite-950: oklch(0.16 0.004 265);
+  --graphite-900: oklch(0.19 0.004 265);
+  --graphite-850: oklch(0.22 0.005 265);
+  --graphite-800: oklch(0.25 0.006 265);
+  --graphite-700: oklch(0.31 0.007 265);
+  --graphite-600: oklch(0.42 0.008 265);
+  --graphite-400: oklch(0.63 0.009 265);
+  --graphite-200: oklch(0.83 0.006 265);
+  --graphite-050: oklch(0.95 0.003 265);
+
+  /* ---- semantic surface tokens ------------------------------------------ */
+  --background: var(--graphite-950);
+  --foreground: var(--graphite-050);
+  --card: var(--graphite-900);
+  --card-foreground: var(--graphite-050);
+  --popover: var(--graphite-850);
+  --popover-foreground: var(--graphite-050);
+  --primary: var(--graphite-200);
+  --primary-foreground: var(--graphite-950);
+  --secondary: var(--graphite-800);
+  --secondary-foreground: var(--graphite-050);
+  --muted: var(--graphite-850);
+  --muted-foreground: var(--graphite-400);
+  --accent: var(--graphite-800);
+  --accent-foreground: var(--graphite-050);
+  --destructive: oklch(0.62 0.19 25);
+  --border: var(--graphite-800);
+  --input: var(--graphite-800);
+  /* Focus ring: deliberately high contrast against every graphite step. */
+  --ring: oklch(0.78 0.11 235);
+
+  /* ---- canvas ----------------------------------------------------------- */
+  --canvas: oklch(0.2 0.004 265);
+  --canvas-grid: oklch(0.26 0.005 265);
+
+  /* ---- v0 work states --------------------------------------------------- */
+  /* Phases of work, never a quality judgement. Always paired with a label and
+     an icon or line style so the information survives without colour. */
+  --state-planned: oklch(0.82 0.15 88);
+  --state-active: oklch(0.72 0.13 240);
+  --state-applied: oklch(0.75 0.15 152);
+  --state-removed: oklch(0.66 0.2 25);
+
+  /* ---- live connection -------------------------------------------------- */
+  --live-connected: var(--state-applied);
+  --live-reconnecting: var(--state-planned);
+  --live-offline: var(--graphite-400);
 }
 
-* {
-  box-sizing: border-box;
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+
+  --color-canvas: var(--canvas);
+  --color-canvas-grid: var(--canvas-grid);
+
+  --color-state-planned: var(--state-planned);
+  --color-state-active: var(--state-active);
+  --color-state-applied: var(--state-applied);
+  --color-state-removed: var(--state-removed);
+
+  --color-live-connected: var(--live-connected);
+  --color-live-reconnecting: var(--live-reconnecting);
+  --color-live-offline: var(--live-offline);
+
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+
+  --font-sans:
+    ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  --font-mono:
+    ui-monospace, 'JetBrains Mono', 'SFMono-Regular', 'Cascadia Mono', Menlo,
+    monospace;
+
+  /* Compact desktop typography: the cockpit shows a lot of structure at once. */
+  --text-2xs: 0.6875rem;
+  --text-2xs--line-height: 1rem;
 }
 
-html,
-body,
-#root {
-  height: 100%;
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  html,
+  body,
+  #root {
+    height: 100%;
+  }
+
+  body {
+    @apply bg-background text-foreground font-sans antialiased;
+    margin: 0;
+    /* Desktop application surface: the page itself never scrolls sideways.
+       Wide content scrolls inside its own container instead. */
+    overflow: hidden;
+    font-size: 0.875rem;
+    line-height: 1.5;
+  }
+
+  /* Focus must always be visible — keyboard is a first-class input here. */
+  :focus-visible {
+    @apply outline-ring;
+    outline-width: 2px;
+    outline-style: solid;
+    outline-offset: 2px;
+  }
 }
 
-body {
-  margin: 0;
-  background: var(--surface);
-  color: var(--text);
-  /* The cockpit is a desktop application surface: it must not scroll sideways. */
-  overflow-x: hidden;
-}
+@layer components {
+  /* Shared surface for the three panes. */
+  .pane-surface {
+    @apply bg-card text-card-foreground flex h-full min-h-0 min-w-0 flex-col;
+  }
 
-.shell {
-  max-width: 72rem;
-  margin: 0 auto;
-  padding: 3rem 2rem;
-}
-
-.lead {
-  color: var(--text-muted);
-  max-width: 60ch;
-}
-
-.panel {
-  margin-top: 2rem;
-  padding: 1.25rem 1.5rem;
-  background: var(--surface-raised);
-  border: 1px solid var(--border);
-  border-radius: 0.75rem;
-}
-
-h1 {
-  font-size: 1.75rem;
-  margin: 0 0 0.5rem;
-}
-
-h2 {
-  font-size: 1rem;
-  margin: 0 0 0.5rem;
-  color: var(--text-muted);
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
-}
-
-:focus-visible {
-  outline: 2px solid #6ea8fe;
-  outline-offset: 2px;
+  .pane-heading {
+    @apply text-2xs text-muted-foreground font-semibold tracking-[0.08em] uppercase;
+  }
 }
