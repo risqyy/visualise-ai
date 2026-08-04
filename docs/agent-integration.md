@@ -194,9 +194,11 @@ Das Limit trifft in der Praxis zwei Dinge: sehr große
 sich aufteilen — die Architektur über inkrementelle `change_*`-Events, Diffs
 ohnehin pro Datei.
 
-Ist die Anfrage größer als 8 MiB, lehnt bereits Nginx sie ab, und zwar mit einer
-HTML-Fehlerseite statt einem `application/problem+json`. Ein Client sollte
-`413` deshalb nicht am Antwortkörper erkennen, sondern am Statuscode.
+Überschreitet die Anfrage zusätzlich das Limit des Einstiegspunkts
+(`MAX_REQUEST_BODY_SIZE`, Default `4m`), lehnt bereits Nginx sie ab. Auch diese
+Ablehnung kommt als `application/problem+json` mit `code: event_too_large`, ist
+für einen Client also nicht von der des Backends zu unterscheiden — genau das
+ist beabsichtigt.
 
 ## Fehlerformat
 

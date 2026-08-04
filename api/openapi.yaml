@@ -16,7 +16,7 @@ info:
     | `POST /api/v1/events` | Single-event ingestion, idempotent per `clientEventId`. |
     | `GET /api/v1/projects/{projectId}/stream` | Server-Sent Events: gap-free replay followed by the live stream. |
     | `GET /api/v1/projects` … `GET /api/v1/projects/{projectId}/components/{componentId}/history` | Project scoped read models: projects, architecture, runs, agents, plans and component evidence. |
-    | `GET /healthz`, `GET /readyz` | Internal container probes, not reachable from outside the Compose network. |
+    | `GET /healthz`, `GET /readyz` | Container probes, proxied by Nginx and therefore reachable from the published port. |
 
     ## The read models
 
@@ -725,12 +725,12 @@ paths:
       operationId: getLiveness
       summary: Liveness probe (internal)
       description: |
-        Internal liveness probe of the Go backend container. It reports only that the process
-        is running and answering; it never touches PostgreSQL. Not routed through the Nginx
-        frontend and therefore not reachable from outside the Compose network.
-      servers:
-        - url: http://backend:8080
-          description: Internal Go backend container — reachable only inside the Compose network
+        Liveness probe of the Go backend container. It reports only that the process is
+        running and answering; it never touches PostgreSQL.
+
+        Nginx proxies this route, so it answers on the published port as well as inside the
+        Compose network. It carries no project data, but like every other route in v0 it is
+        unauthenticated — see the trust boundary in `docs/security-and-boundaries.md`.
       responses:
         '200':
           description: The process is alive.
@@ -746,12 +746,12 @@ paths:
       operationId: getReadiness
       summary: Readiness probe (internal)
       description: |
-        Internal readiness probe of the Go backend container. It reports whether the backend
-        can serve traffic, which includes a reachable PostgreSQL and applied migrations. Not
-        routed through the Nginx frontend.
-      servers:
-        - url: http://backend:8080
-          description: Internal Go backend container — reachable only inside the Compose network
+        Readiness probe of the Go backend container. It reports whether the backend can serve
+        traffic, which includes a reachable PostgreSQL and applied migrations.
+
+        Nginx proxies this route, so it answers on the published port as well as inside the
+        Compose network. The Compose healthcheck probes it, which is why a backend that failed
+        to start is never routed to as ready.
       responses:
         '200':
           description: The backend is ready to serve ingestion and streaming.

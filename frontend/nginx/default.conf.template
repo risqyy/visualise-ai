@@ -13,7 +13,20 @@ server {
     resolver 127.0.0.11 valid=10s ipv6=off;
     set $backend http://backend:8080;
 
-    client_max_body_size 8m;
+    # Must stay above the backend's MAX_EVENT_BYTES (2 MiB by default), otherwise
+    # Nginx rejects an oversized event before the backend can answer with the
+    # contract's problem+json. Raising MAX_EVENT_BYTES means raising this too;
+    # both are documented together in .env.example.
+    client_max_body_size ${MAX_REQUEST_BODY_SIZE};
+
+    # An event over the limit is still a contract violation, so answer it the way
+    # the contract says instead of with Nginx's HTML error page.
+    error_page 413 = @too_large;
+
+    location @too_large {
+        default_type application/problem+json;
+        return 413 '{"type":"https://visualise-ai.local/problems/event-too-large","title":"Content Too Large","status":413,"detail":"The request body exceeds the size the entry point accepts. See MAX_EVENT_BYTES and MAX_REQUEST_BODY_SIZE.","code":"event_too_large"}';
+    }
 
     # ---- Server-Sent Events -------------------------------------------------
     # Must be declared before the generic /api/ prefix: regex locations win.
