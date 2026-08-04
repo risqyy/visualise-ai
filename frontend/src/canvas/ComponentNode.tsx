@@ -2,7 +2,10 @@ import { Handle, Position, type NodeProps } from '@xyflow/react'
 import { memo } from 'react'
 
 import { cn } from '@/lib/utils'
+import { WORK_STATE_BY_ID } from '@/state/workStates'
 
+import { ChangeOverlayMark } from './ChangeOverlayMark'
+import type { ChangeOverlay } from './changeOverlays'
 import { componentKindStyle, componentTags, technologyParts } from './componentKinds'
 import { showsTags, showsTechnology } from './detailLevel'
 import { HANDLE_IDS, type ArchitectureNode } from './graphProjection'
@@ -15,7 +18,42 @@ import { useDetailLevel } from './useDetailLevel'
  * container around its children. Both take their size from the layout and
  * **never change it with the detail level** — the box is a fixed part of the
  * layout, only its content grows with the zoom (see `./detailLevel`).
+ *
+ * A reported work state is drawn **onto** the box: the border takes the state's
+ * line style and colour and a `ChangeOverlayMark` adds the icon and the label.
+ * The box size is untouched by it, so a change arriving cannot move the layout
+ * under the camera. A node that is not part of the applied model — an announced
+ * component, or one an applied change removed — is drawn dimmed and marked as
+ * such, so a proposal is never mistaken for something that already exists.
  */
+
+/** Border, tint and data attributes an overlay puts on a node box. */
+function overlayBoxProps(overlay: ChangeOverlay | null, applied: boolean) {
+  if (!overlay) {
+    return {
+      className: '',
+      style: undefined,
+      attributes: { 'data-applied': applied ? 'true' : 'false' } as Record<string, string>,
+    }
+  }
+  const definition = WORK_STATE_BY_ID[overlay.state]
+  return {
+    className: cn('border-2', overlay.presence !== 'applied' && 'opacity-80'),
+    style: {
+      borderColor: `var(${definition.colorVar})`,
+      borderStyle: definition.borderStyle,
+    } as const,
+    attributes: {
+      'data-applied': applied ? 'true' : 'false',
+      'data-work-state': overlay.state,
+      'data-work-state-label': definition.label,
+      'data-border-style': definition.borderStyle,
+      'data-operation': overlay.operation ?? 'none',
+      'data-presence': overlay.presence,
+      'data-agent-count': String(overlay.agentIds.length),
+    } as Record<string, string>,
+  }
+}
 
 /** Invisible, non-interactive connection points. v0 is read-only. */
 function NodeHandles() {
@@ -92,23 +130,30 @@ export const ComponentNode = memo(function ComponentNode({
   selected,
 }: NodeProps<ArchitectureNode>) {
   const level = useDetailLevel()
-  const { component } = data
+  const { component, overlay, applied } = data
   const kind = componentKindStyle(component.kind)
   const Icon = kind.icon
   const technology = technologyParts(component.technology)
   const tags = componentTags(component)
+  const box = overlayBoxProps(overlay, applied)
 
   return (
     <div
       className={cn(
-        'bg-card/95 border-border flex h-full w-full flex-col gap-1 overflow-hidden rounded-md border px-2.5 py-2 text-left shadow-sm transition-colors',
+        'bg-card/95 border-border flex h-full w-full flex-col gap-1 overflow-hidden rounded-md border px-2.5 py-2 text-left shadow-sm',
+        // Colour and border only, and only over 150 ms: a state arriving must
+        // read as a quiet change of appearance, never as motion.
+        'transition-[color,background-color,border-color,opacity] duration-150',
         'hover:border-muted-foreground/60',
+        box.className,
         selected && 'ring-ring border-ring/70 ring-2',
       )}
+      style={box.style}
       data-testid={`canvas-node-${component.componentId}`}
       data-component-id={component.componentId}
       data-detail-level={level}
       data-selected={selected ? 'true' : 'false'}
+      {...box.attributes}
     >
       <div className="flex items-start gap-1.5">
         <Icon className="text-muted-foreground mt-px size-3.5 shrink-0" aria-hidden="true" />
@@ -122,6 +167,7 @@ export const ComponentNode = memo(function ComponentNode({
         <KindBadge label={kind.label} />
       </div>
 
+      {overlay && <ChangeOverlayMark overlay={overlay} className="self-start" />}
       {showsTechnology(level) && <TechnologyRow parts={technology} />}
       {showsTags(level) && <TagRow tags={tags} />}
 
@@ -135,22 +181,27 @@ export const CompoundNode = memo(function CompoundNode({
   selected,
 }: NodeProps<ArchitectureNode>) {
   const level = useDetailLevel()
-  const { component, childCount } = data
+  const { component, childCount, overlay, applied } = data
   const kind = componentKindStyle(component.kind)
   const Icon = kind.icon
   const technology = technologyParts(component.technology)
+  const box = overlayBoxProps(overlay, applied)
 
   return (
     <div
       className={cn(
         'border-border/90 bg-card/35 h-full w-full rounded-lg border',
+        'transition-[border-color,opacity] duration-150',
+        box.className,
         selected && 'ring-ring border-ring/70 ring-2',
       )}
+      style={box.style}
       data-testid={`canvas-node-${component.componentId}`}
       data-component-id={component.componentId}
       data-detail-level={level}
       data-compound="true"
       data-selected={selected ? 'true' : 'false'}
+      {...box.attributes}
     >
       {/* Header row. The ELK padding reserves exactly this height at the top of
           the container, so it never overlaps a child. */}
@@ -171,6 +222,7 @@ export const CompoundNode = memo(function CompoundNode({
             {technology.join(' · ')}
           </span>
         )}
+        {overlay && <ChangeOverlayMark overlay={overlay} />}
         <span className="text-muted-foreground shrink-0 text-[10px]">
           {childCount} Kinder
         </span>

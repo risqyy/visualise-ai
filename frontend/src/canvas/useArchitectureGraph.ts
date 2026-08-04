@@ -29,6 +29,14 @@ export interface ArchitectureGraph {
   error: unknown
   /** Structural fingerprint of the model currently laid out. */
   signature: string
+  /** Nodes that belong to the applied architecture model. */
+  appliedNodeCount: number
+  /** Nodes drawn only because a change was reported (proposals and ghosts). */
+  overlayNodeCount: number
+  /** Edges of the applied model. */
+  appliedEdgeCount: number
+  /** Edges drawn only because a change was reported. */
+  overlayEdgeCount: number
 }
 
 const EMPTY_MODEL: ArchitectureModel = { components: [], relationships: [] }
@@ -95,7 +103,11 @@ export function useArchitectureGraph(
     const isCurrent = laidOut !== null && laidOut.signature === signature
 
     return {
-      nodes: isEmpty ? [] : isCurrent ? laidOut.nodes : (laidOut?.nodes ?? []),
+      nodes: isEmpty
+        ? []
+        : isCurrent
+          ? withCurrentData(laidOut.nodes, projection.nodes)
+          : (laidOut?.nodes ?? []),
       edges: projection.edges,
       routes: isCurrent ? laidOut.routes : {},
       diagnostics: projection.diagnostics ?? EMPTY_DIAGNOSTICS,
@@ -103,8 +115,34 @@ export function useArchitectureGraph(
       isRelayouting: !isEmpty && !isCurrent,
       error,
       signature,
+      appliedNodeCount: projection.appliedNodeCount,
+      overlayNodeCount: projection.overlayNodeCount,
+      appliedEdgeCount: projection.appliedEdgeCount,
+      overlayEdgeCount: projection.overlayEdgeCount,
     }
   }, [laidOut, projection, signature, error])
+}
+
+/**
+ * Puts the current node data on the laid-out nodes.
+ *
+ * A work state changes far more often than the structure does — a planned
+ * change becomes active, an active one becomes applied — and none of that moves
+ * a node: `projectionSignature` covers ids, nesting and sizes only, so ELK is
+ * deliberately not re-run for it. The positions therefore stay the ones from the
+ * last layout while the data comes from the current projection. Without this
+ * step a state change would be invisible until something structural happened to
+ * force a new layout.
+ */
+function withCurrentData(
+  laidOut: readonly ArchitectureNode[],
+  current: readonly ArchitectureNode[],
+): ArchitectureNode[] {
+  const dataById = new Map(current.map((node) => [node.id, node.data]))
+  return laidOut.map((node) => {
+    const data = dataById.get(node.id)
+    return data === undefined || data === node.data ? node : { ...node, data }
+  })
 }
 
 interface LayoutState {

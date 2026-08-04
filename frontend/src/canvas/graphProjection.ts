@@ -3,10 +3,13 @@ import type { Edge, Node, NodeHandle, Position } from '@xyflow/react'
 import type {
   AppliedComponent,
   AppliedRelationship,
+  Component,
   ComponentId,
   Identifier,
+  Relationship,
 } from '@/api/types'
 
+import type { ChangeOverlay, ChangeOverlayModel } from './changeOverlays'
 import { relationshipDiscriminator, relationshipDisplayName } from './relationshipKinds'
 
 /**
@@ -86,13 +89,22 @@ export function nodeHandles(width: number, height: number): NodeHandle[] {
 }
 
 export interface ComponentNodeData extends Record<string, unknown> {
-  component: AppliedComponent
+  /**
+   * The applied component, or — for an overlay-only node — the descriptor the
+   * agent reported with the change. Both satisfy `Component`; only an applied
+   * one carries provenance.
+   */
+  component: AppliedComponent | Component
+  /** `true` when this node is part of the applied architecture model. */
+  applied: boolean
   /** 0 for a root component, 1 for its children, and so on. */
   depth: number
   /** Number of direct children rendered inside this node. */
   childCount: number
   /** `true` when this node is a compound container. */
   isCompound: boolean
+  /** Reported work state of this component, or `null` when none was reported. */
+  overlay: ChangeOverlay | null
 }
 
 export type ArchitectureNode = Node<ComponentNodeData, ArchitectureNodeType>
@@ -105,7 +117,11 @@ export interface RelationshipEdgeData extends Record<string, unknown> {
    * `relationshipId`. Always at least one entry — this is the list the UI
    * resolves a bundle back into.
    */
-  relationships: AppliedRelationship[]
+  relationships: (AppliedRelationship | Relationship)[]
+  /** `true` when every relationship of this edge is part of the applied model. */
+  applied: boolean
+  /** Reported work state per `relationshipId`. Empty when none was reported. */
+  overlays: Record<Identifier, ChangeOverlay>
   /** `true` when more than one relationship shares this pair of components. */
   bundled: boolean
   /**
@@ -206,6 +222,13 @@ export function diagnosticsCount(diagnostics: ProjectionDiagnostics): number {
 export interface ArchitectureModel {
   components: readonly AppliedComponent[]
   relationships: readonly AppliedRelationship[]
+  /**
+   * The live change overlay, if one was built. It never enters `components` or
+   * `relationships`: proposals and ghosts become their **own** nodes and edges,
+   * marked `applied: false`, so the applied model stays exactly what the read
+   * API reported.
+   */
+  overlay?: ChangeOverlayModel | undefined
 }
 
 export interface ArchitectureProjection {
@@ -215,7 +238,15 @@ export interface ArchitectureProjection {
   edges: ArchitectureEdge[]
   diagnostics: ProjectionDiagnostics
   /** Components by id, for lookups that would otherwise re-scan the list. */
-  componentsById: Map<ComponentId, AppliedComponent>
+  componentsById: Map<ComponentId, AppliedComponent | Component>
+  /** Nodes that are part of the applied model. */
+  appliedNodeCount: number
+  /** Nodes drawn only because a change was reported (proposals and ghosts). */
+  overlayNodeCount: number
+  /** Edges of the applied model. */
+  appliedEdgeCount: number
+  /** Edges drawn only because a change was reported. */
+  overlayEdgeCount: number
 }
 
 export const EMPTY_DIAGNOSTICS: ProjectionDiagnostics = {
@@ -230,6 +261,17 @@ export const EMPTY_DIAGNOSTICS: ProjectionDiagnostics = {
 /** Builds the id of the edge that carries the relationships of one node pair. */
 export function bundleEdgeId(source: ComponentId, target: ComponentId): string {
   return `rel:${source}~>${target}`
+}
+
+/**
+ * Id of the edge that carries the *proposed* relationships of one node pair.
+ *
+ * Deliberately a different id space from `bundleEdgeId`: an announced edge and
+ * an applied edge between the same two components are two separate statements,
+ * and bundling them into one line would claim the proposal already happened.
+ */
+export function overlayEdgeId(source: ComponentId, target: ComponentId): string {
+  return `overlay:${source}~>${target}`
 }
 
 const compareIds = (a: string, b: string): number => (a < b ? -1 : a > b ? 1 : 0)
@@ -250,8 +292,16 @@ export function projectArchitecture(model: ArchitectureModel): ArchitectureProje
     selfReferences: [],
   }
 
+  const overlay = model.overlay
+
   // ---- 1. canonical component index ---------------------------------------
-  const componentsById = new Map<ComponentId, AppliedComponent>()
+  // The applied model first, the overlay-only components after it. An overlay
+  // component whose id is already applied is skipped rather than merged: the
+  // applied row is what the read API reported and it wins, always.
+  const componentsById = new Map<ComponentId, AppliedComponent | Component>()
+  const appliedComponentIds = new Set<ComponentId>()
+  const overlayOfComponent = new Map<ComponentId, ChangeOverlay>()
+
   const sortedComponents = [...model.components].sort((a, b) =>
     compareIds(a.componentId, b.componentId),
   )
@@ -263,6 +313,22 @@ export function projectArchitecture(model: ArchitectureModel): ArchitectureProje
       continue
     }
     componentsById.set(component.componentId, component)
+    appliedComponentIds.add(component.componentId)
+  }
+
+  if (overlay) {
+    for (const [componentId, entry] of overlay.components) {
+      if (appliedComponentIds.has(componentId)) overlayOfComponent.set(componentId, entry)
+    }
+    const extras = [...overlay.extraComponents].sort((a, b) =>
+      compareIds(a.component.componentId, b.component.componentId),
+    )
+    for (const extra of extras) {
+      const componentId = extra.component.componentId
+      if (componentsById.has(componentId)) continue
+      componentsById.set(componentId, extra.component)
+      overlayOfComponent.set(componentId, extra.overlay)
+    }
   }
 
   // ---- 2. resolve parents, cutting links that point nowhere ---------------
@@ -270,8 +336,9 @@ export function projectArchitecture(model: ArchitectureModel): ArchitectureProje
   for (const [componentId, component] of componentsById) {
     // The contract types `parentComponentId` as `ComponentId | null` and always
     // sends the field; `ComponentId` has `minLength: 1`, so "no parent" is
-    // `null` and never an empty string. There is nothing else to guard against.
-    const parentId = component.parentComponentId
+    // `null` and never an empty string. A reported descriptor may omit it
+    // entirely, which means the same thing.
+    const parentId = component.parentComponentId ?? null
     if (parentId === null) {
       parentOf.set(componentId, null)
       continue
@@ -358,9 +425,11 @@ export function projectArchitecture(model: ArchitectureModel): ArchitectureProje
       handles: nodeHandles(size.width, size.height),
       data: {
         component,
+        applied: appliedComponentIds.has(entry.componentId),
         depth: entry.depth,
         childCount: children.length,
         isCompound,
+        overlay: overlayOfComponent.get(entry.componentId) ?? null,
       },
       ...(parentId !== null ? { parentId, extent: 'parent' as const } : {}),
     }
@@ -373,7 +442,10 @@ export function projectArchitecture(model: ArchitectureModel): ArchitectureProje
   }
 
   // ---- 6. relationships -> bundled edges ----------------------------------
-  const relationshipsById = new Map<Identifier, AppliedRelationship>()
+  const relationshipsById = new Map<Identifier, AppliedRelationship | Relationship>()
+  const appliedRelationshipIds = new Set<Identifier>()
+  const overlayOfRelationship = new Map<Identifier, ChangeOverlay>()
+
   const sortedRelationships = [...model.relationships].sort((a, b) =>
     compareIds(a.relationshipId, b.relationshipId),
   )
@@ -385,9 +457,27 @@ export function projectArchitecture(model: ArchitectureModel): ArchitectureProje
       continue
     }
     relationshipsById.set(relationship.relationshipId, relationship)
+    appliedRelationshipIds.add(relationship.relationshipId)
   }
 
-  const bundles = new Map<string, AppliedRelationship[]>()
+  if (overlay) {
+    for (const [relationshipId, entry] of overlay.relationships) {
+      if (appliedRelationshipIds.has(relationshipId)) {
+        overlayOfRelationship.set(relationshipId, entry)
+      }
+    }
+    const extras = [...overlay.extraRelationships].sort((a, b) =>
+      compareIds(a.relationship.relationshipId, b.relationship.relationshipId),
+    )
+    for (const extra of extras) {
+      const relationshipId = extra.relationship.relationshipId
+      if (relationshipsById.has(relationshipId)) continue
+      relationshipsById.set(relationshipId, extra.relationship)
+      overlayOfRelationship.set(relationshipId, extra.overlay)
+    }
+  }
+
+  const bundles = new Map<string, (AppliedRelationship | Relationship)[]>()
   for (const relationship of relationshipsById.values()) {
     const { sourceComponentId, targetComponentId, relationshipId } = relationship
 
@@ -411,18 +501,30 @@ export function projectArchitecture(model: ArchitectureModel): ArchitectureProje
       diagnostics.selfReferences.push(relationshipId)
     }
 
-    const key = bundleEdgeId(sourceComponentId, targetComponentId)
+    const key = appliedRelationshipIds.has(relationshipId)
+      ? bundleEdgeId(sourceComponentId, targetComponentId)
+      : overlayEdgeId(sourceComponentId, targetComponentId)
     const existing = bundles.get(key)
     if (existing) existing.push(relationship)
     else bundles.set(key, [relationship])
   }
 
+  let overlayEdgeCount = 0
   const edges: ArchitectureEdge[] = [...bundles.keys()]
     .sort(compareIds)
     .map((edgeId) => {
       // Non-null: the key came from this very map.
-      const relationships = bundles.get(edgeId) as AppliedRelationship[]
-      const first = relationships[0] as AppliedRelationship
+      const relationships = bundles.get(edgeId) as (AppliedRelationship | Relationship)[]
+      const first = relationships[0] as AppliedRelationship | Relationship
+      const applied = appliedRelationshipIds.has(first.relationshipId)
+      if (!applied) overlayEdgeCount += 1
+
+      const overlays: Record<Identifier, ChangeOverlay> = {}
+      for (const relationship of relationships) {
+        const entry = overlayOfRelationship.get(relationship.relationshipId)
+        if (entry) overlays[relationship.relationshipId] = entry
+      }
+
       return {
         id: edgeId,
         type: RELATIONSHIP_EDGE_TYPE,
@@ -434,12 +536,25 @@ export function projectArchitecture(model: ArchitectureModel): ArchitectureProje
           sourceComponentId: first.sourceComponentId,
           targetComponentId: first.targetComponentId,
           relationships,
+          applied,
+          overlays,
           bundled: relationships.length > 1,
         },
       }
     })
 
-  return { nodes, edges, diagnostics, componentsById }
+  const overlayNodeCount = nodes.filter((node) => node.data.applied === false).length
+
+  return {
+    nodes,
+    edges,
+    diagnostics,
+    componentsById,
+    appliedNodeCount: nodes.length - overlayNodeCount,
+    overlayNodeCount,
+    appliedEdgeCount: edges.length - overlayEdgeCount,
+    overlayEdgeCount,
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -447,7 +562,7 @@ export function projectArchitecture(model: ArchitectureModel): ArchitectureProje
 // ---------------------------------------------------------------------------
 
 export interface ResolvedRelationship {
-  relationship: AppliedRelationship
+  relationship: AppliedRelationship | Relationship
   /** Index within the bundle, used for the fan-out offset. */
   index: number
   /** Number of relationships in the bundle this one belongs to. */
@@ -476,7 +591,7 @@ export function resolveEdgeBundle(edge: ArchitectureEdge): ResolvedRelationship[
 
 /** Same as `resolveEdgeBundle`, for callers that already hold the list. */
 export function resolveRelationships(
-  relationships: readonly AppliedRelationship[],
+  relationships: readonly (AppliedRelationship | Relationship)[],
 ): ResolvedRelationship[] {
   return relationships.map((relationship, index) => ({
     relationship,
