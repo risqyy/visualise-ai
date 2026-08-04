@@ -1,16 +1,39 @@
+import type { RelationshipKind } from '@/api/types'
 import { RELATIONSHIP_KIND_STYLES } from '@/canvas/relationshipKinds'
 import { cn } from '@/lib/utils'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 
 /**
- * Legend for the six relationship kinds of the contract.
+ * Legend for the relationship kinds the canvas is currently drawing.
  *
  * The canvas encodes a kind through its stroke pattern, its arrow head and a
  * text badge — never through colour, because the accent hues belong to the work
  * states. This legend shows exactly those three channels, so it stays readable
  * in greyscale and matches what is drawn on the canvas one for one.
+ *
+ * It lists only the kinds actually present in the reported model. A legend is a
+ * key to what is on screen, not a catalogue of what the contract can express:
+ * showing `NATS` and `gRPC` for a project that reports neither invites the
+ * reader to look for something that is not there.
  */
-export function RelationshipLegend({ className }: { className?: string }) {
+export function RelationshipLegend({
+  className,
+  kinds,
+}: {
+  className?: string
+  /**
+   * Kinds present in the current model. Omitted or empty falls back to the full
+   * catalogue, which is the honest answer while nothing has been reported yet.
+   */
+  kinds?: readonly RelationshipKind[]
+}) {
+  const present = kinds && kinds.length > 0 ? new Set(kinds) : null
+  const styles = present
+    ? RELATIONSHIP_KIND_STYLES.filter((style) => present.has(style.id))
+    : RELATIONSHIP_KIND_STYLES
+
+  if (styles.length === 0) return null
+
   return (
     <div className={cn('flex flex-wrap items-center gap-x-4 gap-y-1.5', className)}>
       <span className="pane-heading">Beziehungsarten</span>
@@ -18,7 +41,7 @@ export function RelationshipLegend({ className }: { className?: string }) {
         className="flex flex-wrap items-center gap-x-4 gap-y-1.5"
         data-testid="relationship-legend"
       >
-        {RELATIONSHIP_KIND_STYLES.map((style) => (
+        {styles.map((style) => (
           <li key={style.id}>
             <Tooltip>
               <TooltipTrigger asChild>

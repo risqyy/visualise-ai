@@ -19,6 +19,7 @@ import {
 } from '@/components/ui/collapsible'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Separator } from '@/components/ui/separator'
+import { COUNT_LABELS, counted } from '@/lib/plural'
 
 export interface RunAgentPaneProps {
   projectId: ProjectId
@@ -136,8 +137,9 @@ export function RunAgentPane({ projectId, runId }: RunAgentPaneProps) {
                       </span>
                     </Row>
                     <Row label="Umfang">
-                      {run.data.run.counts.agents} Agents · {run.data.run.counts.plans}{' '}
-                      Pläne · {run.data.run.counts.workSteps} Arbeitsschritte
+                      {counted(run.data.run.counts.agents, COUNT_LABELS.agent)} ·{' '}
+                      {counted(run.data.run.counts.plans, COUNT_LABELS.plan)} ·{' '}
+                      {counted(run.data.run.counts.workSteps, COUNT_LABELS.workStep)}
                     </Row>
                   </dl>
                 )}
