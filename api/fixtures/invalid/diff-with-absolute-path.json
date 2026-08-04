@@ -1,0 +1,17 @@
+{
+  "_reason": "filePath must be repository relative — no leading slash, no parent traversal",
+  "schemaVersion": "1.0",
+  "clientEventId": "6b6e9b6a-4f5f-4a1f-9b7d-2f0f2a5b1c04",
+  "projectId": "demo-shop",
+  "runId": "run-2026-08-04-a",
+  "agentId": "subagent-checkout",
+  "parentAgentId": "orchestrator-root",
+  "occurredAt": "2026-08-04T09:00:00Z",
+  "type": "diff.reported",
+  "payload": {
+    "diffId": "diff-0001",
+    "componentIds": ["checkout-service"],
+    "filePath": "/etc/passwd",
+    "unifiedDiff": "--- a/etc/passwd\n+++ b/etc/passwd\n@@ -1 +1 @@\n-root\n+root\n"
+  }
+}

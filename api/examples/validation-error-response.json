@@ -1,0 +1,25 @@
+{
+  "type": "https://visualise-ai.local/problems/invalid-field",
+  "title": "Invalid field",
+  "status": 400,
+  "detail": "The event was rejected because 3 fields violate the contract.",
+  "code": "invalid_field",
+  "instance": "/api/v1/events",
+  "errors": [
+    {
+      "field": "/payload/percent",
+      "code": "out_of_range",
+      "message": "percent must be an integer between 0 and 100, got 140."
+    },
+    {
+      "field": "/payload/scope",
+      "code": "required",
+      "message": "scope is required for agent.progress_reported."
+    },
+    {
+      "field": "/occuredAt",
+      "code": "unknown_property",
+      "message": "Unknown top-level field \"occuredAt\". Did you mean \"occurredAt\"?"
+    }
+  ]
+}

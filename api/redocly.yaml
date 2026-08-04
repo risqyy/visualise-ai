@@ -1,0 +1,22 @@
+extends:
+  - recommended
+
+apis:
+  event-contract@v1:
+    root: openapi.yaml
+
+rules:
+  # The document must be a structurally valid OpenAPI 3.1 description.
+  # `struct` is the current name of the former `spec` rule (@redocly/cli >= 2).
+  struct: error
+
+  # v0 is a private, locally operated product: the repository carries no license file, so
+  # `info.license` would have to be invented.
+  info-license: off
+
+  # The only external entry point of v0 is the Nginx frontend container published on
+  # http://localhost:8080. There is no public deployment, so the localhost URL is correct.
+  no-server-example.com: off
+
+# Targeted, documented exceptions live in .redocly.lint-ignore.yaml so that the rules stay
+# enforced for every other operation.

@@ -1,0 +1,16 @@
+{
+  "_reason": "percent must stay within 0..100",
+  "schemaVersion": "1.0",
+  "clientEventId": "6b6e9b6a-4f5f-4a1f-9b7d-2f0f2a5b1c05",
+  "projectId": "demo-shop",
+  "runId": "run-2026-08-04-a",
+  "agentId": "subagent-checkout",
+  "parentAgentId": "orchestrator-root",
+  "occurredAt": "2026-08-04T09:00:00Z",
+  "type": "agent.progress_reported",
+  "payload": {
+    "percent": 140,
+    "scope": "own_task",
+    "basis": "reported_estimate"
+  }
+}

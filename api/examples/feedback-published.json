@@ -1,0 +1,20 @@
+{
+  "schemaVersion": "1.0",
+  "clientEventId": "2a7e1f38-4c5b-4d61-9f2a-8e0b3c7d5619",
+  "projectId": "visualise-ai",
+  "runId": "run-2026-08-04-0001",
+  "agentId": "subagent-reviewer",
+  "parentAgentId": "orchestrator-root",
+  "occurredAt": "2026-08-04T10:02:31Z",
+  "type": "feedback.published",
+  "payload": {
+    "feedbackId": "feedback-2026-08-04-0003",
+    "componentIds": [
+      "shop-platform.orders.domain.pricing",
+      "shop-platform.orders.domain.tax"
+    ],
+    "format": "markdown",
+    "title": "VAT extraction leaves the discount order undefined",
+    "body": "## What I looked at\n\nThe extraction of VAT handling out of `pricing` into the new `tax` module.\n\n## What stands out\n\n1. **Order of operations is now implicit.** `Total` applies tax before the discount, while the\n   old code applied the flat 19 % rate after summing net lines. For percentage discounts this\n   changes the result.\n2. **No rounding rule is stated.** `tax.For(country).Apply(sum)` returns a `money.Amount`, but\n   nothing documents whether it rounds half-up per line or per order.\n\n## Suggestion\n\nMake the sequence explicit and cover it with a table test:\n\n```go\nnet := order.NetTotal()\ndiscounted := net.Sub(p.discountFor(order))\ntotal := discounted.Add(tax.For(order.DeliveryCountry).Apply(discounted))\n```\n\nThis is a reported observation, not a measured defect.\n"
+  }
+}

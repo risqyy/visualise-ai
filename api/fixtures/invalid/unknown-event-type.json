@@ -1,0 +1,15 @@
+{
+  "_reason": "type is not part of the closed v0 catalogue — there is no free-form fallback event",
+  "schemaVersion": "1.0",
+  "clientEventId": "6b6e9b6a-4f5f-4a1f-9b7d-2f0f2a5b1c01",
+  "projectId": "demo-shop",
+  "runId": "run-2026-08-04-a",
+  "agentId": "orchestrator-root",
+  "parentAgentId": null,
+  "occurredAt": "2026-08-04T09:00:00Z",
+  "type": "tool.invoked",
+  "payload": {
+    "tool": "bash",
+    "command": "ls -la"
+  }
+}

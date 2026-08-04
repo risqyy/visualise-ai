@@ -1,0 +1,27 @@
+{
+  "schemaVersion": "1.0",
+  "clientEventId": "9b2d4c6a-1e3f-4a58-8c07-5d1b9e6f2a44",
+  "projectId": "visualise-ai",
+  "runId": "run-2026-08-04-0001",
+  "agentId": "subagent-architecture-mapper",
+  "parentAgentId": "orchestrator-root",
+  "occurredAt": "2026-08-04T09:47:53Z",
+  "type": "component.change_applied",
+  "payload": {
+    "changeId": "change-2026-08-04-0007",
+    "operation": "add",
+    "component": {
+      "componentId": "shop-platform.orders.domain.tax",
+      "name": "Tax Calculation",
+      "kind": "module",
+      "parentComponentId": "shop-platform.orders.domain",
+      "description": "VAT rules per delivery country, extracted from the pricing module.",
+      "technology": {
+        "language": "Go",
+        "runtime": "Go",
+        "version": "1.24"
+      },
+      "tags": ["pricing", "tax"]
+    }
+  }
+}

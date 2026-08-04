@@ -1,0 +1,25 @@
+{
+  "schemaVersion": "1.0",
+  "clientEventId": "c56a4180-65aa-42ec-a945-5fd21dec0538",
+  "projectId": "visualise-ai",
+  "runId": "run-2026-08-04-0001",
+  "agentId": "subagent-implementer",
+  "parentAgentId": "orchestrator-root",
+  "occurredAt": "2026-08-04T09:52:04Z",
+  "type": "correction.issued",
+  "payload": {
+    "correctsClientEventId": "5d41402a-bc4b-4a76-b971-9d911017c592",
+    "reason": "The diff was attributed to the pricing module only; it also touches the new tax module.",
+    "correctedType": "diff.reported",
+    "correctedPayload": {
+      "diffId": "diff-2026-08-04-0011",
+      "changeId": "change-2026-08-04-0007",
+      "componentIds": [
+        "shop-platform.orders.domain.pricing",
+        "shop-platform.orders.domain.tax"
+      ],
+      "filePath": "internal/orders/domain/pricing/pricing.go",
+      "unifiedDiff": "--- a/internal/orders/domain/pricing/pricing.go\n+++ b/internal/orders/domain/pricing/pricing.go\n@@ -18,11 +19,9 @@ func (p *Pricing) Total(order Order) money.Amount {\n \tsum := money.Zero(order.Currency)\n \tfor _, line := range order.Lines {\n \t\tsum = sum.Add(line.Net)\n \t}\n-\n-\tvat := sum.MultiplyFloat(0.19)\n-\tsum = sum.Add(vat)\n+\tsum = sum.Add(tax.For(order.DeliveryCountry).Apply(sum))\n \n \treturn sum.Sub(p.discountFor(order))\n }\n"
+    }
+  }
+}
