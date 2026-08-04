@@ -19,6 +19,7 @@ right or wrong.
 | `backend/`        | Go module: Gin HTTP surface, zerolog, GORM/PostgreSQL       |
 | `frontend/`       | React + TypeScript application, built by Vite               |
 | `frontend/nginx/` | Nginx site config — the only external entry point           |
+| `simulator/`      | Node/TypeScript event simulator — the deterministic demo client |
 | `docker-compose.yml` | `frontend`, `backend` and `postgres` services           |
 | `docs/decisions/` | Architecture decision records                               |
 
@@ -30,6 +31,18 @@ docker compose up --build
 ```
 
 Then open <http://localhost:8080>.
+
+A fresh database is empty, so the cockpit has nothing to show until an agent
+reports something. The bundled simulator fills it deterministically through the
+public route:
+
+```bash
+cd simulator
+npm install
+npm run simulate                # or: npm run simulate -- --base http://localhost:8091
+```
+
+See [`simulator/README.md`](simulator/README.md) for the scenarios and flags.
 
 The full operations and agent-integration guide is delivered separately; this
 file covers the scaffold only.
@@ -91,6 +104,11 @@ go build ./... && go vet ./... && go test ./...
 cd frontend
 npm ci
 npm run lint && npm run typecheck && npm run test && npm run build
+
+# Simulator
+cd simulator
+npm ci
+npm run lint && npm run typecheck && npm test
 ```
 
 `npm run dev` starts Vite on port 5173 and proxies `/api`, `/healthz` and
