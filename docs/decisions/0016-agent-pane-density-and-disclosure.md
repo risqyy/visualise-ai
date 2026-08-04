@@ -1,4 +1,4 @@
-# 14. Agent pane density: what is painted first, and what is never removed
+# 16. Agent pane density: what is painted first, and what is never removed
 
 - **Status:** accepted
 - **Date:** 2026-08-04
