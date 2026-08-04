@@ -1,5 +1,6 @@
 import { RefreshCw, TriangleAlert } from 'lucide-react'
 import type { ReactNode } from 'react'
+import { useTranslation } from 'react-i18next'
 
 import { describeError, isProblemError } from '@/api/problem'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
@@ -42,6 +43,10 @@ export function AsyncState({
   className,
   children,
 }: AsyncStateProps) {
+  // `emptyTitle` and `emptyDescription` stay props: what "nothing here" means is
+  // the caller's sentence, not this component's.
+  const { t } = useTranslation(['common', 'errors'])
+
   if (isPending) {
     return (
       <div
@@ -50,7 +55,7 @@ export function AsyncState({
         aria-live="polite"
         aria-busy="true"
       >
-        <span className="sr-only">Daten werden geladen…</span>
+        <span className="sr-only">{t('common:state.loading')}</span>
         {Array.from({ length: skeletonRows }, (_, index) => (
           <Skeleton key={index} className="h-9 w-full" />
         ))}
@@ -62,8 +67,14 @@ export function AsyncState({
     return (
       <Alert variant="destructive" className={className}>
         <TriangleAlert />
-        <AlertTitle>Daten konnten nicht geladen werden</AlertTitle>
+        <AlertTitle>{t('errors:load.title')}</AlertTitle>
         <AlertDescription>
+          {/*
+            `describeError` mostly surfaces what the backend reported — the
+            problem title and its stable code. That is reported data and stays
+            as it is; only its two generic fallbacks are ours, and they move
+            into the catalogues with the rest of the app in #42.
+          */}
           <p>{describeError(error)}</p>
           {isProblemError(error) && error.errors.length > 0 && (
             <ul className="list-disc space-y-0.5 pl-4">
@@ -77,7 +88,7 @@ export function AsyncState({
           {onRetry && (
             <Button variant="outline" size="sm" onClick={onRetry} className="mt-1">
               <RefreshCw />
-              Erneut versuchen
+              {t('common:action.retry')}
             </Button>
           )}
         </AlertDescription>
