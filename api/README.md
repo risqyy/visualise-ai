@@ -1,9 +1,9 @@
 # Event contract
 
-`openapi.yaml` is the single, versioned contract between the reporting agents and the
-Visualise AI cockpit. Everything the cockpit shows arrives through it; nothing is inferred.
+`openapi.yaml` is the single, versioned contract between the reporting agents, the Visualise
+AI cockpit and its UI. Everything the cockpit shows arrives through it; nothing is inferred.
 
-* **Document version** — `info.version` (`1.0.0`), OpenAPI 3.1.0.
+* **Document version** — `info.version` (`1.1.0`), OpenAPI 3.1.0.
 * **Payload version** — `schemaVersion` inside every event envelope. v0 accepts `1.0` only.
 
 ## Surface
@@ -12,9 +12,44 @@ Visualise AI cockpit. Everything the cockpit shows arrives through it; nothing i
 | --- | --- |
 | `POST /api/v1/events` | Single-event ingestion, idempotent on `clientEventId`. |
 | `GET /api/v1/projects/{projectId}/stream` | Server-Sent Events: replay from a position, then live. |
+| `GET /api/v1/projects` | Every known project. |
+| `GET /api/v1/projects/{projectId}` | One project with the sizes of its read models. |
+| `GET /api/v1/projects/{projectId}/architecture` | Applied components and relationships plus pending proposals. |
+| `GET /api/v1/projects/{projectId}/runs` | Current and historical runs, paged. |
+| `GET /api/v1/projects/{projectId}/runs/{runId}` | One run; `current` resolves to the current one. |
+| `GET /api/v1/projects/{projectId}/runs/{runId}/agents` | Flat agent tree of one run. |
+| `GET /api/v1/projects/{projectId}/runs/{runId}/plans` | Every plan of one run with all revisions. |
+| `GET /api/v1/projects/{projectId}/components/{componentId}` | Component inspector for exactly one run. |
+| `GET /api/v1/projects/{projectId}/components/{componentId}/history` | Run spanning component history, paged. |
 | `GET /healthz`, `GET /readyz` | Internal probes on the Go backend container. |
 
-The historical read API is specified separately and is not part of this document.
+## Read models
+
+The read endpoints answer from normalised projections the backend advances in the same
+transaction that appends the event. A client never queries the event log; the only place the
+log surfaces is the component history, and there as a paged, component filtered list.
+
+* **`projectPosition` is in every response.** It is the project position at the moment the
+  snapshot was read, so an HTTP snapshot and the SSE stream can be reconciled without guessing
+  which one is ahead. Every row additionally carries the position of the event that last wrote
+  it as `position`. On the project collection, which is not scoped to one project,
+  `projectPosition` is the highest position across the listed projects.
+* **Everything is scoped to one project.** No response ever carries a row of another project,
+  even when two projects reuse the same run, agent or component ids.
+* **Current run and history are separate views.** The inspector shows the evidence of exactly
+  one run — the one in `runId`, or the current one. `…/history` is the run spanning, paged
+  view. Neither mixes into the other.
+* **`activeChanges` means pending.** Only changes in state `planned` are listed: an applied
+  change *is* the model, a retracted one was withdrawn.
+* **Pagination.** `limit` defaults to 50 and maxes out at 200; a value outside that range is a
+  `400`, never a silently clamped page. `cursor` is opaque and echoed back unchanged. Runs, the
+  component history and the inspector's unified diffs (`diffLimit`, `diffCursor`,
+  `nextDiffCursor`) are paged; every other collection is complete.
+* **Errors follow RFC 9457** as on the write path, with the additional codes `run_not_found`,
+  `current_run_not_found`, `component_not_found` and `invalid_query_parameter`. A project whose
+  runs were never opened by a root orchestrator has no current run, and
+  `current_run_not_found` is distinct from `run_not_found` so a client can tell "no run yet"
+  from "wrong run id".
 
 ## How the contract is closed
 
@@ -86,6 +121,8 @@ Low-level tool calls, terminal commands, file reads and token usage are delibera
 | `diff-reported.json` | Single-file unified diff |
 | `correction-issued.json` | Correction of an earlier event |
 | `run-finished.json` | Optional terminal run event |
+| `architecture-read-model.json` | Read model of the applied architecture with two pending proposals |
+| `component-inspector.json` | Read model of one component in one run: feedback, diff, risk, problem, proposal |
 | `retry-idempotent-response.json` | `200` with `duplicate: true` |
 | `conflict-response.json` | `409` problem |
 | `validation-error-response.json` | `400` problem with field errors |
@@ -129,5 +166,6 @@ the simulator and the UI are built against.
 `redocly.yaml` extends the `recommended` ruleset with `struct: error` (the current name of the
 former `spec` rule). Two rules are switched off with a reason in the file: `info-license`
 (the repository declares no license) and `no-server-example.com` (the only entry point really
-is `http://localhost:8080`). `.redocly.lint-ignore.yaml` carries one narrow exception for the
-two internal probes, so `operation-4xx-response` stays enforced everywhere else.
+is `http://localhost:8080`). `.redocly.lint-ignore.yaml` carries narrow, documented exceptions
+for the two internal probes and for `GET /api/v1/projects`, which takes no parameter a client
+could get wrong; `operation-4xx-response` stays enforced everywhere else.

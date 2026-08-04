@@ -1,0 +1,122 @@
+{
+  "projectPosition": 17,
+  "runId": "run-2026-08-04-0001",
+  "component": {
+    "componentId": "shop-platform.orders.domain.pricing",
+    "name": "Pricing",
+    "kind": "module",
+    "parentComponentId": "shop-platform.orders.domain",
+    "description": "Fourth hierarchy level: discount and tax calculation inside the domain layer.",
+    "technology": {},
+    "tags": [
+      "pricing"
+    ],
+    "appliedAt": "2026-08-04T09:00:05Z",
+    "appliedByAgentId": "subagent-architecture-mapper",
+    "appliedRunId": "run-2026-08-04-0001",
+    "position": 5
+  },
+  "responsibleAgent": {
+    "agentId": "subagent-implementer",
+    "runId": "run-2026-08-04-0001",
+    "parentAgentId": "orchestrator-root",
+    "role": "subagent",
+    "displayName": "Implementer",
+    "assignedTask": "Move VAT handling out of the pricing module.",
+    "status": "working",
+    "statusNote": "Rewriting Total().",
+    "progress": {
+      "percent": 70,
+      "scope": "own_task",
+      "basis": "completed_steps"
+    },
+    "finishedOutcome": null,
+    "startedAt": "2026-08-04T09:00:03Z",
+    "lastEventAt": "2026-08-04T09:00:11Z",
+    "position": 11
+  },
+  "currentWorkStep": {
+    "workStepId": "work-extract-tax",
+    "runId": "run-2026-08-04-0001",
+    "agentId": "subagent-implementer",
+    "planStepId": "step-extract",
+    "title": "Move VAT handling into its own module",
+    "startedAt": "2026-08-04T09:00:08Z",
+    "completedAt": null,
+    "summary": null,
+    "position": 8
+  },
+  "feedback": [
+    {
+      "feedbackId": "feedback-2026-08-04-0003",
+      "runId": "run-2026-08-04-0001",
+      "agentId": "subagent-reviewer",
+      "format": "markdown",
+      "title": "VAT extraction leaves the discount order undefined",
+      "body": "## What I looked at\n\nThe extraction of VAT handling out of `pricing` into the new `tax` module.\n\n## What stands out\n\n1. **Order of operations is now implicit.** `Total` applies tax before the discount, while the\n   old code applied the flat 19 % rate after summing net lines. For percentage discounts this\n   changes the result.\n2. **No rounding rule is stated.** `tax.For(country).Apply(sum)` returns a `money.Amount`, but\n   nothing documents whether it rounds half-up per line or per order.\n\n## Suggestion\n\nMake the sequence explicit and cover it with a table test:\n\n```go\nnet := order.NetTotal()\ndiscounted := net.Sub(p.discountFor(order))\ntotal := discounted.Add(tax.For(order.DeliveryCountry).Apply(discounted))\n```\n\nThis is a reported observation, not a measured defect.\n",
+      "createdAt": "2026-08-04T09:00:13Z",
+      "position": 13
+    }
+  ],
+  "diffs": [
+    {
+      "diffId": "diff-2026-08-04-0011",
+      "runId": "run-2026-08-04-0001",
+      "agentId": "subagent-implementer",
+      "changeId": "change-2026-08-04-0007",
+      "filePath": "internal/orders/domain/pricing/pricing.go",
+      "unifiedDiff": "--- a/internal/orders/domain/pricing/pricing.go\n+++ b/internal/orders/domain/pricing/pricing.go\n@@ -1,6 +1,7 @@\n package pricing\n \n import (\n \t\"shop-platform/internal/shared/money\"\n+\t\"shop-platform/internal/orders/domain/tax\"\n )\n \n@@ -18,11 +19,9 @@ func (p *Pricing) Total(order Order) money.Amount {\n \tsum := money.Zero(order.Currency)\n \tfor _, line := range order.Lines {\n \t\tsum = sum.Add(line.Net)\n \t}\n-\n-\tvat := sum.MultiplyFloat(0.19)\n-\tsum = sum.Add(vat)\n+\tsum = sum.Add(tax.For(order.DeliveryCountry).Apply(sum))\n \n \treturn sum.Sub(p.discountFor(order))\n }\n",
+      "createdAt": "2026-08-04T09:00:11Z",
+      "position": 11
+    }
+  ],
+  "nextDiffCursor": null,
+  "risks": [
+    {
+      "riskId": "risk-2026-08-04-0002",
+      "runId": "run-2026-08-04-0001",
+      "agentId": "subagent-reviewer",
+      "title": "Rounding rule of the extracted VAT calculation is undocumented",
+      "detail": "Neither the diff nor the module doc states whether rounding happens per line or per order.",
+      "severity": "medium",
+      "createdAt": "2026-08-04T09:00:14Z",
+      "position": 14
+    }
+  ],
+  "problems": [
+    {
+      "problemId": "problem-2026-08-04-0001",
+      "runId": "run-2026-08-04-0001",
+      "agentId": "subagent-reviewer",
+      "title": "The pricing table test no longer compiles",
+      "detail": "pricing_test.go still constructs the removed vat field.",
+      "createdAt": "2026-08-04T09:00:15Z",
+      "position": 15
+    }
+  ],
+  "activeChanges": [
+    {
+      "changeId": "change-2026-08-04-0008",
+      "targetKind": "component",
+      "targetId": "shop-platform.orders.domain.pricing",
+      "operation": "modify",
+      "state": "planned",
+      "runId": "run-2026-08-04-0001",
+      "agentId": "subagent-architecture-mapper",
+      "plannedAt": "2026-08-04T09:00:16Z",
+      "appliedAt": null,
+      "retractedAt": null,
+      "snapshot": {
+        "kind": "module",
+        "name": "Pricing",
+        "tags": [
+          "pricing"
+        ],
+        "componentId": "shop-platform.orders.domain.pricing",
+        "description": "Discount calculation only; VAT now lives in the tax module.",
+        "parentComponentId": "shop-platform.orders.domain"
+      },
+      "position": 16
+    }
+  ]
+}
