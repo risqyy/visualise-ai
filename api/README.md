@@ -91,13 +91,40 @@ Low-level tool calls, terminal commands, file reads and token usage are delibera
 | `validation-error-response.json` | `400` problem with field errors |
 | [`sse-reconnect.md`](./examples/sse-reconnect.md) | Full SSE reconnect walkthrough with `Last-Event-ID` |
 
+## Rejection fixtures
+
+`fixtures/invalid/` holds documents that the contract **must** refuse. They exist so the
+"closed catalogue" property is tested rather than merely asserted. Each file carries a
+`_reason` field describing what it proves; the validator strips it before checking.
+
+| File | Proves |
+| --- | --- |
+| `unknown-event-type.json` | A tool-call event is not representable — no free-form fallback |
+| `unsupported-schema-version.json` | `schemaVersion: "2.0"` is refused |
+| `unknown-payload-field.json` | Raw terminal output cannot be smuggled into a payload |
+| `diff-with-absolute-path.json` | `filePath` must be repository relative |
+| `progress-out-of-range.json` | `percent` stays within `0..100` |
+
 ## Working on the spec
 
 ```bash
-npm ci        # or: npm install
-npm run lint  # redocly lint openapi.yaml
-npm run bundle # writes dist/openapi.bundled.yaml
+npm ci                     # or: npm install
+npm test                   # lint + bundle + example validation
 ```
+
+The individual steps:
+
+```bash
+npm run lint               # redocly lint openapi.yaml
+npm run bundle             # writes dist/openapi.bundled.yaml
+npm run validate:examples  # checks examples/ and fixtures/invalid/ against the bundle
+```
+
+`validate:examples` compiles the bundled component schemas with Ajv (OpenAPI 3.1 schemas are
+JSON Schema 2020-12) and asserts that every example matches the schema it illustrates and that
+every rejection fixture is refused. `externalValue` examples are not checked by `redocly lint`,
+so without this step the examples could silently drift away from the contract that the backend,
+the simulator and the UI are built against.
 
 `redocly.yaml` extends the `recommended` ruleset with `struct: error` (the current name of the
 former `spec` rule). Two rules are switched off with a reason in the file: `info-license`
