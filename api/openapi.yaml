@@ -961,12 +961,21 @@ components:
       description: |
         The event is well-formed and schema-valid but contradicts the current state of the
         project. Codes: `unknown_agent`, `run_already_finished`, `run_not_started`,
-        `parent_agent_unknown`, `terminal_event_not_allowed`, `correction_target_unknown`.
+        `run_already_started`, `parent_agent_unknown`, `terminal_event_not_allowed`,
+        `correction_target_unknown`.
       content:
         application/problem+json:
           schema:
             $ref: '#/components/schemas/Problem'
           examples:
+            runAlreadyStarted:
+              summary: A second root agent.started for a run that already exists
+              value:
+                type: 'https://visualise-ai.local/problems/run-already-started'
+                title: Run already started
+                status: 422
+                detail: Run "run-2026-08-04-0001" was already opened by a root agent.started in this project.
+                code: run_already_started
             runAlreadyFinished:
               summary: Work event after run.finished
               value:
@@ -2642,7 +2651,7 @@ components:
             `unsupported_event_type`, `unsupported_schema_version`,
             `client_event_id_conflict`, `event_too_large`, `unsupported_media_type`,
             `unknown_agent`, `run_already_finished`, `run_not_started`,
-            `parent_agent_unknown`, `terminal_event_not_allowed`,
+            `run_already_started`, `parent_agent_unknown`, `terminal_event_not_allowed`,
             `correction_target_unknown`, `project_not_found`, `run_not_found`,
             `current_run_not_found`, `component_not_found`, `invalid_query_parameter` or
             `not_ready`.
