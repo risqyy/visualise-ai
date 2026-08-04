@@ -18,6 +18,7 @@ import (
 	"github.com/risqyy/visualise-ai/backend/internal/health"
 	"github.com/risqyy/visualise-ai/backend/internal/httpapi"
 	"github.com/risqyy/visualise-ai/backend/internal/logging"
+	"github.com/risqyy/visualise-ai/backend/internal/store"
 )
 
 // version is overridden at build time via -ldflags.
@@ -79,8 +80,10 @@ func run() error {
 		serverErr <- nil
 	}()
 
-	// Startup work is complete: only now may the instance report readiness.
-	bootstrap(db, checker, logger)
+	// Startup work must succeed before the instance may report readiness.
+	if err := bootstrap(db, checker, logger); err != nil {
+		return err
+	}
 
 	select {
 	case err := <-serverErr:
@@ -101,8 +104,20 @@ func run() error {
 }
 
 // bootstrap performs the startup work that must succeed before the backend is
-// routed to. Schema migration is added together with the event store.
-func bootstrap(_ *gorm.DB, checker *health.Checker, logger zerolog.Logger) {
+// routed to.
+//
+// The schema is owned by the backend: GORM AutoMigrate is the only migration
+// mechanism in v0. A failing migration returns an error, so the instance never
+// marks itself bootstrapped, /readyz keeps answering 503 and the process exits
+// non-zero instead of serving against an unknown schema.
+func bootstrap(db *gorm.DB, checker *health.Checker, logger zerolog.Logger) error {
+	if err := store.Migrate(db); err != nil {
+		logger.Error().Err(err).Msg("schema migration failed")
+		return err
+	}
+	logger.Info().Msg("schema migrated")
+
 	checker.MarkBootstrapped()
 	logger.Info().Msg("backend is ready")
+	return nil
 }
