@@ -192,6 +192,64 @@ describe('where the camera goes', () => {
     expect(overview.zoom).toBeLessThan(MIN_READABLE_ZOOM)
   })
 
+  it('pans a focus that would fall off the edge back onto the surface', () => {
+    // A node four levels down, far to the right of a model that does not fit at
+    // the readable zoom. Without the focus it sat past the right edge: drawn,
+    // selected, described by the inspector — and nowhere on screen.
+    const node = { x: 1700, y: 300, width: 228, height: 96 }
+
+    const blind = viewportForBounds(TOP_LEVELS, SURFACE, {
+      minZoom: MIN_READABLE_ZOOM,
+      overflow: 'start',
+    })
+    expect(node.x * blind.zoom + blind.x + node.width * blind.zoom).toBeGreaterThan(
+      SURFACE.width,
+    )
+
+    const focused = viewportForBounds(TOP_LEVELS, SURFACE, {
+      minZoom: MIN_READABLE_ZOOM,
+      overflow: 'start',
+      focus: node,
+    })
+
+    const left = node.x * focused.zoom + focused.x
+    const top = node.y * focused.zoom + focused.y
+    expect(left).toBeGreaterThanOrEqual(0)
+    expect(top).toBeGreaterThanOrEqual(0)
+    expect(left + node.width * focused.zoom).toBeLessThanOrEqual(SURFACE.width)
+    expect(top + node.height * focused.zoom).toBeLessThanOrEqual(SURFACE.height)
+
+    // Panned, never zoomed: the readability floor is not the price of a link.
+    expect(focused.zoom).toBe(blind.zoom)
+  })
+
+  it('leaves the camera alone for a focus that is already on screen', () => {
+    const options = {
+      minZoom: MIN_READABLE_ZOOM,
+      overflow: 'start' as const,
+    }
+    const without = viewportForBounds(TOP_LEVELS, SURFACE, options)
+    const withFocus = viewportForBounds(TOP_LEVELS, SURFACE, {
+      ...options,
+      focus: { x: 40, y: 40, width: 228, height: 96 },
+    })
+    expect(withFocus).toEqual(without)
+  })
+
+  it('shows where an oversized focus begins rather than where it ends', () => {
+    // A container wider than the surface cannot be contained; its top-left is
+    // the part worth showing, for the same reason `overflow: start` exists.
+    const huge = { x: 900, y: 0, width: 4000, height: 200 }
+    const viewport = viewportForBounds(TOP_LEVELS, SURFACE, {
+      minZoom: MIN_READABLE_ZOOM,
+      overflow: 'start',
+      focus: huge,
+    })
+    const left = huge.x * viewport.zoom + viewport.x
+    expect(left).toBeGreaterThan(0)
+    expect(left).toBeLessThan(SURFACE.width / 2)
+  })
+
   it('never returns a zoom outside the canvas limits', () => {
     const clamped = viewportForBounds({ x: 0, y: 0, width: 10, height: 10 }, SURFACE, {
       minZoom: MIN_READABLE_ZOOM,

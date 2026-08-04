@@ -82,6 +82,41 @@ function viewportTransform(): string {
   )
 }
 
+/**
+ * Where a rendered node actually sits on the drawing surface, in CSS px.
+ *
+ * jsdom has no layout engine, so `getBoundingClientRect` answers zero for
+ * everything. The two inputs that decide the answer are both observable
+ * without one: React Flow writes each node's **absolute** flow position into
+ * its `transform`, and the canvas reports the surface it computed the camera
+ * against. Applying the camera to the first gives the same number a browser
+ * would measure.
+ */
+function nodeRectOnSurface(canvas: HTMLElement, componentId: string) {
+  const node = document.querySelector<HTMLElement>(
+    `.react-flow__node[data-id="${componentId}"]`,
+  )
+  if (!node) throw new Error(`node ${componentId} is not rendered`)
+
+  const translate = /translate\((-?[\d.]+)px,\s*(-?[\d.]+)px\)/.exec(node.style.transform)
+  if (!translate) throw new Error(`node ${componentId} has no position: ${node.style.transform}`)
+
+  const { x, y, zoom } = useUiStore.getState().camera
+  const left = Number(translate[1]) * zoom + x
+  const top = Number(translate[2]) * zoom + y
+
+  return {
+    left,
+    top,
+    right: left + LEAF_NODE_SIZE.width * zoom,
+    bottom: top + LEAF_NODE_SIZE.height * zoom,
+    surface: {
+      width: Number(canvas.getAttribute('data-surface-width')),
+      height: Number(canvas.getAttribute('data-surface-height')),
+    },
+  }
+}
+
 /** Resolves once the one automatic fit has run its course. */
 async function waitForCameraSettled(): Promise<void> {
   await waitFor(() => expect(useUiStore.getState().camera.zoom).toBeGreaterThan(0), {
@@ -327,6 +362,67 @@ describe('architecture canvas — a deep link reaches a deep component', () => {
 
       // And it still cost exactly one camera movement.
       expect(canvas.getAttribute('data-fit-view-count')).toBe('1')
+    },
+    CANVAS_TIMEOUT,
+  )
+
+  it(
+    'puts it inside the drawing surface, without a second camera movement',
+    async () => {
+      renderLargeModel(`${WORKSPACE_URL}?component=${LARGE_DEEP_COMPONENT_ID}`)
+      const canvas = await waitForCanvas()
+      await screen.findByTestId(`canvas-node-${LARGE_DEEP_COMPONENT_ID}`, undefined, {
+        timeout: CANVAS_TIMEOUT,
+      })
+      await waitForCameraSettled()
+
+      // Being drawn is not the same as being on screen. Before the initial
+      // camera learned about the deep link, the linked node sat several hundred
+      // pixels past the right edge: the inspector described a component the
+      // architecture surface did not show anywhere.
+      const rect = nodeRectOnSurface(canvas, LARGE_DEEP_COMPONENT_ID)
+      expect(rect.surface.width).toBeGreaterThan(0)
+      expect(rect.left).toBeGreaterThanOrEqual(0)
+      expect(rect.top).toBeGreaterThanOrEqual(0)
+      expect(rect.right).toBeLessThanOrEqual(rect.surface.width)
+      expect(rect.bottom).toBeLessThanOrEqual(rect.surface.height)
+
+      // Reached by panning, not by zooming out: the readable floor holds.
+      expect(useUiStore.getState().camera.zoom).toBeGreaterThanOrEqual(MIN_READABLE_ZOOM)
+      // And it is still the one automatic movement, not two.
+      expect(canvas.getAttribute('data-fit-view-count')).toBe('1')
+    },
+    CANVAS_TIMEOUT,
+  )
+
+  it(
+    'does not move the camera when the user selects another component by clicking',
+    async () => {
+      const user = userEvent.setup()
+      const { router } = renderLargeModel(
+        `${WORKSPACE_URL}?component=${LARGE_DEEP_COMPONENT_ID}`,
+      )
+      const canvas = await waitForCanvas()
+      await screen.findByTestId(`canvas-node-${LARGE_DEEP_COMPONENT_ID}`, undefined, {
+        timeout: CANVAS_TIMEOUT,
+      })
+      await waitForCameraSettled()
+
+      const cameraBefore = useUiStore.getState().camera
+      const transformBefore = viewportTransform()
+      expect(transformBefore).not.toBe('')
+
+      // The deep link is an input to the *first* picture only. From then on the
+      // camera is the user's, and choosing another component is not a request
+      // to move it — even when that component is off screen.
+      await user.click(screen.getByTestId('canvas-node-mesh.s4'))
+      await waitFor(() =>
+        expect(router.state.location.search).toEqual({ component: 'mesh.s4' }),
+      )
+
+      expect(canvas.getAttribute('data-fit-view-count')).toBe('1')
+      expect(viewportTransform()).toBe(transformBefore)
+      expect(useUiStore.getState().camera).toEqual(cameraBefore)
     },
     CANVAS_TIMEOUT,
   )

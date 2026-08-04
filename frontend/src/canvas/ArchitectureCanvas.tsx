@@ -168,12 +168,12 @@ function ArchitectureCanvasInner({
    * layout — the same model always ends up under the same camera.
    *
    * The two modes are the whole readability rule. `initial` may not zoom below
-   * `MIN_READABLE_ZOOM` and anchors an oversized model at its top-left corner;
-   * `user` fits whatever is there, however small that turns out, because the
-   * user asked for the overview.
+   * `MIN_READABLE_ZOOM`, anchors an oversized model at its top-left corner and
+   * keeps `focusComponentId` on screen; `user` fits whatever is there, however
+   * small that turns out, because the user asked for the overview.
    */
   const fitView = useCallback(
-    (mode: FitMode) => {
+    (mode: FitMode, focusComponentId: ComponentId | null = null) => {
       setFitViewCount((count) => count + 1)
 
       const { width, height, nodeLookup } = storeApi.getState()
@@ -182,11 +182,17 @@ function ArchitectureCanvasInner({
       const bounds = getNodesBounds([...nodeLookup.values()], { nodeLookup })
       if (width <= 0 || height <= 0 || bounds.width <= 0 || bounds.height <= 0) return
 
+      // The absolute box of the node the URL points at. `getNodesBounds` is what
+      // resolves a nested node's parent-relative position for us, so the focus
+      // arrives in the same coordinates as the model bounds.
+      const focusNode = focusComponentId === null ? undefined : nodeLookup.get(focusComponentId)
+      const focus = focusNode ? getNodesBounds([focusNode], { nodeLookup }) : null
+
       const viewport = viewportForBounds(
         bounds,
         { width, height },
         mode === 'initial'
-          ? { minZoom: MIN_READABLE_ZOOM, overflow: 'start' }
+          ? { minZoom: MIN_READABLE_ZOOM, overflow: 'start', focus }
           : { minZoom: MIN_ZOOM },
       )
       void flow.setViewport(viewport)
@@ -204,19 +210,26 @@ function ArchitectureCanvasInner({
    * rather than state: the parked request changes nothing on screen, and the
    * effect that redeems it already re-runs when the new layout lands.
    */
-  const pendingFitRef = useRef<FitMode | null>(null)
+  const pendingFitRef = useRef<{ mode: FitMode; focusComponentId: ComponentId | null } | null>(
+    null,
+  )
 
   /** Fits now if the graph is already the right one, otherwise after re-layout. */
   const requestFit = useCallback(
     (mode: FitMode, afterRelayout: boolean) => {
+      // "Systemebene" reproduces the entry picture, and the entry picture keeps
+      // the selected component on screen. The whole-model overview does not: it
+      // is about the model, not about one component of it.
+      const focusComponentId =
+        mode === 'initial' ? (selectedComponentId ?? null) : null
       if (afterRelayout) {
-        pendingFitRef.current = mode
+        pendingFitRef.current = { mode, focusComponentId }
         return
       }
       policyRef.current = onUserFitRequest(policyRef.current).state
-      fitView(mode)
+      fitView(mode, focusComponentId)
     },
-    [fitView],
+    [fitView, selectedComponentId],
   )
 
   // Switching projects makes the next model an initial one again — including
@@ -238,6 +251,13 @@ function ArchitectureCanvasInner({
   // and the user has not taken the camera over. Every later layout — an added
   // component, a removed relationship, a replacing snapshot — returns `null`
   // here and leaves zoom, pan and selection exactly where the user left them.
+  //
+  // `selectedComponentId` is an *input* to that one movement, not a trigger for
+  // a second one. A deep link says which component the picture is about, and
+  // the first picture is the only one nobody has taken over yet; honouring it
+  // there costs no extra fit. It is in the dependency list because a later
+  // selection change must run the policy again and be told `null` — which is
+  // exactly the assertion that a click never moves the camera.
   useEffect(() => {
     const decision = onLayoutReady(policyRef.current, {
       projectId,
@@ -247,8 +267,15 @@ function ArchitectureCanvasInner({
     })
     policyRef.current = decision.state
     if (decision.fit === null) return
-    fitView('initial')
-  }, [projectId, graph.nodes.length, surfaceWidth, surfaceHeight, fitView])
+    fitView('initial', selectedComponentId ?? null)
+  }, [
+    projectId,
+    graph.nodes.length,
+    surfaceWidth,
+    surfaceHeight,
+    selectedComponentId,
+    fitView,
+  ])
 
   // The initial disclosure, written down once it has been applied.
   //
@@ -271,7 +298,7 @@ function ArchitectureCanvasInner({
     if (pending === null || graph.isRelayouting || graph.nodes.length === 0) return
     pendingFitRef.current = null
     policyRef.current = onUserFitRequest(policyRef.current).state
-    fitView(pending)
+    fitView(pending.mode, pending.focusComponentId)
   }, [graph.isRelayouting, graph.nodes.length, graph.signature, fitView])
 
   const edges = useMemo<ArchitectureEdge[]>(() => {
@@ -386,6 +413,10 @@ function ArchitectureCanvasInner({
       data-visible-node-count={graph.visibleNodeCount}
       data-hidden-node-count={hiddenCount}
       data-collapsed-count={graph.collapsedIds.length}
+      // The surface the camera was computed against. Reported so "is this node
+      // actually on screen" is answerable from outside without a layout engine.
+      data-surface-width={surfaceWidth}
+      data-surface-height={surfaceHeight}
       data-layouting={graph.isRelayouting ? 'true' : 'false'}
     >
       <EdgeMarkerDefs />

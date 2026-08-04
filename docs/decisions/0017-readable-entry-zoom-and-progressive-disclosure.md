@@ -94,6 +94,44 @@ most once per project plus while the surface is settling, and **no new exception
 was added**: the readable floor changes *where* the camera goes, never *whether*
 it moves. A live event still returns `null`.
 
+### The selected component is an input to the first picture
+
+The floor and the anchoring together produced a defect worth naming, because it
+is the exact failure mode this ADR otherwise argues against. A deep link into a
+component four levels down opened the path to it and selected it — and then the
+readable zoom put it 732 px past the right edge of a 1036 px surface: **0 %
+visible**. The inspector described a component the architecture surface did not
+show anywhere. Fitting the whole model, for all its illegibility, had at least
+kept the linked node on screen.
+
+`viewportForBounds` therefore takes an optional `focus` rectangle, and the
+initial camera passes the box of the component the URL points at. It is brought
+in by **panning only** — by the least amount that gets it inside — and never by
+zooming out: the floor is not the price of following a link, and the two are not
+in competition, since a leaf node is 176 × 74 px at the readable zoom and fits
+any supported surface many times over. A focus that is already visible leaves
+the camera untouched.
+
+This is deliberately **not** a fourth `fitView` reason, and the alternative —
+treating a deep link as an explicit user action, i.e. a second movement — was
+rejected. There is only ever one automatic movement, and at the moment it
+happens no user has taken the camera over; letting it read the URL as well as
+the layout gives it one more input, not one more occasion. `data-fit-view-count`
+is `1` for a deep link exactly as it is without one.
+
+The boundary is where it has to be: `selectedComponentId` is in the dependency
+list of the layout effect, so a **later** selection change re-runs the policy —
+and the policy answers `null`. Choosing another component by clicking therefore
+leaves zoom and pan byte-identical, even when the newly selected component is
+off screen. From the first picture onwards the camera is the user's, and a
+selection is not a request to move it. `ArchitectureZoom.test.tsx` asserts both
+halves: the linked node lies inside the surface rectangle after the first
+render, and a click afterwards changes nothing about the viewport transform.
+
+"Systemebene" reproduces the entry picture and therefore honours the selection
+the same way. "Gesamtes Modell einpassen" does not: it is a statement about the
+model, not about one component of it.
+
 ### The hierarchy opens on the top two levels
 
 `src/canvas/collapse.ts` reduces the projected graph to what a set of collapsed
@@ -172,12 +210,14 @@ what contains it.
 
 It is resolved **with** the initial collapsed set, before the first layout, so a
 deep link still costs exactly one ELK run and one camera movement:
-`data-fit-view-count` is `1` on a deep link exactly as it is without one. And it
-changes visibility only — zoom and pan are not touched by it, so the deep link is
-not a camera exception either. The reverse case is handled explicitly: closing a
-container that holds the current selection moves the selection **up** to that
-container, so the URL never points at something that is not on screen and the
-inspector never describes an invisible component.
+`data-fit-view-count` is `1` on a deep link exactly as it is without one. Being
+drawn is not the same as being on screen, though — see "The selected component
+is an input to the first picture" above for the second half of this.
+
+The reverse case is handled explicitly: closing a container that holds the
+current selection moves the selection **up** to that container, so the URL never
+points at something that is not on screen and the inspector never describes an
+invisible component.
 
 ### The disclosure is transient, like the camera
 
@@ -213,8 +253,14 @@ Measured in Chromium at 1920 × 1080, centre pane 1035.7 × 932.5 px, with
   and fits it. "Systemebene" reproduces the entry picture on demand.
 - **A large model is now partly off-screen at the readable zoom.** 28 components
   on their top level lay out to 1944 × 518, which is 69 % of a 1036 px surface at
-  0.77. The minimap (ADR 0008) and the anchored overflow are what make that
-  navigable rather than disorienting.
+  0.77. The minimap (ADR 0008), the anchored overflow and the focus on the
+  selected component are what make that navigable rather than disorienting.
+- **A selection that is off screen stays off screen.** Only the *first* picture
+  pans to the selected component. Clicking a node the user can see cannot move
+  the camera, and neither can a selection arriving from anywhere else. If it
+  turns out that following a link from the inspector into an off-screen
+  component needs the camera too, that is a new, explicit user action and it
+  belongs in the toolbar next to "Einpassen" — not in the policy.
 - **Two canvas test files start from the open model.** `ArchitectureCanvas.test`
   and `ChangeOverlays.test` assert bundling, overlays and selection on components
   three and four levels down; they now pass `expandAllComponents` to `renderApp`,
