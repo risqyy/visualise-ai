@@ -100,6 +100,13 @@ export interface UiState {
   selectedComponentId: ComponentId | null
   selectedRelationshipId: Identifier | null
   hoveredComponentId: ComponentId | null
+  /**
+   * Relationship bundles the user unfolded by clicking them. Purely a way of
+   * looking at the graph — the bundle itself is a rendering, never a merge.
+   */
+  expandedEdgeIds: string[]
+  /** `false` hides the canvas minimap. */
+  minimapVisible: boolean
   deepFocus: DeepFocusTarget | null
   /** Pane arrangement to restore when deep focus ends. */
   paneStateBeforeDeepFocus: PaneArrangement | null
@@ -121,6 +128,10 @@ export interface UiState {
   setSelectedRelationshipId: (relationshipId: Identifier | null) => void
   setHoveredComponentId: (componentId: ComponentId | null) => void
 
+  toggleEdgeExpanded: (edgeId: string) => void
+  clearExpandedEdges: () => void
+  setMinimapVisible: (visible: boolean) => void
+
   setAgentCollapsed: (agentId: string, collapsed: boolean) => void
   toggleAgentCollapsed: (agentId: string) => void
 
@@ -134,6 +145,7 @@ const transientDefaults = {
   selectedComponentId: null,
   selectedRelationshipId: null,
   hoveredComponentId: null,
+  expandedEdgeIds: [],
   deepFocus: null,
   paneStateBeforeDeepFocus: null,
 } satisfies Partial<UiState>
@@ -145,6 +157,7 @@ export const useUiStore = create<UiState>()(
       leftCollapsed: false,
       rightCollapsed: false,
       collapsedAgentIds: [],
+      minimapVisible: true,
       ...transientDefaults,
 
       setLayout: (layout) => set({ layout }),
@@ -165,6 +178,15 @@ export const useUiStore = create<UiState>()(
       setSelectedRelationshipId: (selectedRelationshipId) =>
         set({ selectedRelationshipId }),
       setHoveredComponentId: (hoveredComponentId) => set({ hoveredComponentId }),
+
+      toggleEdgeExpanded: (edgeId) =>
+        set((s) => ({
+          expandedEdgeIds: s.expandedEdgeIds.includes(edgeId)
+            ? s.expandedEdgeIds.filter((id) => id !== edgeId)
+            : [...s.expandedEdgeIds, edgeId],
+        })),
+      clearExpandedEdges: () => set({ expandedEdgeIds: [] }),
+      setMinimapVisible: (minimapVisible) => set({ minimapVisible }),
 
       setAgentCollapsed: (agentId, collapsed) =>
         set((s) => {
@@ -222,7 +244,11 @@ export const useUiStore = create<UiState>()(
           leftCollapsed: state.leftCollapsed,
           rightCollapsed: state.rightCollapsed,
         }
-        return { ...persistedPanes, collapsedAgentIds: state.collapsedAgentIds }
+        return {
+          ...persistedPanes,
+          collapsedAgentIds: state.collapsedAgentIds,
+          minimapVisible: state.minimapVisible,
+        }
       },
     },
   ),

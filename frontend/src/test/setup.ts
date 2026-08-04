@@ -11,6 +11,11 @@ import { resetUiStore } from '@/state/uiStore'
  * react-resizable-panels and Radix rely on. The stubs are inert: they satisfy
  * the API surface without pretending to report sizes, so no test can
  * accidentally depend on a fake layout measurement.
+ *
+ * React Flow deliberately needs no measurement stub here: the architecture
+ * canvas declares node sizes and handle positions on the nodes themselves (see
+ * `src/canvas/graphProjection.ts`), so its geometry comes from the ELK layout
+ * rather than from a rendered DOM.
  */
 class ResizeObserverStub implements ResizeObserver {
   observe(): void {}
