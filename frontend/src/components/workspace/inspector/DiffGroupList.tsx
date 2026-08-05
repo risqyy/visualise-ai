@@ -1,11 +1,11 @@
 import { FileDiff, GitCommitVertical } from 'lucide-react'
-import { useTranslation } from 'react-i18next'
+import { Trans, useTranslation } from 'react-i18next'
 
 import type { ReportedDiff } from '@/api/types'
 import { EmptyState } from '@/components/AsyncState'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { ReportedTime } from '@/i18n'
+import { ReportedText, ReportedTime } from '@/i18n'
 
 import { groupDiffs, type DiffGroup } from './diffGroups'
 import { SCROLL_ANCHOR_ATTRIBUTE } from './scrollStability'
@@ -34,14 +34,13 @@ export function DiffGroupList({
   isFetchingNextPage,
   onFetchNextPage,
 }: DiffGroupListProps) {
+  const { t } = useTranslation('inspector')
+  const { t: tCommon } = useTranslation('common')
   const groups = groupDiffs(diffs)
 
   if (groups.length === 0) {
     return (
-      <EmptyState
-        title="Keine Diffs gemeldet"
-        description="Für diese Komponente wurde in diesem Run kein diff.reported gemeldet."
-      />
+      <EmptyState title={t('diff.emptyTitle')} description={t('diff.emptyDescription')} />
     )
   }
 
@@ -59,7 +58,7 @@ export function DiffGroupList({
           disabled={isFetchingNextPage}
           onClick={onFetchNextPage}
         >
-          {isFetchingNextPage ? 'Lädt…' : 'Weitere Diffs laden'}
+          {isFetchingNextPage ? tCommon('state.loadingMore') : t('diff.loadMore')}
         </Button>
       )}
     </div>
@@ -67,11 +66,15 @@ export function DiffGroupList({
 }
 
 function DiffGroupCard({ group }: { group: DiffGroup }) {
-  const { t } = useTranslation('common')
+  const { t } = useTranslation('inspector')
+  const { t: tCommon } = useTranslation('common')
   const isAttributed = group.changeId !== null
+  // The heading names *our* concept and quotes the reported id. The id has to
+  // sit inside the phrase, so it is interpolated — i18next never translates an
+  // interpolated value.
   const heading = isAttributed
-    ? `Änderung ${group.changeId}`
-    : `Einzelner Diff ${group.files[0]?.diff.diffId ?? ''}`
+    ? t('diff.changeHeading', { changeId: group.changeId })
+    : t('diff.singleHeading', { diffId: group.files[0]?.diff.diffId ?? '' })
 
   return (
     <article
@@ -94,7 +97,7 @@ function DiffGroupCard({ group }: { group: DiffGroup }) {
             {heading}
           </h4>
           <Badge variant="outline" className="text-2xs shrink-0 font-normal tabular-nums">
-            {t('count.file', { count: group.files.length })}
+            {tCommon('count.file', { count: group.files.length })}
           </Badge>
         </div>
         <p className="text-muted-foreground text-2xs">
@@ -103,9 +106,9 @@ function DiffGroupCard({ group }: { group: DiffGroup }) {
             group rather than repeated on every file: the files below are, by
             construction, the work of this agent in this run.
           */}
-          <span className="font-mono">{group.agentId}</span>
+          <ReportedText value={group.agentId} className="font-mono" />
           <span aria-hidden="true"> · </span>
-          Run <span className="font-mono">{group.runId}</span>
+          {t('meta.runPrefix')} <ReportedText value={group.runId} className="font-mono" />
           <span aria-hidden="true"> · </span>
           <ReportedTime value={group.reportedAt} />
           <span aria-hidden="true"> · </span>
@@ -115,8 +118,15 @@ function DiffGroupCard({ group }: { group: DiffGroup }) {
         </p>
         {!isAttributed && (
           <p className="text-muted-foreground text-2xs">
-            Ohne <code className="font-mono">changeId</code> gemeldet — der Agent hat
-            diesen Diff keiner angekündigten Änderung zugeordnet.
+            {/*
+              `changeId` is a contract field name and appears as itself in every
+              language, so it is a `<Trans>` slot rather than catalogue text.
+            */}
+            <Trans
+              ns="inspector"
+              i18nKey="diff.withoutChangeId"
+              components={{ field: <code className="font-mono">changeId</code> }}
+            />
           </p>
         )}
       </header>

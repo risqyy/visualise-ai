@@ -1,1 +1,125 @@
-{}
+{
+  "change": {
+    "emptyDescription": "Für diese Komponente ist in diesem Run keine Änderung angekündigt und noch nicht angewandt.",
+    "emptyTitle": "Keine offenen Vorschläge",
+    "label": "Offene Vorschläge",
+    "plannedAt": "geplant",
+    "stateLabel": "Zustand"
+  },
+  "component": {
+    "emptyTitle": "Keine Daten zu dieser Komponente"
+  },
+  "context": {
+    "agentLabel": "Agent",
+    "finished": "beendet:",
+    "label": "Komponentenkontext",
+    "noAgent": "Kein verantwortlicher Agent belegt.",
+    "noTask": "Keine Aufgabe gemeldet.",
+    "noWorkStep": "Kein Arbeitsschritt hat diese Komponente in diesem Run genannt.",
+    "notInModel": "nicht im angewandten Modell",
+    "notInModelNote": "Die Komponente ist nicht mehr Teil des angewandten Architekturmodells. Belege und Historie bleiben erhalten.",
+    "roleNotReported": "Rolle nicht gemeldet",
+    "runNotReported": "nicht gemeldet",
+    "selfReported": "selbst gemeldet",
+    "statusLabel": "Status",
+    "taskLabel": "Aufgabe",
+    "workStepCompleted": "abgeschlossen",
+    "workStepLabel": "Arbeitsschritt",
+    "workStepOpen": "offen seit"
+  },
+  "deepFocus": {
+    "banner": "Deep Focus: {{section}} — die Architektur bleibt links sichtbar.",
+    "enter": "Deep Focus",
+    "exit": "Beenden",
+    "leave": "Deep Focus beenden"
+  },
+  "diff": {
+    "changeHeading": "Änderung {{changeId}}",
+    "emptyDescription": "Für diese Komponente wurde in diesem Run kein diff.reported gemeldet.",
+    "emptyTitle": "Keine Diffs gemeldet",
+    "label": "Unified Diffs",
+    "lineAddition": "hinzugefügt",
+    "lineContext": "unverändert",
+    "lineHunk": "Abschnitt",
+    "lineMeta": "Kopfzeile",
+    "lineRemoval": "entfernt",
+    "loadMore": "Weitere Diffs laden",
+    "singleHeading": "Einzelner Diff {{diffId}}",
+    "stat": "{{stat}} in Datei",
+    "withoutChangeId": "Ohne <field/> gemeldet — der Agent hat diesen Diff keiner angekündigten Änderung zugeordnet."
+  },
+  "empty": {
+    "description": "Wählen Sie eine Komponente auf der Architekturfläche aus. Die Auswahl steht als ?component= in der Adresse und ist damit direkt verlinkbar.",
+    "title": "Keine Komponente ausgewählt"
+  },
+  "eventType": {
+    "agentFinished": "Agent beendet",
+    "agentProgressReported": "Fortschritt gemeldet",
+    "agentStarted": "Agent gestartet",
+    "agentStatusReported": "Status gemeldet",
+    "architectureSnapshotPublished": "Architektur-Snapshot veröffentlicht",
+    "componentChangeApplied": "Komponentenänderung angewandt",
+    "componentChangePlanned": "Komponentenänderung geplant",
+    "correctionIssued": "Korrektur",
+    "diffReported": "Diff gemeldet",
+    "feedbackPublished": "Feedback veröffentlicht",
+    "planPublished": "Plan veröffentlicht",
+    "planStepUpdated": "Planschritt aktualisiert",
+    "problemReported": "Problem gemeldet",
+    "relationshipChangeApplied": "Beziehungsänderung angewandt",
+    "relationshipChangePlanned": "Beziehungsänderung geplant",
+    "retractionIssued": "Retraktion",
+    "riskReported": "Risiko gemeldet",
+    "runFinished": "Run beendet",
+    "workStepCompleted": "Arbeitsschritt abgeschlossen",
+    "workStepStarted": "Arbeitsschritt begonnen"
+  },
+  "feedback": {
+    "emptyDescription": "Für diese Komponente wurde in diesem Run kein feedback.published gemeldet.",
+    "emptyTitle": "Kein Feedback gemeldet",
+    "label": "KI-Feedback",
+    "untitled": "Ohne Titel gemeldet"
+  },
+  "history": {
+    "correctedInto": "— neuer Inhalt als {{type}}",
+    "corrects": "korrigiert",
+    "currentRunSuffix": "(aktueller Run)",
+    "emptyTitle": "Keine älteren Belege",
+    "label": "Historie",
+    "laterCorrected": "später korrigiert — Eintrag bleibt bestehen",
+    "laterRetracted": "später zurückgezogen — Eintrag bleibt bestehen",
+    "listEmptyDescription": "Zu dieser Komponente wurde noch kein Ereignis gemeldet.",
+    "listEmptyTitle": "Keine Historie",
+    "loadOlder": "Ältere Einträge laden",
+    "note": "Alle Runs, neueste zuerst. Korrekturen und Retraktionen stehen als eigene Einträge daneben — nichts wird überschrieben.",
+    "reasonLabel": "Begründung:",
+    "retracts": "zieht zurück",
+    "title": "Historie über alle Runs"
+  },
+  "meta": {
+    "runPrefix": "Run"
+  },
+  "pane": {
+    "subtitleEmpty": "keine Komponente ausgewählt"
+  },
+  "problem": {
+    "emptyDescription": "Für diese Komponente wurde in diesem Run kein problem.reported gemeldet.",
+    "emptyTitle": "Keine Probleme gemeldet",
+    "label": "Probleme"
+  },
+  "risk": {
+    "emptyDescription": "Für diese Komponente wurde in diesem Run kein risk.reported gemeldet.",
+    "emptyTitle": "Keine Risiken gemeldet",
+    "label": "Risiken",
+    "severityHigh": "hoch (vom Agenten eingeschätzt)",
+    "severityLabel": "Schweregrad: {{severity}}",
+    "severityLow": "gering (vom Agenten eingeschätzt)",
+    "severityMedium": "mittel (vom Agenten eingeschätzt)"
+  },
+  "source": {
+    "allRuns": "alle Runs",
+    "currentRun": "Aktueller Run",
+    "history": "Historie",
+    "label": "Belegquelle"
+  }
+}

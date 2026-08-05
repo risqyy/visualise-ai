@@ -62,7 +62,14 @@ describe('fetchJson', () => {
     expect(problemError.problem).toEqual(problem)
     expect(problemError.errors).toEqual(problem.errors)
     expect(problemError.message).toBe('The request body violates the contract.')
-    expect(describeError(problemError)).toBe('Invalid field (invalid_field)')
+    // The backend's own words, marked as reported: `describeError` returns the
+    // distinction rather than a finished sentence since #42, so that
+    // `<ErrorDescription>` can render this half verbatim and only its two
+    // generic fallbacks out of the catalogue.
+    expect(describeError(problemError)).toEqual({
+      kind: 'reported',
+      text: 'Invalid field (invalid_field)',
+    })
   })
 
   it('keeps the ProblemError shape when the body is not a valid problem', async () => {

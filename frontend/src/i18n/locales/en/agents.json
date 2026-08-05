@@ -1,1 +1,120 @@
-{}
+{
+  "outcome": {
+    "cancelled": "cancelled",
+    "completed": "completed",
+    "failed": "failed"
+  },
+  "pane": {
+    "title": "Runs and agents"
+  },
+  "plan": {
+    "currentBadge": "current",
+    "earlierBadge": "earlier version",
+    "revisionTitle": "Revision {{revision}}",
+    "revisionsLabel": "Revisions of {{planId}}"
+  },
+  "planStep": {
+    "done": "done",
+    "inProgress": "in progress",
+    "pending": "open",
+    "skipped": "skipped"
+  },
+  "plans": {
+    "emptyDescription": "No plan.published event has arrived for run {{runId}} yet.",
+    "emptyTitle": "No plan published",
+    "title": "Plans"
+  },
+  "progress": {
+    "basisCompletedSteps": "counted from completed steps",
+    "basisReportedEstimate": "freely estimated",
+    "basisUnreported": "without a reported derivation",
+    "claimNote": "Self-assessment reported by <agent/> · {{derivation}}. Not measured progress.",
+    "meterLabel": "{{percent}} {{subject}}, {{derivation}}",
+    "none": "No progress reported",
+    "subjectOverallEstimate": "for the whole run",
+    "subjectOwnTask": "for its own task",
+    "subjectUnreported": "without a reported subject"
+  },
+  "role": {
+    "orchestrator": "Orchestrator",
+    "subagent": "Subagent",
+    "unreported": "no role reported"
+  },
+  "row": {
+    "agentIdLabel": "Agent id",
+    "cycleBroken": "The reported parent chain runs in a circle. The edge to “{{parent}}” was cut here; the agent is shown as a root of its own.",
+    "detailHide": "Hide the details of {{agent}}",
+    "detailShow": "Show the details of {{agent}}",
+    "lastEventLabel": "Last reported",
+    "noOutcome": "no outcome reported",
+    "noTask": "no task reported",
+    "orphaned": "The reported parent “{{parent}}” does not belong to this run. The agent is shown as a root of its own.",
+    "outcomeLabel": "Outcome",
+    "showFull": "Show more",
+    "showLess": "Show less",
+    "statusLabel": "Status",
+    "subjectStatusNote": "Status message",
+    "subjectTask": "Task",
+    "subtreeCollapse": "Collapse the subagents of {{agent}}",
+    "subtreeExpand": "Expand the subagents of {{agent}}",
+    "taskLabel": "Task",
+    "textCollapse": "Shorten the {{subject}} of {{agent}} again",
+    "textExpand": "Show the {{subject}} of {{agent}} in full"
+  },
+  "runState": {
+    "emptyTitle": "Run not available",
+    "endLabel": "End",
+    "noEnd": "no end reported",
+    "runLabel": "Run",
+    "scopeLabel": "Scope",
+    "sectionLabel": "Reported run state",
+    "startLabel": "Start",
+    "stateLabel": "State",
+    "title": "Run state"
+  },
+  "runs": {
+    "currentBadge": "current",
+    "currentBanner": "Current run of the project",
+    "emptyDescription": "As soon as an orchestrator sends events, its run appears here.",
+    "emptyTitle": "No runs reported",
+    "finishedState": "finished: {{outcome}}",
+    "historicalDescription": "This view shows an archived run, not the current one. The current one is <run/>.",
+    "historicalTitle": "Historical run",
+    "listLabel": "Runs of the project",
+    "loadOlder": "Load older runs",
+    "loadedCount": "{{count}} loaded",
+    "noCurrentDescription": "No root orchestrator has opened a run for this project yet.",
+    "noCurrentTitle": "No current run",
+    "noOutcome": "without a reported outcome",
+    "noRootAgent": "no root agent reported",
+    "openState": "open — no terminal event reported",
+    "rootLabel": "Root:",
+    "since": "since",
+    "switchToCurrent": "Switch to the current run",
+    "title": "Runs"
+  },
+  "status": {
+    "blocked": "blocked",
+    "done": "done",
+    "idle": "idle",
+    "unreported": "no status reported",
+    "waiting": "waiting",
+    "working": "working"
+  },
+  "steps": {
+    "completed": "{{done, number}} of {{total, number}} steps completed",
+    "meterLabel": "{{label}}: {{done, number}} of {{total, number}} steps completed"
+  },
+  "tree": {
+    "collapseAll": "Collapse all subagents",
+    "emptyDescription": "No agent.started event has arrived for run {{runId}} yet.",
+    "emptyTitle": "No agents reported",
+    "expandAll": "Expand all subagents",
+    "filterEmptyDescription": "No agent of this run contains “{{filter}}”.",
+    "filterEmptyTitle": "No agent matches the filter",
+    "filterLabel": "Filter agents",
+    "label": "Agent hierarchy",
+    "reportedCount": "{{count}} reported",
+    "statusTally": "Reported statuses"
+  }
+}

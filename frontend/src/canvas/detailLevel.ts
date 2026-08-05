@@ -1,3 +1,5 @@
+import type { CanvasKey } from '@/i18n'
+
 /**
  * Progressive detail levels of the architecture canvas.
  *
@@ -126,37 +128,37 @@ export function isReadableZoom(zoom: number): boolean {
 export const INITIAL_EXPANDED_DEPTH = 1
 
 /**
- * Every string the disclosure controls show.
+ * Every text the disclosure controls show, as translation keys.
  *
- * Collected in one object rather than spread over the components so the i18n
- * migration (#42) has a single place to pick up, and so two controls cannot
- * drift into naming the same action differently.
+ * Collected in one object rather than spread over the components so two
+ * controls cannot drift into naming the same action differently. Since #42 the
+ * values are keys of the `canvas` namespace instead of German strings; a key
+ * that does not exist there is a `tsc` error, not a bare label in the browser.
  */
-export const DISCLOSURE_LABELS = {
-  expand: 'Aufklappen',
-  collapse: 'Einklappen',
-  fitWholeModel: 'Gesamtes Modell einpassen',
-  fitWholeModelHint:
-    'Klappt alle Container auf und passt das vollständige Modell in die Fläche ein. Bei vielen Komponenten wird die Darstellung dabei bewusst klein — das ist die Übersichtsaktion.',
-  backToOverview: 'Systemebene',
-  backToOverviewHint:
-    'Zurück auf System- und Container-Ebene: tiefere Komponenten werden wieder eingeklappt und die Ansicht in lesbarer Größe eingepasst.',
-  visibility: (visible: number, total: number) =>
-    `${visible} von ${total} Komponenten sichtbar`,
-  visibilityHint:
-    'Tiefere Komponenten sind hinter ihrem Container eingeklappt, damit die oberen Ebenen lesbar bleiben. Aufklappen über das Dreieck am Container, über einen Deep Link oder über „Gesamtes Modell einpassen".',
-} as const
+export const DISCLOSURE_LABEL_KEYS = {
+  expand: 'tool.expand',
+  collapse: 'tool.collapse',
+  /** Takes the counted hidden components as `{{hidden}}`. */
+  expandHidden: 'tool.expandHidden',
+  fitWholeModel: 'tool.fitWholeModel',
+  fitWholeModelHint: 'tool.fitWholeModelHint',
+  backToOverview: 'tool.backToOverview',
+  backToOverviewHint: 'tool.backToOverviewHint',
+  /** Takes `{{visible}}` and `{{total}}`. */
+  visibility: 'visibility.summary',
+  visibilityHint: 'visibility.hint',
+} as const satisfies Record<string, CanvasKey>
 
-export const DETAIL_LEVEL_LABELS: Record<DetailLevel, string> = {
-  overview: 'Übersicht',
-  standard: 'Standard',
-  full: 'Vollständig',
+export const DETAIL_LEVEL_LABEL_KEYS: Record<DetailLevel, CanvasKey> = {
+  overview: 'detail.overviewLabel',
+  standard: 'detail.standardLabel',
+  full: 'detail.fullLabel',
 }
 
-export const DETAIL_LEVEL_DESCRIPTIONS: Record<DetailLevel, string> = {
-  overview: 'Nur Name und Art. Parallele Beziehungen sind gebündelt.',
-  standard: 'Zusätzlich die gemeldete Technologie. Parallele Beziehungen sind gebündelt.',
-  full: 'Zusätzlich Tags. Gebündelte Beziehungen sind einzeln aufgefächert.',
+export const DETAIL_LEVEL_DESCRIPTION_KEYS: Record<DetailLevel, CanvasKey> = {
+  overview: 'detail.overviewDescription',
+  standard: 'detail.standardDescription',
+  full: 'detail.fullDescription',
 }
 
 /** `true` once the level is detailed enough to show technology metadata. */

@@ -1,5 +1,5 @@
 import { execFileSync } from 'node:child_process'
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import { cpSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { dirname, join, resolve } from 'node:path'
 
@@ -57,12 +57,68 @@ function catalogues(files: Record<string, unknown>): string {
   return root
 }
 
+/** A copy of the real catalogues, for tests that then damage one of them. */
+function realCatalogues(): string {
+  const root = mkdtempSync(join(tmpdir(), 'vai-locales-real-'))
+  temporaryRoots.push(root)
+  cpSync(resolve(FRONTEND_ROOT, 'src/i18n/locales'), root, { recursive: true })
+  return root
+}
+
 describe('translation catalogues', () => {
   it('describe the same keys in German and English', () => {
     const { ok, output } = runCheck()
 
     expect(output).toContain('Translation catalogues agree')
     expect(ok).toBe(true)
+  })
+
+  it('cover every namespace, so #42 left none of the four empty', () => {
+    const { output } = runCheck()
+
+    // The message names the reference key count. Four namespaces were committed
+    // empty in #38; a catalogue set that is still nearly empty would pass every
+    // parity check and fail this one.
+    const keys = Number(/agree: (\d+) keys/.exec(output)?.[1] ?? 0)
+    expect(keys).toBeGreaterThan(200)
+  })
+
+  it('turns red when a key of the real catalogues goes missing', () => {
+    // The parity check is not just green against a synthetic tree: removing one
+    // real key — the label of the agent status the whole cockpit is about —
+    // makes it fail and names exactly that key.
+    const root = realCatalogues()
+    const file = join(root, 'en/agents.json')
+    const english = JSON.parse(readFileSync(file, 'utf8')) as {
+      status: Record<string, string>
+    }
+    delete english.status.working
+    writeFileSync(file, `${JSON.stringify(english, null, 2)}\n`, 'utf8')
+
+    const { ok, output } = runCheck(root)
+
+    expect(ok).toBe(false)
+    expect(output).toContain('missing-key')
+    expect(output).toContain('en/agents.json status.working')
+  })
+
+  it('turns red when a real translation drops a reported value it interpolates', () => {
+    // `{{runId}}` carries reported data into a sentence. An English translation
+    // that quietly loses it would drop the run from the empty state and nothing
+    // at runtime would say so.
+    const root = realCatalogues()
+    const file = join(root, 'en/agents.json')
+    const english = JSON.parse(readFileSync(file, 'utf8')) as {
+      tree: Record<string, string>
+    }
+    english.tree.emptyDescription = 'No agent.started event has arrived yet.'
+    writeFileSync(file, `${JSON.stringify(english, null, 2)}\n`, 'utf8')
+
+    const { ok, output } = runCheck(root)
+
+    expect(ok).toBe(false)
+    expect(output).toContain('placeholder-mismatch')
+    expect(output).toContain('runId')
   })
 
   it('turns red when a key is missing in one language', () => {

@@ -3,7 +3,9 @@ import { describe, expect, it } from 'vitest'
 import { EVENT_TYPES } from '@/api/types'
 import { HISTORY_ENTRIES, historyEntry } from '@/test/inspectorFixtures'
 
-import { buildHistoryItems, EVENT_TYPE_LABELS } from './historyEntries'
+import { translateWith } from '@/test/translate'
+
+import { buildHistoryItems, EVENT_TYPE_LABEL_KEY } from './historyEntries'
 
 describe('buildHistoryItems', () => {
   it('keeps every reported entry, including the ones that were taken back', () => {
@@ -51,9 +53,15 @@ describe('buildHistoryItems', () => {
     expect(items[0]?.referencesClientEventId).toBeNull()
   })
 
-  it('labels every event type of the closed catalogue', () => {
-    for (const type of EVENT_TYPES) {
-      expect(EVENT_TYPE_LABELS[type]).toBeTruthy()
+  it('labels every event type of the closed catalogue, in both languages', () => {
+    for (const language of ['de', 'en'] as const) {
+      const t = translateWith('inspector', language)
+      for (const type of EVENT_TYPES) {
+        // A label that is missing from a catalogue would resolve to the key
+        // itself, which still contains the dot-separated key path.
+        expect(t(EVENT_TYPE_LABEL_KEY[type])).toBeTruthy()
+        expect(t(EVENT_TYPE_LABEL_KEY[type])).not.toContain('eventType.')
+      }
     }
   })
 })

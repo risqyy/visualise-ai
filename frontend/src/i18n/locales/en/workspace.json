@@ -1,1 +1,26 @@
-{}
+{
+  "header": {
+    "contextLabel": "Context",
+    "projectsLink": "Projects"
+  },
+  "live": {
+    "connectingHint": "The live connection is being established.",
+    "connectingLabel": "connecting",
+    "label": "Live connection: {{state}}",
+    "lastPositionLabel": "Last processed position:",
+    "liveHint": "Events arrive in real time.",
+    "liveLabel": "live",
+    "offlineHint": "No live connection. What is shown is the last state loaded — it is no longer being updated.",
+    "offlineLabel": "offline",
+    "reconnectingHint": "The live connection is interrupted and will resume from the last position seen. The data on screen is kept.",
+    "reconnectingLabel": "reconnecting"
+  },
+  "pane": {
+    "collapse": "Collapse {{pane}}",
+    "expand": "Expand {{pane}}",
+    "leftLabel": "Runs and agents",
+    "leftWidthLabel": "Width of the runs and agents pane",
+    "rightLabel": "Inspector",
+    "rightWidthLabel": "Width of the inspector pane"
+  }
+}

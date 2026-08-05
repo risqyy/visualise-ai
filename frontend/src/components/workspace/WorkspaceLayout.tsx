@@ -1,5 +1,6 @@
 import { PanelLeftOpen, PanelRightOpen } from 'lucide-react'
 import { useEffect, useRef, useState, type ReactNode } from 'react'
+import { useTranslation } from 'react-i18next'
 import type {
   GroupImperativeHandle,
   Layout,
@@ -52,6 +53,7 @@ export interface WorkspaceLayoutProps {
  * scrollbar in either direction.
  */
 export function WorkspaceLayout({ left, center, right }: WorkspaceLayoutProps) {
+  const { t } = useTranslation('workspace')
   const layout = useUiStore((state) => state.layout)
   const leftCollapsed = useUiStore((state) => state.leftCollapsed)
   const rightCollapsed = useUiStore((state) => state.rightCollapsed)
@@ -94,7 +96,7 @@ export function WorkspaceLayout({ left, center, right }: WorkspaceLayoutProps) {
         {leftCollapsed ? (
           <CollapsedRail
             side="left"
-            label="Run- und Agent-Bereich"
+            label={t('pane.leftLabel')}
             onExpand={() => setLeftCollapsed(false)}
           />
         ) : (
@@ -102,7 +104,7 @@ export function WorkspaceLayout({ left, center, right }: WorkspaceLayoutProps) {
         )}
       </ResizablePanel>
 
-      <ResizableHandle withHandle aria-label="Breite des Run- und Agent-Bereichs" />
+      <ResizableHandle withHandle aria-label={t('pane.leftWidthLabel')} />
 
       <ResizablePanel
         id={PANE_IDS.center}
@@ -112,7 +114,7 @@ export function WorkspaceLayout({ left, center, right }: WorkspaceLayoutProps) {
         {center}
       </ResizablePanel>
 
-      <ResizableHandle withHandle aria-label="Breite des Inspectors" />
+      <ResizableHandle withHandle aria-label={t('pane.rightWidthLabel')} />
 
       <ResizablePanel
         id={PANE_IDS.right}
@@ -127,7 +129,7 @@ export function WorkspaceLayout({ left, center, right }: WorkspaceLayoutProps) {
         {rightCollapsed ? (
           <CollapsedRail
             side="right"
-            label="Inspector"
+            label={t('pane.rightLabel')}
             onExpand={() => setRightCollapsed(false)}
           />
         ) : (
@@ -148,7 +150,9 @@ function CollapsedRail({
   label: string
   onExpand: () => void
 }) {
+  const { t } = useTranslation('workspace')
   const Icon = side === 'left' ? PanelLeftOpen : PanelRightOpen
+  const expand = t('pane.expand', { pane: label })
 
   return (
     <div
@@ -159,12 +163,10 @@ function CollapsedRail({
         <TooltipTrigger asChild>
           <Button variant="ghost" size="icon" className="size-7" onClick={onExpand}>
             <Icon aria-hidden="true" />
-            <span className="sr-only">{label} ausklappen</span>
+            <span className="sr-only">{expand}</span>
           </Button>
         </TooltipTrigger>
-        <TooltipContent side={side === 'left' ? 'right' : 'left'}>
-          {label} ausklappen
-        </TooltipContent>
+        <TooltipContent side={side === 'left' ? 'right' : 'left'}>{expand}</TooltipContent>
       </Tooltip>
       <span
         className="pane-heading text-muted-foreground whitespace-nowrap"

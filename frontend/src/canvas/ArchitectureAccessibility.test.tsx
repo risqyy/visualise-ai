@@ -21,7 +21,15 @@ import {
 } from '@/test/fixtures'
 import { renderApp } from '@/test/renderApp'
 
-import { CANVAS_A11Y_TEXT } from './canvasAccessibility'
+import { translateWith } from '@/test/translate'
+
+import { CANVAS_A11Y_KEYS } from './canvasAccessibility'
+
+/**
+ * The German rendering of a canvas key. `renderApp` starts in German by
+ * default, so this is what the rendered application actually says.
+ */
+const say = translateWith('canvas')
 
 /**
  * The accessible architecture graph, exercised through the real application.
@@ -148,11 +156,11 @@ describe('accessible architecture graph — every node arrives named', () => {
       // A container and a leaf are told apart by words, not by box size.
       expect(nodeElement('platform.core')).toHaveAttribute(
         'aria-roledescription',
-        CANVAS_A11Y_TEXT.containerRoleDescription,
+        say(CANVAS_A11Y_KEYS.containerRoleDescription),
       )
       expect(nodeElement('platform.db')).toHaveAttribute(
         'aria-roledescription',
-        CANVAS_A11Y_TEXT.componentRoleDescription,
+        say(CANVAS_A11Y_KEYS.componentRoleDescription),
       )
       expect(nodeElement('platform.core').getAttribute('aria-label')).toContain(
         'Container mit 2 Komponenten',
@@ -172,10 +180,10 @@ describe('accessible architecture graph — every node arrives named', () => {
       ).toBe(nodeElement('platform.db'))
 
       const flow = document.querySelector('.react-flow')
-      expect(flow).toHaveAttribute('aria-label', CANVAS_A11Y_TEXT.graphLabel)
+      expect(flow).toHaveAttribute('aria-label', say(CANVAS_A11Y_KEYS.graphLabel))
       const describedBy = flow?.getAttribute('aria-describedby') ?? ''
       expect(document.getElementById(describedBy)?.textContent).toBe(
-        CANVAS_A11Y_TEXT.graphInstructions,
+        say(CANVAS_A11Y_KEYS.graphInstructions),
       )
     },
     CANVAS_TIMEOUT,
@@ -191,7 +199,7 @@ describe('accessible architecture graph — every node arrives named', () => {
       const description = document.getElementById(
         node.getAttribute('aria-describedby') ?? '',
       )
-      expect(description?.textContent).toBe(CANVAS_A11Y_TEXT.nodeInstructions)
+      expect(description?.textContent).toBe(say(CANVAS_A11Y_KEYS.nodeInstructions))
       expect(description?.textContent).not.toMatch(/delete|remove/i)
     },
     CANVAS_TIMEOUT,
@@ -211,7 +219,7 @@ describe('accessible architecture graph — every node arrives named', () => {
         expect(name).toContain('Beziehung von ')
         expect(edge).toHaveAttribute(
           'aria-roledescription',
-          CANVAS_A11Y_TEXT.relationshipRoleDescription,
+          say(CANVAS_A11Y_KEYS.relationshipRoleDescription),
         )
       }
 
@@ -461,7 +469,7 @@ describe('accessible architecture graph — the state a screen reader hears is t
       const name = nodeElement('platform.core.shipping').getAttribute('aria-label') ?? ''
       expect(name).toContain('Shipping')
       expect(name).toContain('geplant · hinzufügen')
-      expect(name).toContain(CANVAS_A11Y_TEXT.proposalNote)
+      expect(name).toContain(say(CANVAS_A11Y_KEYS.proposalNote))
       // …and it is a phase of work, never a verdict.
       expect(name).not.toMatch(/gut|schlecht|Fehler|riskant/i)
     },
@@ -478,7 +486,7 @@ describe('accessible architecture graph — the state a screen reader hears is t
         const inner = node.querySelector('[data-component-id]')
         const label = node.getAttribute('aria-label') ?? ''
         if (inner?.getAttribute('data-work-state') === null) {
-          expect(label).toContain(CANVAS_A11Y_TEXT.noWorkState)
+          expect(label).toContain(say(CANVAS_A11Y_KEYS.noWorkState))
         }
       }
     },

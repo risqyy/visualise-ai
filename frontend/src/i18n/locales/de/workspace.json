@@ -1,1 +1,26 @@
-{}
+{
+  "header": {
+    "contextLabel": "Kontext",
+    "projectsLink": "Projekte"
+  },
+  "live": {
+    "connectingHint": "Die Live-Verbindung wird aufgebaut.",
+    "connectingLabel": "verbindet",
+    "label": "Live-Verbindung: {{state}}",
+    "lastPositionLabel": "Zuletzt verarbeitete Position:",
+    "liveHint": "Ereignisse treffen in Echtzeit ein.",
+    "liveLabel": "live",
+    "offlineHint": "Keine Live-Verbindung. Angezeigt wird der zuletzt geladene Stand — er wird nicht mehr aktualisiert.",
+    "offlineLabel": "offline",
+    "reconnectingHint": "Die Live-Verbindung ist unterbrochen und wird ab der zuletzt gesehenen Position fortgesetzt. Die angezeigten Daten bleiben erhalten.",
+    "reconnectingLabel": "verbindet neu"
+  },
+  "pane": {
+    "collapse": "{{pane}} einklappen",
+    "expand": "{{pane}} ausklappen",
+    "leftLabel": "Run- und Agent-Bereich",
+    "leftWidthLabel": "Breite des Run- und Agent-Bereichs",
+    "rightLabel": "Inspector",
+    "rightWidthLabel": "Breite des Inspectors"
+  }
+}

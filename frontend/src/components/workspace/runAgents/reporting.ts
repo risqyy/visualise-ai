@@ -5,6 +5,7 @@ import type {
   RunAgent,
   RunPlanRevision,
 } from '@/api/types'
+import type { AgentsKey } from '@/i18n'
 
 /**
  * The role and status vocabularies of the **read model**, which are wider than
@@ -31,19 +32,29 @@ type ReportedStatus = RunAgent['status']
 // Closed vocabularies
 // ---------------------------------------------------------------------------
 
-export const AGENT_ROLE_LABEL: Record<ReportedRole, string> = {
-  '': 'keine Rolle gemeldet',
-  orchestrator: 'Orchestrator',
-  subagent: 'Subagent',
+export const AGENT_ROLE_LABEL_KEY: Record<ReportedRole, AgentsKey> = {
+  '': 'role.unreported',
+  orchestrator: 'role.orchestrator',
+  subagent: 'role.subagent',
 }
 
-export const AGENT_STATUS_LABEL: Record<ReportedStatus, string> = {
-  '': 'kein Status gemeldet',
-  working: 'arbeitet',
-  waiting: 'wartet',
-  blocked: 'blockiert',
-  idle: 'untätig',
-  done: 'fertig',
+/**
+ * The reported status word, mapped onto a display word.
+ *
+ * This is the sharp edge of the translation contract, and it falls on the
+ * translated side: `working` is a **contract value** and stays `working` in
+ * every payload, in every id and in every `data-status` attribute; the word the
+ * cockpit paints next to it is the cockpit's own vocabulary and reads
+ * "arbeitet" or "working". Mapping a closed value onto a display word is not a
+ * change to the value (ADR 0014).
+ */
+export const AGENT_STATUS_LABEL_KEY: Record<ReportedStatus, AgentsKey> = {
+  '': 'status.unreported',
+  working: 'status.working',
+  waiting: 'status.waiting',
+  blocked: 'status.blocked',
+  idle: 'status.idle',
+  done: 'status.done',
 }
 
 /**
@@ -63,17 +74,17 @@ export const AGENT_STATUS_GLYPH: Record<ReportedStatus, string> = {
   done: '●',
 }
 
-export const OUTCOME_LABEL: Record<Outcome, string> = {
-  completed: 'abgeschlossen',
-  failed: 'fehlgeschlagen',
-  cancelled: 'abgebrochen',
+export const OUTCOME_LABEL_KEY: Record<Outcome, AgentsKey> = {
+  completed: 'outcome.completed',
+  failed: 'outcome.failed',
+  cancelled: 'outcome.cancelled',
 }
 
-export const PLAN_STEP_STATE_LABEL: Record<PlanStepState, string> = {
-  pending: 'offen',
-  in_progress: 'in Arbeit',
-  done: 'abgeschlossen',
-  skipped: 'übersprungen',
+export const PLAN_STEP_STATE_LABEL_KEY: Record<PlanStepState, AgentsKey> = {
+  pending: 'planStep.pending',
+  in_progress: 'planStep.inProgress',
+  done: 'planStep.done',
+  skipped: 'planStep.skipped',
 }
 
 /**
@@ -206,10 +217,10 @@ export interface ProgressStatement {
   /** Contract value, or `'unreported'` when the agent did not send one. */
   scope: 'own_task' | 'overall_estimate' | 'unreported'
   basis: 'reported_estimate' | 'completed_steps' | 'unreported'
-  /** What the number is about, as a sentence fragment. */
-  subject: string
-  /** How the agent arrived at it. */
-  derivation: string
+  /** Key of what the number is about, as a sentence fragment. */
+  subjectKey: AgentsKey
+  /** Key of how the agent arrived at it. */
+  derivationKey: AgentsKey
 }
 
 export function progressStatement(progress: AgentProgress): ProgressStatement {
@@ -223,21 +234,21 @@ export function progressStatement(progress: AgentProgress): ProgressStatement {
     percent: progress.percent,
     scope,
     basis,
-    subject: PROGRESS_SUBJECT[scope],
-    derivation: PROGRESS_DERIVATION[basis],
+    subjectKey: PROGRESS_SUBJECT_KEY[scope],
+    derivationKey: PROGRESS_DERIVATION_KEY[basis],
   }
 }
 
-const PROGRESS_SUBJECT: Record<ProgressStatement['scope'], string> = {
-  own_task: 'für den eigenen Task',
-  overall_estimate: 'für den gesamten Run',
-  unreported: 'ohne gemeldeten Bezug',
+const PROGRESS_SUBJECT_KEY: Record<ProgressStatement['scope'], AgentsKey> = {
+  own_task: 'progress.subjectOwnTask',
+  overall_estimate: 'progress.subjectOverallEstimate',
+  unreported: 'progress.subjectUnreported',
 }
 
-const PROGRESS_DERIVATION: Record<ProgressStatement['basis'], string> = {
-  completed_steps: 'aus abgeschlossenen Schritten gezählt',
-  reported_estimate: 'frei geschätzt',
-  unreported: 'ohne gemeldete Herleitung',
+const PROGRESS_DERIVATION_KEY: Record<ProgressStatement['basis'], AgentsKey> = {
+  completed_steps: 'progress.basisCompletedSteps',
+  reported_estimate: 'progress.basisReportedEstimate',
+  unreported: 'progress.basisUnreported',
 }
 
 // ---------------------------------------------------------------------------

@@ -1,14 +1,15 @@
 import { Link } from '@tanstack/react-router'
 import { History, Radio } from 'lucide-react'
+import { Trans, useTranslation } from 'react-i18next'
 
 import type { ProjectId, RunDetail, RunId, RunSummary } from '@/api/types'
 import { AsyncState, EmptyState } from '@/components/AsyncState'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { ReportedTime } from '@/i18n'
+import { ReportedText, ReportedTime } from '@/i18n'
 import { cn } from '@/lib/utils'
 
-import { OUTCOME_LABEL } from './reporting'
+import { OUTCOME_LABEL_KEY } from './reporting'
 
 export interface RunSelectorProps {
   projectId: ProjectId
@@ -49,6 +50,8 @@ export function RunSelector({
   onFetchNextPage,
   onRetry,
 }: RunSelectorProps) {
+  const { t } = useTranslation('agents')
+  const { t: tCommon } = useTranslation('common')
   const showingCurrentRun = currentRun != null && currentRun.runId === runId
 
   return (
@@ -56,8 +59,8 @@ export function RunSelector({
       {currentRun === null && (
         <div data-testid="no-current-run">
           <EmptyState
-            title="Kein aktueller Run"
-            description="Für dieses Projekt hat noch kein Root-Orchestrator einen Run eröffnet."
+            title={t('runs.noCurrentTitle')}
+            description={t('runs.noCurrentDescription')}
           />
         </div>
       )}
@@ -70,11 +73,22 @@ export function RunSelector({
         >
           <p className="flex items-center gap-1.5 text-xs font-medium">
             <History className="size-3.5 shrink-0" aria-hidden="true" />
-            Historischer Run
+            {t('runs.historicalTitle')}
           </p>
           <p className="text-muted-foreground text-xs">
-            Diese Ansicht zeigt einen abgelegten Run, nicht den aktuellen. Aktuell ist{' '}
-            <span className="font-mono">{currentRun.runId}</span>.
+            {/*
+              The run id has to sit inside the clause and carries markup, which
+              is the one case `<Trans>` exists for. The value itself comes from
+              the props of `ReportedText`, not from the catalogue, so no
+              translation can reach it.
+            */}
+            <Trans
+              ns="agents"
+              i18nKey="runs.historicalDescription"
+              components={{
+                run: <ReportedText value={currentRun.runId} className="font-mono" />,
+              }}
+            />
           </p>
           <Button asChild variant="outline" size="xs" className="w-full">
             <Link
@@ -84,7 +98,7 @@ export function RunSelector({
               data-testid="back-to-current-run"
             >
               <Radio className="size-3" aria-hidden="true" />
-              Zum aktuellen Run wechseln
+              {t('runs.switchToCurrent')}
             </Link>
           </Button>
         </div>
@@ -96,7 +110,7 @@ export function RunSelector({
           className="text-muted-foreground flex items-center gap-1.5 text-xs"
         >
           <Radio className="text-state-applied size-3.5 shrink-0" aria-hidden="true" />
-          Aktueller Run des Projekts
+          {t('runs.currentBanner')}
         </p>
       )}
 
@@ -105,11 +119,11 @@ export function RunSelector({
         isError={isError}
         error={error}
         isEmpty={runs.length === 0}
-        emptyTitle="Keine Runs gemeldet"
-        emptyDescription="Sobald ein Orchestrator Ereignisse sendet, erscheint sein Run hier."
+        emptyTitle={t('runs.emptyTitle')}
+        emptyDescription={t('runs.emptyDescription')}
         onRetry={onRetry}
       >
-        <ul aria-label="Runs des Projekts" className="space-y-1">
+        <ul aria-label={t('runs.listLabel')} className="space-y-1">
           {runs.map((run) => (
             <li key={run.runId}>
               <RunLink projectId={projectId} run={run} shown={run.runId === runId} />
@@ -124,7 +138,7 @@ export function RunSelector({
             disabled={isFetchingNextPage}
             onClick={onFetchNextPage}
           >
-            {isFetchingNextPage ? 'Lädt…' : 'Ältere Runs laden'}
+            {isFetchingNextPage ? tCommon('state.loadingMore') : t('runs.loadOlder')}
           </Button>
         )}
       </AsyncState>
@@ -148,6 +162,8 @@ function RunLink({
   run: RunSummary
   shown: boolean
 }) {
+  const { t } = useTranslation('agents')
+
   return (
     <Link
       to="/projects/$projectId/runs/$runId"
@@ -163,27 +179,34 @@ function RunLink({
       )}
     >
       <span className="flex min-w-0 items-center gap-1.5">
-        <span className="truncate font-mono text-xs">{run.runId}</span>
+        <ReportedText value={run.runId} className="truncate font-mono text-xs" />
         {run.isCurrent && (
           <Badge variant="secondary" className="shrink-0 font-normal">
-            aktuell
+            {t('runs.currentBadge')}
           </Badge>
         )}
       </span>
       <span className="text-muted-foreground block text-xs">
         {run.isOpen
-          ? 'offen — kein Terminalereignis gemeldet'
-          : `beendet: ${run.outcome ? OUTCOME_LABEL[run.outcome] : 'ohne gemeldetes Ergebnis'}`}
+          ? t('runs.openState')
+          : t('runs.finishedState', {
+              outcome: run.outcome ? t(OUTCOME_LABEL_KEY[run.outcome]) : t('runs.noOutcome'),
+            })}
       </span>
       <span className="pane-meta text-muted-foreground block">
-        seit <ReportedTime value={run.startedAt} className="pane-meta" />
+        {t('runs.since')} <ReportedTime value={run.startedAt} className="pane-meta" />
       </span>
       <span className="text-muted-foreground block text-xs">
         {/*
           `RunSummary` carries no agent count — only `RunDetail.counts` does, on
           a different endpoint. The root agent is what the summary reports.
         */}
-        Root: {run.rootAgentId ?? 'kein Root-Agent gemeldet'}
+        {t('runs.rootLabel')}{' '}
+        {run.rootAgentId ? (
+          <ReportedText value={run.rootAgentId} />
+        ) : (
+          t('runs.noRootAgent')
+        )}
       </span>
     </Link>
   )

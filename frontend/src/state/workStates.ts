@@ -7,6 +7,7 @@ import {
 } from 'lucide-react'
 
 import type { ActiveChange } from '@/api/types'
+import type { CanvasKey } from '@/i18n'
 
 /**
  * The four v0 work states.
@@ -29,10 +30,14 @@ export type WorkStateId = 'planned' | 'active' | 'recently_applied' | 'removed'
 
 export interface WorkStateDefinition {
   id: WorkStateId
-  /** Short label rendered next to the colour swatch. Never omitted. */
-  label: string
-  /** One sentence explaining what the agent reported for this state. */
-  description: string
+  /**
+   * Key of the short label rendered next to the colour swatch. Never omitted:
+   * the word is the channel that survives greyscale, so it has to exist in
+   * every language (#42).
+   */
+  labelKey: CanvasKey
+  /** Key of the sentence explaining what the agent reported for this state. */
+  descriptionKey: CanvasKey
   /** CSS custom property holding the colour token. */
   colorVar: string
   /** Tailwind utility bound to the same token, for text and icons. */
@@ -48,9 +53,8 @@ export interface WorkStateDefinition {
 export const WORK_STATES: readonly WorkStateDefinition[] = [
   {
     id: 'planned',
-    label: 'geplant',
-    description:
-      'Ein Agent hat die Änderung angekündigt. Das angewandte Architekturmodell ist unverändert.',
+    labelKey: 'workState.planned.label',
+    descriptionKey: 'workState.planned.description',
     colorVar: '--state-planned',
     colorClass: 'text-state-planned',
     strokeDasharray: '6 4',
@@ -59,9 +63,8 @@ export const WORK_STATES: readonly WorkStateDefinition[] = [
   },
   {
     id: 'active',
-    label: 'aktiv',
-    description:
-      'Ein Agent hat für diesen Bereich einen Arbeitsschritt begonnen und ihn noch nicht abgeschlossen.',
+    labelKey: 'workState.active.label',
+    descriptionKey: 'workState.active.description',
     colorVar: '--state-active',
     colorClass: 'text-state-active',
     strokeDasharray: '2 3',
@@ -70,9 +73,8 @@ export const WORK_STATES: readonly WorkStateDefinition[] = [
   },
   {
     id: 'recently_applied',
-    label: 'kürzlich angewandt',
-    description:
-      'Die gemeldete Änderung ist im angewandten Architekturmodell enthalten.',
+    labelKey: 'workState.recentlyApplied.label',
+    descriptionKey: 'workState.recentlyApplied.description',
     colorVar: '--state-applied',
     colorClass: 'text-state-applied',
     strokeDasharray: '0',
@@ -81,9 +83,8 @@ export const WORK_STATES: readonly WorkStateDefinition[] = [
   },
   {
     id: 'removed',
-    label: 'entfernt',
-    description:
-      'Der Agent hat gemeldet, dass dieses Element entfernt wurde. Es wird nur noch als Beleg gezeigt.',
+    labelKey: 'workState.removed.label',
+    descriptionKey: 'workState.removed.description',
     colorVar: '--state-removed',
     colorClass: 'text-state-removed',
     strokeDasharray: '1 4',
@@ -102,9 +103,7 @@ export const WORK_STATE_BY_ID: Record<WorkStateId, WorkStateDefinition> =
  * Shown with the legend wherever the states appear. The product explicitly does
  * not evaluate agent work, so the colours must not be read as a verdict.
  */
-export const WORK_STATE_DISCLAIMER =
-  'Die Farben zeigen ausschließlich Arbeitsphasen der Agents. Sie sind kein Qualitätsurteil: ' +
-  'Das Cockpit bewertet die Arbeit nicht — das tun Sie.'
+export const WORK_STATE_DISCLAIMER_KEY: CanvasKey = 'legend.disclaimer'
 
 export interface WorkStateInput {
   /** A work step of this element is started and not yet completed. */

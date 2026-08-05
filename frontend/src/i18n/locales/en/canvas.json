@@ -1,1 +1,169 @@
-{}
+{
+  "a11y": {
+    "agentsReporting": "{{agents}} are reporting on it",
+    "bundleOf": "bundled edge with {{relationships}}",
+    "collapsedNote": "collapsed, {{components}} hidden",
+    "componentRole": "architecture component",
+    "containerRole": "architecture container",
+    "contains": "container holding {{components}}",
+    "fitView": "Fit the view",
+    "fromTo": "Relationship from {{source}} to {{target}}",
+    "furtherRelationships": "and {{relationships}} more",
+    "ghostNote": "no longer part of the applied architecture model",
+    "handle": "Connection point",
+    "identifiedBy": "component id {{componentId}}",
+    "inContainer": "in {{container}}",
+    "noWorkState": "no change status reported",
+    "proposalNote": "announced, not part of the applied architecture model yet",
+    "relationshipRole": "architecture relationship",
+    "rolledUpNote": "reported for a collapsed component inside it",
+    "toggleInteractive": "Toggle interactivity",
+    "zoomControls": "Zoom controls of the architecture graph",
+    "zoomIn": "Zoom in",
+    "zoomOut": "Zoom out"
+  },
+  "componentKind": {
+    "datastore": "Data store",
+    "external": "External",
+    "library": "Library",
+    "module": "Module",
+    "queue": "Queue",
+    "service": "Service",
+    "system": "System",
+    "topic": "Topic",
+    "ui": "UI"
+  },
+  "counter": {
+    "none": "No reported changes"
+  },
+  "detail": {
+    "fullDescription": "Tags in addition. Bundled relationships are fanned out one by one.",
+    "fullLabel": "Full",
+    "indicator": "Detail level: {{level}}",
+    "overviewDescription": "Name and kind only. Parallel relationships are bundled.",
+    "overviewLabel": "Overview",
+    "standardDescription": "The reported technology in addition. Parallel relationships are bundled.",
+    "standardLabel": "Standard"
+  },
+  "diagnostics": {
+    "danglingRelationships": "{{count}} relationship(s) point to a component outside the snapshot and are not drawn.",
+    "duplicateComponentIds": "{{count}} duplicate component id(s); the first report of each is shown.",
+    "duplicateRelationshipIds": "{{count}} duplicate relationship id(s); the first report of each is shown.",
+    "hierarchyCycles": "{{count}} cycle(s) in the hierarchy. The first node of each was detached so the structure stays drawable.",
+    "orphanedParents": "{{count}} component(s) refer to a parent that is not part of the snapshot. They are shown as roots of their own.",
+    "summary": "{{count}} inconsistent entries"
+  },
+  "edge": {
+    "bundleCollapse": "Fold the bundled edge back together",
+    "bundleExpand": "Unfold the bundled edge: {{relationships}}",
+    "channel": "Channel: {{value}}",
+    "operation": "Operation: {{value}}",
+    "protocol": "Protocol: {{value}}"
+  },
+  "graph": {
+    "edgeInstructions": "Enter or Space selects this relationship; on a bundled edge it unfolds and folds the relationships it contains. Escape clears the selection.",
+    "instructions": "Architecture graph of the project. Use Tab to move between the components and the relationships. Enter or Space selects the focused component and shows it in the inspector; activating it again clears the selection, as does Escape. Every component names its reported name, its kind, whether it contains further components, which container it sits in, and what change status an agent reported for it. The graph is an observation: the reported architecture model cannot be edited here.",
+    "label": "Interactive architecture graph",
+    "layouting": "Computing the layout…",
+    "minimapLabel": "Overview map of the architecture",
+    "nodeInstructions": "Enter or Space selects this component and shows it in the inspector. Escape clears the selection. The component cannot be edited or removed — the cockpit only observes."
+  },
+  "legend": {
+    "dialogTitle": "Work states of the agents",
+    "disclaimer": "The colours show phases of the agents' work and nothing else. They are not a quality judgement: the cockpit does not assess the work — you do.",
+    "explain": "Explain the legend",
+    "relationshipTitle": "Relationship kinds",
+    "workStateTitle": "Work states"
+  },
+  "node": {
+    "collapsed": "{{components}} collapsed"
+  },
+  "overlay": {
+    "agentsReporting": "agents are reporting on this element",
+    "agentsReportingCount": "{{count}} agents are reporting on this element:",
+    "applied": {
+      "add": "added",
+      "modify": "modified",
+      "remove": "removed"
+    },
+    "changeApplied": "Change applied: {{operation}}",
+    "changePlanned": "Change announced: {{operation}}",
+    "ghostNote": "No longer part of the applied architecture model.",
+    "operation": {
+      "add": "add",
+      "modify": "modify",
+      "remove": "remove"
+    },
+    "proposalNote": "Proposal: not part of the applied architecture model.",
+    "workStepRunning": "Work step running: {{title}}"
+  },
+  "pane": {
+    "components": "{{count}} components",
+    "emptyDescription": "The model appears as soon as an agent sends architecture.snapshot_published.",
+    "emptyTitle": "No architecture model reported yet",
+    "label": "Architecture surface",
+    "relationships": "{{count}} relationships",
+    "title": "Architecture"
+  },
+  "relationshipKind": {
+    "async": {
+      "description": "Asynchronous message flow without an immediate reply.",
+      "label": "Asynchronous message"
+    },
+    "data": {
+      "description": "Reading or writing access to a data store.",
+      "label": "Data access"
+    },
+    "dependency": {
+      "description": "Structural dependency without a concrete runtime protocol.",
+      "label": "Dependency"
+    },
+    "grpc": {
+      "description": "Synchronous gRPC call from the source to the target.",
+      "label": "gRPC call"
+    },
+    "http": {
+      "description": "Synchronous HTTP call from the source to the target.",
+      "label": "HTTP call"
+    },
+    "natsTopic": {
+      "description": "A single NATS topic. Every topic stays a relationship of its own and is never merged.",
+      "label": "NATS topic"
+    }
+  },
+  "tool": {
+    "backToOverview": "System level",
+    "backToOverviewHint": "Back to system and container level: deeper components are collapsed again and the view is fitted at a readable size.",
+    "collapse": "Collapse",
+    "expand": "Expand",
+    "expandHidden": "Expand ({{hidden}})",
+    "fitWholeModel": "Fit the whole model",
+    "fitWholeModelHint": "Expands every container and fits the complete model into the surface. With many components the picture deliberately becomes small — this is the overview action. Otherwise the camera only moves on the first load — never because events arrive.",
+    "hideMinimap": "Hide the overview map",
+    "resetPositions": "Reset positions",
+    "resetPositionsHint": "Moves dragged nodes back onto the computed layout. Drags are local only and do not change the architecture model anyway.",
+    "showMinimap": "Show the overview map"
+  },
+  "visibility": {
+    "hint": "Deeper components are collapsed behind their container so the upper levels stay readable. Expand them through the triangle on the container, through a deep link or through “Fit the whole model”.",
+    "summary": "{{visible}} of {{total}} components visible"
+  },
+  "workState": {
+    "active": {
+      "description": "An agent started a work step for this area and has not completed it yet.",
+      "label": "active"
+    },
+    "planned": {
+      "description": "An agent announced the change. The applied architecture model is unchanged.",
+      "label": "planned"
+    },
+    "recentlyApplied": {
+      "description": "The reported change is contained in the applied architecture model.",
+      "label": "recently applied"
+    },
+    "removed": {
+      "description": "The agent reported that this element was removed. It is only shown as evidence.",
+      "label": "removed"
+    }
+  }
+}

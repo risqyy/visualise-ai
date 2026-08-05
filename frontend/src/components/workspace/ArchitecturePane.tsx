@@ -1,4 +1,5 @@
 import { useMemo } from 'react'
+import { useTranslation } from 'react-i18next'
 
 import { useArchitecture } from '@/api/queries'
 import type { ComponentId, ProjectId } from '@/api/types'
@@ -10,6 +11,7 @@ import { ChangeCounter } from '@/components/workspace/ChangeCounter'
 import { PaneHeader } from '@/components/workspace/PaneHeader'
 import { RelationshipLegend } from '@/components/workspace/RelationshipLegend'
 import { Badge } from '@/components/ui/badge'
+import { ReportedText } from '@/i18n'
 
 export interface ArchitecturePaneProps {
   projectId: ProjectId
@@ -33,6 +35,7 @@ export function ArchitecturePane({
   selectedComponentId,
   onSelectComponent,
 }: ArchitecturePaneProps) {
+  const { t } = useTranslation('canvas')
   const architecture = useArchitecture(projectId)
   const overlay = useChangeOverlays(projectId, architecture.data)
 
@@ -63,22 +66,27 @@ export function ArchitecturePane({
   return (
     <section
       className="pane-surface bg-canvas"
-      aria-label="Architekturfläche"
+      aria-label={t('pane.label')}
       data-testid="pane-architecture"
     >
       <PaneHeader
-        title="Architektur"
-        subtitle={projectId}
+        title={t('pane.title')}
+        subtitle={<ReportedText value={projectId} />}
         actions={
           architecture.isSuccess && (
             <div className="flex items-center gap-2">
               <ChangeCounter counts={overlay.counts} />
               <span className="bg-border h-4 w-px" aria-hidden="true" />
+              {/*
+                The grammatical plural of these two counts is #40's, not this
+                issue's: the words moved into the catalogue, the `_one`/`_other`
+                forms follow with the locale-aware formatting service.
+              */}
               <Badge variant="outline" className="text-2xs font-normal">
-                {componentCount} Komponenten
+                {t('pane.components', { count: componentCount })}
               </Badge>
               <Badge variant="outline" className="text-2xs font-normal">
-                {relationshipCount} Beziehungen
+                {t('pane.relationships', { count: relationshipCount })}
               </Badge>
             </div>
           )
@@ -95,8 +103,8 @@ export function ArchitecturePane({
               isError={architecture.isError}
               error={architecture.error}
               isEmpty={componentCount === 0}
-              emptyTitle="Noch kein Architekturmodell gemeldet"
-              emptyDescription="Das Modell erscheint, sobald ein Agent architecture.snapshot_published sendet."
+              emptyTitle={t('pane.emptyTitle')}
+              emptyDescription={t('pane.emptyDescription')}
               onRetry={() => void architecture.refetch()}
               skeletonRows={5}
               className="w-full max-w-2xl"

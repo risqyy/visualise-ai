@@ -1,26 +1,21 @@
 import { ChevronDown, ChevronRight, CornerDownRight, RotateCcw, Unlink } from 'lucide-react'
 import { useId, type ReactNode } from 'react'
+import { useTranslation } from 'react-i18next'
 
 import type { AgentId } from '@/api/types'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { ReportedTime } from '@/i18n'
+import { ReportedText as ReportedValue, ReportedTime } from '@/i18n'
 import { cn } from '@/lib/utils'
 
 import type { AgentTreeNode } from './agentHierarchy'
 import { ReportedProgress } from './ProgressDisplay'
-import { ReportedText } from './ReportedText'
+import { ClippedReportedText } from './ClippedReportedText'
 import {
-  AGENT_PANE_TEXT,
-  TEXT_SUBJECT,
-  detailToggleLabel,
-  subtreeToggleLabel,
-} from './paneText'
-import {
-  AGENT_ROLE_LABEL,
+  AGENT_ROLE_LABEL_KEY,
   AGENT_STATUS_GLYPH,
-  AGENT_STATUS_LABEL,
-  OUTCOME_LABEL,
+  AGENT_STATUS_LABEL_KEY,
+  OUTCOME_LABEL_KEY,
   reportedWorkState,
 } from './reporting'
 
@@ -87,6 +82,7 @@ export function AgentTreeItem({
   onToggleDetail,
   onSelect,
 }: AgentTreeItemProps) {
+  const { t } = useTranslation('agents')
   const { agent, depth, attachment, children, descendantCount } = node
   const hasChildren = children.length > 0
   const name = agent.displayName || agent.agentId
@@ -124,7 +120,11 @@ export function AgentTreeItem({
             size="icon-xs"
             className={cn('mt-px shrink-0', CONTROL_FOCUS)}
             aria-expanded={!collapsed}
-            aria-label={subtreeToggleLabel(name, collapsed)}
+            // The agent's reported name is interpolated into our sentence: an
+            // `aria-label` holds a string, so markup cannot mark it (ADR 0014).
+            aria-label={t(collapsed ? 'row.subtreeExpand' : 'row.subtreeCollapse', {
+              agent: name,
+            })}
             onClick={() => onToggleCollapsed(agent.agentId)}
           >
             <ChevronRight
@@ -158,7 +158,8 @@ export function AgentTreeItem({
                   : 'text-foreground/80 font-medium',
               )}
             >
-              {name}
+              {/* Reported display name, or the reported id when there is none. */}
+              <ReportedValue value={name} />
             </span>
             {collapsed && descendantCount > 0 && (
               <Badge variant="secondary" className="shrink-0 font-normal">
@@ -174,7 +175,7 @@ export function AgentTreeItem({
           className={cn('mt-px shrink-0', CONTROL_FOCUS)}
           aria-expanded={detailOpen}
           aria-controls={detailId}
-          aria-label={detailToggleLabel(name, detailOpen)}
+          aria-label={t(detailOpen ? 'row.detailHide' : 'row.detailShow', { agent: name })}
           data-testid={`agent-detail-toggle-${agent.agentId}`}
           onClick={() => onToggleDetail(agent.agentId)}
         >
@@ -188,7 +189,7 @@ export function AgentTreeItem({
       <div className="space-y-1 pt-0.5 pl-7">
         <div className="flex min-w-0 flex-wrap items-baseline gap-x-1.5 gap-y-0.5 text-xs">
           <Badge variant="outline" className="shrink-0 font-normal">
-            {AGENT_ROLE_LABEL[agent.role]}
+            {t(AGENT_ROLE_LABEL_KEY[agent.role])}
           </Badge>
           {/*
             The reported status cell: the status word and, when the agent sent
@@ -202,7 +203,7 @@ export function AgentTreeItem({
             data-work-state={workState}
             className="flex min-w-0 flex-1 flex-wrap items-baseline gap-x-1.5 gap-y-0.5"
           >
-            <span className="sr-only">{AGENT_PANE_TEXT.statusLabel}: </span>
+            <span className="sr-only">{t('row.statusLabel')}: </span>
             <span
               className={cn(
                 'shrink-0 rounded-sm px-1 py-px',
@@ -214,13 +215,13 @@ export function AgentTreeItem({
               <span aria-hidden="true" className="font-mono">
                 {AGENT_STATUS_GLYPH[agent.status]}
               </span>{' '}
-              {AGENT_STATUS_LABEL[agent.status]}
+              {t(AGENT_STATUS_LABEL_KEY[agent.status])}
             </span>
             {agent.statusNote && (
               <span className="text-muted-foreground min-w-0 flex-1">
-                <ReportedText
+                <ClippedReportedText
                   text={agent.statusNote}
-                  subject={TEXT_SUBJECT.statusNote}
+                  subject={t('row.subjectStatusNote')}
                   agentName={name}
                   lines={detailOpen ? 3 : 1}
                   testId={`agent-status-note-${agent.agentId}`}
@@ -233,19 +234,17 @@ export function AgentTreeItem({
         <div
           className={cn('text-xs', !agent.assignedTask && 'text-muted-foreground italic')}
         >
-          <span className="sr-only">{AGENT_PANE_TEXT.taskLabel}: </span>
+          <span className="sr-only">{t('row.taskLabel')}: </span>
           {agent.assignedTask ? (
-            <ReportedText
+            <ClippedReportedText
               text={agent.assignedTask}
-              subject={TEXT_SUBJECT.task}
+              subject={t('row.subjectTask')}
               agentName={name}
               lines={2}
               testId={`agent-task-${agent.agentId}`}
             />
           ) : (
-            <span data-testid={`agent-task-${agent.agentId}`}>
-              {AGENT_PANE_TEXT.noTaskReported}
-            </span>
+            <span data-testid={`agent-task-${agent.agentId}`}>{t('row.noTask')}</span>
           )}
         </div>
 
@@ -253,14 +252,14 @@ export function AgentTreeItem({
           <AttachmentNote
             icon={Unlink}
             testId={`agent-orphaned-${agent.agentId}`}
-            text={`Gemeldeter Parent „${agent.parentAgentId ?? ''}“ gehört nicht zu diesem Run. Der Agent wird als eigene Wurzel gezeigt.`}
+            text={t('row.orphaned', { parent: agent.parentAgentId ?? '' })}
           />
         )}
         {attachment === 'cycle_broken' && (
           <AttachmentNote
             icon={RotateCcw}
             testId={`agent-cycle-${agent.agentId}`}
-            text={`Die gemeldete Parent-Kette läuft im Kreis. Die Kante zu „${agent.parentAgentId ?? ''}“ wurde hier getrennt; der Agent wird als eigene Wurzel gezeigt.`}
+            text={t('row.cycleBroken', { parent: agent.parentAgentId ?? '' })}
           />
         )}
 
@@ -273,7 +272,7 @@ export function AgentTreeItem({
             />
 
             <dl className="space-y-0.5 text-xs">
-              <DetailRow label={AGENT_PANE_TEXT.lastEventLabel}>
+              <DetailRow label={t('row.lastEventLabel')}>
                 {/*
                   "Zuletzt gemeldet" asks how long ago, so the relative phrase
                   leads and the exact UTC instant travels with it in `title`,
@@ -291,21 +290,22 @@ export function AgentTreeItem({
                   />
                 </span>
               </DetailRow>
-              <DetailRow label={AGENT_PANE_TEXT.outcomeLabel}>
+              <DetailRow label={t('row.outcomeLabel')}>
                 <span
                   data-testid={`agent-outcome-${agent.agentId}`}
                   data-outcome={agent.finishedOutcome ?? 'none'}
                   className={cn(!agent.finishedOutcome && 'text-muted-foreground italic')}
                 >
                   {agent.finishedOutcome
-                    ? OUTCOME_LABEL[agent.finishedOutcome]
-                    : AGENT_PANE_TEXT.noOutcomeReported}
+                    ? t(OUTCOME_LABEL_KEY[agent.finishedOutcome])
+                    : t('row.noOutcome')}
                 </span>
               </DetailRow>
-              <DetailRow label={AGENT_PANE_TEXT.agentIdLabel}>
-                <span className="pane-meta text-muted-foreground block truncate">
-                  {agent.agentId}
-                </span>
+              <DetailRow label={t('row.agentIdLabel')}>
+                <ReportedValue
+                  value={agent.agentId}
+                  className="pane-meta text-muted-foreground block truncate"
+                />
               </DetailRow>
             </dl>
           </div>

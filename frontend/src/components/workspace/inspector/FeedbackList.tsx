@@ -1,11 +1,11 @@
 import { MessageSquareText } from 'lucide-react'
+import { useTranslation } from 'react-i18next'
 
 import type { FeedbackEntry } from '@/api/types'
 import { EmptyState } from '@/components/AsyncState'
 import { Badge } from '@/components/ui/badge'
-import { ReportedTime } from '@/i18n'
+import { ReportedText, ReportedTime } from '@/i18n'
 
-import { orNotReported } from './formatting'
 import { SafeMarkdown } from './SafeMarkdown'
 import { SCROLL_ANCHOR_ATTRIBUTE } from './scrollStability'
 
@@ -22,11 +22,13 @@ export interface FeedbackListProps {
 }
 
 export function FeedbackList({ feedback }: FeedbackListProps) {
+  const { t } = useTranslation('inspector')
+
   if (feedback.length === 0) {
     return (
       <EmptyState
-        title="Kein Feedback gemeldet"
-        description="Für diese Komponente wurde in diesem Run kein feedback.published gemeldet."
+        title={t('feedback.emptyTitle')}
+        description={t('feedback.emptyDescription')}
       />
     )
   }
@@ -45,16 +47,23 @@ export function FeedbackList({ feedback }: FeedbackListProps) {
             <div className="flex items-center gap-1.5">
               <MessageSquareText className="size-3.5 shrink-0" aria-hidden="true" />
               <h4 className="min-w-0 flex-1 truncate text-xs font-semibold">
-                {orNotReported(entry.title, 'Ohne Titel gemeldet')}
+                {/* A reported title, or our sentence about its absence. */}
+                {entry.title.trim() === '' ? (
+                  t('feedback.untitled')
+                ) : (
+                  <ReportedText value={entry.title} />
+                )}
               </h4>
+              {/* `format` is a contract value and is shown as it arrived. */}
               <Badge variant="outline" className="text-2xs shrink-0 font-normal">
-                {entry.format}
+                <ReportedText value={entry.format} />
               </Badge>
             </div>
             <p className="text-muted-foreground text-2xs">
-              <span className="font-mono">{entry.agentId}</span>
+              <ReportedText value={entry.agentId} className="font-mono" />
               <span aria-hidden="true"> · </span>
-              Run <span className="font-mono">{entry.runId}</span>
+              {t('meta.runPrefix')}{' '}
+              <ReportedText value={entry.runId} className="font-mono" />
               <span aria-hidden="true"> · </span>
               <ReportedTime value={entry.createdAt} />
             </p>

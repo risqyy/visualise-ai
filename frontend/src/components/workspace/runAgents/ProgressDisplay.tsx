@@ -1,4 +1,6 @@
-import { formatPercent, useFormattingLanguage } from '@/i18n'
+import { Trans, useTranslation } from 'react-i18next'
+
+import { ReportedText, formatPercent, useFormattingLanguage } from '@/i18n'
 import { cn } from '@/lib/utils'
 
 import { progressStatement, type ProgressStatement, type StepCompletion } from './reporting'
@@ -33,6 +35,8 @@ export interface ReportedProgressProps {
 
 /** The progress an agent reported about itself, in the form its claim allows. */
 export function ReportedProgress({ progress, reportedBy, testId }: ReportedProgressProps) {
+  const { t } = useTranslation('agents')
+
   if (progress === null) {
     return (
       <p
@@ -40,7 +44,7 @@ export function ReportedProgress({ progress, reportedBy, testId }: ReportedProgr
         data-progress-form="none"
         className="text-muted-foreground text-xs"
       >
-        Kein Fortschritt gemeldet
+        {t('progress.none')}
       </p>
     )
   }
@@ -68,6 +72,7 @@ function CountedProgress({
   statement: ProgressStatement
   testId: string
 }) {
+  const { t } = useTranslation('agents')
   const language = useFormattingLanguage()
   const percent = formatPercent(statement.percent, language)
   const filled = Math.round((statement.percent / 100) * METER_SEGMENTS)
@@ -86,7 +91,13 @@ function CountedProgress({
         aria-valuenow={statement.percent}
         aria-valuemin={0}
         aria-valuemax={100}
-        aria-label={`${percent} ${statement.subject}, ${statement.derivation}`}
+        // The percentage is already formatted for the reader's language (#40),
+        // so it is interpolated as text and not as a number.
+        aria-label={t('progress.meterLabel', {
+          percent,
+          subject: t(statement.subjectKey),
+          derivation: t(statement.derivationKey),
+        })}
         className="flex gap-0.5"
       >
         {Array.from({ length: METER_SEGMENTS }, (_, index) => (
@@ -103,7 +114,7 @@ function CountedProgress({
       </div>
       <p className="text-muted-foreground text-xs">
         <span className="text-foreground font-medium">{percent}</span>{' '}
-        {statement.subject} · {statement.derivation}
+        {t(statement.subjectKey)} · {t(statement.derivationKey)}
       </p>
     </div>
   )
@@ -126,6 +137,7 @@ function ClaimedProgress({
   reportedBy: string
   testId: string
 }) {
+  const { t } = useTranslation('agents')
   const language = useFormattingLanguage()
 
   return (
@@ -144,11 +156,20 @@ function ClaimedProgress({
         <span data-claim-value="" className="text-foreground font-medium">
           {formatPercent(statement.percent, language)}
         </span>{' '}
-        {statement.subject}
+        {t(statement.subjectKey)}
       </p>
       <p className="mt-0.5">
-        Gemeldete Selbsteinschätzung von {reportedBy} · {statement.derivation}. Kein
-        gemessener Fortschritt.
+        {/*
+          The attribution names the reporting agent inside the clause, which is
+          the `<Trans>` case: the name is a prop of `ReportedText`, so it stays
+          the agent's word in every language.
+        */}
+        <Trans
+          ns="agents"
+          i18nKey="progress.claimNote"
+          values={{ derivation: t(statement.derivationKey) }}
+          components={{ agent: <ReportedText value={reportedBy} /> }}
+        />
       </p>
     </div>
   )
@@ -174,6 +195,8 @@ export function CompletedStepsMeter({
   label,
   testId,
 }: CompletedStepsMeterProps) {
+  const { t } = useTranslation('agents')
+
   return (
     <div
       data-testid={testId}
@@ -188,7 +211,11 @@ export function CompletedStepsMeter({
           aria-valuenow={completion.done}
           aria-valuemin={0}
           aria-valuemax={completion.total}
-          aria-label={`${label}: ${completion.done} von ${completion.total} Schritten abgeschlossen`}
+          aria-label={t('steps.meterLabel', {
+            label,
+            done: completion.done,
+            total: completion.total,
+          })}
           className="flex gap-0.5"
         >
           {completion.states.map((state, index) => (
@@ -206,7 +233,7 @@ export function CompletedStepsMeter({
         </div>
       )}
       <p className="text-muted-foreground text-xs">
-        {completion.done} von {completion.total} Schritten abgeschlossen
+        {t('steps.completed', { done: completion.done, total: completion.total })}
       </p>
     </div>
   )

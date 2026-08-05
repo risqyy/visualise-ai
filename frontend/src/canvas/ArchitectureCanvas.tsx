@@ -15,6 +15,7 @@ import {
   type Viewport,
 } from '@xyflow/react'
 import { Layers2, Map, MapPinOff, Maximize2, RotateCcw, TriangleAlert } from 'lucide-react'
+import type { TFunction } from 'i18next'
 import {
   useCallback,
   useEffect,
@@ -25,6 +26,7 @@ import {
   useState,
   type KeyboardEvent as ReactKeyboardEvent,
 } from 'react'
+import { useTranslation } from 'react-i18next'
 
 import '@xyflow/react/dist/style.css'
 
@@ -43,16 +45,15 @@ import {
   type CameraPolicyState,
 } from './cameraPolicy'
 import {
-  CANVAS_A11Y_TEXT,
-  CANVAS_ARIA_LABEL_CONFIG,
+  canvasAriaLabelConfig,
   componentNamesById,
   withEdgeAccessibility,
   withNodeAccessibility,
 } from './canvasAccessibility'
 import {
-  DETAIL_LEVEL_DESCRIPTIONS,
-  DETAIL_LEVEL_LABELS,
-  DISCLOSURE_LABELS,
+  DETAIL_LEVEL_DESCRIPTION_KEYS,
+  DETAIL_LEVEL_LABEL_KEYS,
+  DISCLOSURE_LABEL_KEYS,
   MIN_READABLE_ZOOM,
   detailLevelForZoom,
 } from './detailLevel'
@@ -69,7 +70,7 @@ import {
   routesInvalidatedByDrag,
   useArchitectureGraph,
 } from './useArchitectureGraph'
-import { useCanvasCountText } from './useCanvasCountText'
+import { useCanvasVoice } from './useCanvasVoice'
 
 /**
  * The interactive architecture canvas.
@@ -147,9 +148,11 @@ function ArchitectureCanvasInner({
   selectedComponentId,
   onSelectComponent,
 }: ArchitectureCanvasProps) {
-  // Counts the nouns the accessible names carry, in the reader's language
-  // (#40). Stable per language, so it does not invalidate the label memos.
-  const countText = useCanvasCountText()
+  const { t } = useTranslation('canvas')
+  // The words *and* the counted nouns the accessible names are built from —
+  // `canvas:*` for the sentences (#42), `common:count.*` for the numbers (#40).
+  // Stable per language, so it does not invalidate the label memos.
+  const voice = useCanvasVoice()
   const collapsedComponentIds = useUiStore((state) => state.collapsedComponentIds)
   const setCollapsedComponentIds = useUiStore((state) => state.setCollapsedComponentIds)
   const setComponentCollapsed = useUiStore((state) => state.setComponentCollapsed)
@@ -192,6 +195,10 @@ function ArchitectureCanvasInner({
   // Id of the visually hidden description every screen reader gets when it
   // enters the graph.
   const instructionsId = `architecture-graph-instructions-${useId()}`
+  // React Flow's own English a11y strings, replaced with the catalogue's. Not
+  // only a translation: its defaults offer "press delete to remove it" and
+  // "use the arrow keys to move the node around", and neither is true here.
+  const ariaLabelConfig = useMemo(() => canvasAriaLabelConfig(t), [t])
   // Flipped by the first pan or zoom that came from a real input event. From
   // then on the camera is the user's and nothing but "Einpassen" touches it.
   const userMovedCameraRef = useRef(false)
@@ -206,9 +213,9 @@ function ArchitectureCanvasInner({
     () =>
       withNodeAccessibility(
         applyTemporaryPositions(graph.nodes, nodePositions, selectedComponentId ?? null),
-        countText,
+        voice,
       ),
-    [graph.nodes, nodePositions, selectedComponentId, countText],
+    [graph.nodes, nodePositions, selectedComponentId, voice],
   )
 
   /**
@@ -393,8 +400,8 @@ function ArchitectureCanvasInner({
       if (!edge.data) return edge
       return { ...edge, data: { ...edge.data, ...(route ? { route } : {}) } }
     })
-    return withEdgeAccessibility(routed, nodeNames, countText)
-  }, [graph.edges, graph.routes, nodePositions, nodeNames, countText])
+    return withEdgeAccessibility(routed, nodeNames, voice)
+  }, [graph.edges, graph.routes, nodePositions, nodeNames, voice])
 
   const onNodeClick = useCallback<NodeMouseHandler>(
     (_event, node) => {
@@ -602,7 +609,7 @@ function ArchitectureCanvasInner({
       {/* Read out when a screen reader enters the graph: what is drawn here and
           how it is operated — including that it cannot be edited. */}
       <p id={instructionsId} className="sr-only" data-testid="canvas-instructions">
-        {CANVAS_A11Y_TEXT.graphInstructions}
+        {t('graph.instructions')}
       </p>
       <CanvasNodeActionsContext value={nodeActions}>
         <ReactFlow
@@ -634,8 +641,8 @@ function ArchitectureCanvasInner({
           // requested by the user's own Tab press, it keeps the zoom, and it is
           // not a `fitView` — `data-fit-view-count` does not move (ADR 0018).
           autoPanOnNodeFocus
-          ariaLabelConfig={CANVAS_ARIA_LABEL_CONFIG}
-          aria-label={CANVAS_A11Y_TEXT.graphLabel}
+          ariaLabelConfig={ariaLabelConfig}
+          aria-label={t('graph.label')}
           aria-describedby={instructionsId}
         >
           <Background
@@ -657,7 +664,7 @@ function ArchitectureCanvasInner({
               position="top-right"
               pannable
               zoomable
-              ariaLabel="Übersichtskarte der Architektur"
+              ariaLabel={t('graph.minimapLabel')}
               className="!border-border !bg-card/80 !m-2 !rounded-md !border"
               style={{ width: 168, height: 112 }}
               maskColor="color-mix(in oklab, var(--background) 72%, transparent)"
@@ -685,12 +692,11 @@ function ArchitectureCanvasInner({
                     data-testid="canvas-fit-view"
                   >
                     <Maximize2 aria-hidden="true" />
-                    {DISCLOSURE_LABELS.fitWholeModel}
+                    {t(DISCLOSURE_LABEL_KEYS.fitWholeModel)}
                   </Button>
                 </TooltipTrigger>
                 <TooltipContent className="max-w-80">
-                  {DISCLOSURE_LABELS.fitWholeModelHint} Die Kamera bewegt sich sonst nur beim
-                  ersten Laden — nie durch eintreffende Ereignisse.
+                  {t(DISCLOSURE_LABEL_KEYS.fitWholeModelHint)}
                 </TooltipContent>
               </Tooltip>
 
@@ -705,11 +711,11 @@ function ArchitectureCanvasInner({
                       data-testid="canvas-back-to-overview"
                     >
                       <Layers2 aria-hidden="true" />
-                      {DISCLOSURE_LABELS.backToOverview}
+                      {t(DISCLOSURE_LABEL_KEYS.backToOverview)}
                     </Button>
                   </TooltipTrigger>
                   <TooltipContent className="max-w-80">
-                    {DISCLOSURE_LABELS.backToOverviewHint}
+                    {t(DISCLOSURE_LABEL_KEYS.backToOverviewHint)}
                   </TooltipContent>
                 </Tooltip>
               )}
@@ -725,13 +731,10 @@ function ArchitectureCanvasInner({
                       data-testid="canvas-reset-positions"
                     >
                       <RotateCcw aria-hidden="true" />
-                      Positionen zurücksetzen
+                      {t('tool.resetPositions')}
                     </Button>
                   </TooltipTrigger>
-                  <TooltipContent>
-                    Verschobene Knoten zurück auf das berechnete Layout. Verschiebungen sind
-                    ohnehin nur lokal und ändern das Architekturmodell nicht.
-                  </TooltipContent>
+                  <TooltipContent>{t('tool.resetPositionsHint')}</TooltipContent>
                 </Tooltip>
               )}
 
@@ -751,12 +754,12 @@ function ArchitectureCanvasInner({
                       <MapPinOff aria-hidden="true" />
                     )}
                     <span className="sr-only">
-                      Übersichtskarte {minimapVisible ? 'ausblenden' : 'einblenden'}
+                      {t(minimapVisible ? 'tool.hideMinimap' : 'tool.showMinimap')}
                     </span>
                   </Button>
                 </TooltipTrigger>
                 <TooltipContent>
-                  Übersichtskarte {minimapVisible ? 'ausblenden' : 'einblenden'}
+                  {t(minimapVisible ? 'tool.hideMinimap' : 'tool.showMinimap')}
                 </TooltipContent>
               </Tooltip>
 
@@ -768,10 +771,14 @@ function ArchitectureCanvasInner({
                     className="text-muted-foreground px-1 text-[11px] whitespace-nowrap"
                     data-testid="canvas-detail-level"
                   >
-                    Detailstufe: {DETAIL_LEVEL_LABELS[detailLevel]}
+                    {t('detail.indicator', {
+                      level: t(DETAIL_LEVEL_LABEL_KEYS[detailLevel]),
+                    })}
                   </span>
                 </TooltipTrigger>
-                <TooltipContent>{DETAIL_LEVEL_DESCRIPTIONS[detailLevel]}</TooltipContent>
+                <TooltipContent>
+                  {t(DETAIL_LEVEL_DESCRIPTION_KEYS[detailLevel])}
+                </TooltipContent>
               </Tooltip>
 
               {hiddenCount > 0 && (
@@ -781,14 +788,14 @@ function ArchitectureCanvasInner({
                       className="text-muted-foreground px-1 text-[11px] whitespace-nowrap"
                       data-testid="canvas-visibility"
                     >
-                      {DISCLOSURE_LABELS.visibility(
-                        graph.visibleNodeCount,
-                        graph.visibleNodeCount + hiddenCount,
-                      )}
+                      {t(DISCLOSURE_LABEL_KEYS.visibility, {
+                        visible: graph.visibleNodeCount,
+                        total: graph.visibleNodeCount + hiddenCount,
+                      })}
                     </span>
                   </TooltipTrigger>
                   <TooltipContent className="max-w-80">
-                    {DISCLOSURE_LABELS.visibilityHint}
+                    {t(DISCLOSURE_LABEL_KEYS.visibilityHint)}
                   </TooltipContent>
                 </Tooltip>
               )}
@@ -801,7 +808,7 @@ function ArchitectureCanvasInner({
                       data-testid="canvas-diagnostics"
                     >
                       <TriangleAlert className="size-3.5" aria-hidden="true" />
-                      {problemCount} unstimmige Angaben
+                      {t('diagnostics.summary', { count: problemCount })}
                     </span>
                   </TooltipTrigger>
                   <TooltipContent className="max-w-80">
@@ -819,7 +826,7 @@ function ArchitectureCanvasInner({
                 role="status"
                 data-testid="canvas-layouting"
               >
-                Layout wird berechnet…
+                {t('graph.layouting')}
               </span>
             </Panel>
           )}
@@ -829,38 +836,22 @@ function ArchitectureCanvasInner({
   )
 }
 
+/**
+ * What the projection had to work around in the reported snapshot.
+ *
+ * Each line names a *count* of reported inconsistencies and what the canvas did
+ * about it. Nothing here quotes a reported value, so every line is entirely the
+ * cockpit's own sentence and comes from the catalogue.
+ */
 function DiagnosticsSummary({
   graph,
 }: {
   graph: ReturnType<typeof useArchitectureGraph>
 }) {
+  const { t } = useTranslation('canvas')
   const { diagnostics } = graph
-  const lines: string[] = []
-  if (diagnostics.orphanedParents.length > 0) {
-    lines.push(
-      `${diagnostics.orphanedParents.length} Komponente(n) verweisen auf ein Elternteil, das nicht Teil des Snapshots ist. Sie werden als eigenständige Wurzeln gezeigt.`,
-    )
-  }
-  if (diagnostics.hierarchyCycles.length > 0) {
-    lines.push(
-      `${diagnostics.hierarchyCycles.length} Zyklus/Zyklen in der Hierarchie. Der jeweils erste Knoten wurde gelöst, damit die Struktur darstellbar bleibt.`,
-    )
-  }
-  if (diagnostics.danglingRelationships.length > 0) {
-    lines.push(
-      `${diagnostics.danglingRelationships.length} Beziehung(en) zeigen auf eine Komponente außerhalb des Snapshots und werden nicht gezeichnet.`,
-    )
-  }
-  if (diagnostics.duplicateComponentIds.length > 0) {
-    lines.push(
-      `${diagnostics.duplicateComponentIds.length} doppelte Komponenten-ID(s); jeweils die erste Meldung wird gezeigt.`,
-    )
-  }
-  if (diagnostics.duplicateRelationshipIds.length > 0) {
-    lines.push(
-      `${diagnostics.duplicateRelationshipIds.length} doppelte Beziehungs-ID(s); jeweils die erste Meldung wird gezeigt.`,
-    )
-  }
+  const lines = diagnosticLines(diagnostics, t)
+
   return (
     <ul className="space-y-1 text-xs">
       {lines.map((line) => (
@@ -868,5 +859,44 @@ function DiagnosticsSummary({
       ))}
     </ul>
   )
+}
+
+function diagnosticLines(
+  diagnostics: ReturnType<typeof useArchitectureGraph>['diagnostics'],
+  t: TFunction<'canvas'>,
+): string[] {
+  const lines: string[] = []
+  if (diagnostics.orphanedParents.length > 0) {
+    lines.push(
+      t('diagnostics.orphanedParents', { count: diagnostics.orphanedParents.length }),
+    )
+  }
+  if (diagnostics.hierarchyCycles.length > 0) {
+    lines.push(
+      t('diagnostics.hierarchyCycles', { count: diagnostics.hierarchyCycles.length }),
+    )
+  }
+  if (diagnostics.danglingRelationships.length > 0) {
+    lines.push(
+      t('diagnostics.danglingRelationships', {
+        count: diagnostics.danglingRelationships.length,
+      }),
+    )
+  }
+  if (diagnostics.duplicateComponentIds.length > 0) {
+    lines.push(
+      t('diagnostics.duplicateComponentIds', {
+        count: diagnostics.duplicateComponentIds.length,
+      }),
+    )
+  }
+  if (diagnostics.duplicateRelationshipIds.length > 0) {
+    lines.push(
+      t('diagnostics.duplicateRelationshipIds', {
+        count: diagnostics.duplicateRelationshipIds.length,
+      }),
+    )
+  }
+  return lines
 }
 

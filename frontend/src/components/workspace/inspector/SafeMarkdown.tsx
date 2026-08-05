@@ -116,12 +116,23 @@ export interface SafeMarkdownProps {
   className?: string
 }
 
-/** Renders untrusted markdown with the sanitising pipeline described above. */
+/**
+ * Renders untrusted markdown with the sanitising pipeline described above.
+ *
+ * `translate="no"` and `data-reported` mark the whole rendered tree as reported
+ * data (#42). Agent feedback is the audit source the user reads to decide
+ * whether an agent did the right thing; a browser's own page translation
+ * rewriting it on a page that declares `lang="de"` would falsify exactly that,
+ * and the reader would never learn it happened. The markdown is a tree, not a
+ * string, so the marker sits on the container instead of on `<ReportedText>`.
+ */
 export function SafeMarkdown({ children, className }: SafeMarkdownProps) {
   return (
     <div
       className={cn('min-w-0 text-sm break-words', className)}
       data-testid="safe-markdown"
+      translate="no"
+      data-reported=""
     >
       <ReactMarkdown
         remarkPlugins={REMARK_PLUGINS}
