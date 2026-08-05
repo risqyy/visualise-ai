@@ -5,6 +5,7 @@ import type { ArchitectureResponse, Component } from '@/api/types'
 import { applyLiveEvent } from '@/api/useLiveStream'
 import { DEFAULT_CAMERA, useUiStore } from '@/state/uiStore'
 import { WORK_STATES } from '@/state/workStates'
+import { translateWith } from '@/test/translate'
 import {
   NESTED_COMPONENTS,
   NESTED_RELATIONSHIPS,
@@ -361,8 +362,9 @@ describe('live change overlays — distinguishable without colour', () => {
   it('gives the four states four distinct non-colour signatures', () => {
     // Label, icon and line style each separate all four states on their own, so
     // no state depends on being seen in colour.
+    const t = translateWith('canvas')
     const signatures = WORK_STATES.map(
-      (state) => `${state.label}|${state.borderStyle}|${state.strokeDasharray}`,
+      (state) => `${t(state.labelKey)}|${state.borderStyle}|${state.strokeDasharray}`,
     )
     expect(new Set(signatures).size).toBe(4)
     expect(new Set(WORK_STATES.map((state) => state.icon)).size).toBe(4)
