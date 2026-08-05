@@ -40,7 +40,7 @@ export function PlanRevisions({ plans }: PlanRevisionsProps) {
         >
           <header className="border-border flex items-baseline gap-1.5 border-b px-2 py-1.5">
             <h4 className="truncate font-mono text-xs font-medium">{plan.planId}</h4>
-            <span className="text-muted-foreground shrink-0 text-2xs">
+            <span className="text-muted-foreground shrink-0 text-xs">
               {plan.revisions.length} Revision{plan.revisions.length === 1 ? '' : 'en'}
             </span>
           </header>
@@ -81,17 +81,17 @@ function PlanRevisionEntry({
       <div className="flex items-baseline gap-1.5">
         <h5 className="text-xs font-medium">Revision {revision.revision}</h5>
         {revision.isCurrent ? (
-          <Badge variant="secondary" className="text-2xs font-normal">
+          <Badge variant="secondary" className="font-normal">
             aktuell
           </Badge>
         ) : (
-          <Badge variant="outline" className="text-2xs font-normal">
+          <Badge variant="outline" className="font-normal">
             frühere Fassung
           </Badge>
         )}
       </div>
 
-      <p className="text-muted-foreground font-mono text-2xs">
+      <p className="pane-meta text-muted-foreground">
         {formatTimestamp(revision.createdAt)} · {revision.createdByAgentId}
       </p>
 
@@ -109,7 +109,7 @@ function PlanRevisionEntry({
               key={step.stepId}
               data-testid={`plan-step-${planId}-${revision.revision}-${step.stepId}`}
               data-step-state={step.state}
-              className="flex items-baseline gap-1.5 text-2xs"
+              className="flex items-baseline gap-1.5 text-xs"
             >
               <span
                 aria-hidden="true"

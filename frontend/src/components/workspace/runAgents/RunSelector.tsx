@@ -71,11 +71,11 @@ export function RunSelector({
             <History className="size-3.5 shrink-0" aria-hidden="true" />
             Historischer Run
           </p>
-          <p className="text-muted-foreground text-2xs">
+          <p className="text-muted-foreground text-xs">
             Diese Ansicht zeigt einen abgelegten Run, nicht den aktuellen. Aktuell ist{' '}
             <span className="font-mono">{currentRun.runId}</span>.
           </p>
-          <Button asChild variant="outline" size="sm" className="h-6 w-full text-2xs">
+          <Button asChild variant="outline" size="xs" className="w-full">
             <Link
               to="/projects/$projectId/runs/$runId"
               params={{ projectId, runId: currentRun.runId }}
@@ -92,7 +92,7 @@ export function RunSelector({
       {currentRun && showingCurrentRun && (
         <p
           data-testid="current-run-banner"
-          className="text-muted-foreground flex items-center gap-1.5 text-2xs"
+          className="text-muted-foreground flex items-center gap-1.5 text-xs"
         >
           <Radio className="text-state-applied size-3.5 shrink-0" aria-hidden="true" />
           Aktueller Run des Projekts
@@ -164,20 +164,20 @@ function RunLink({
       <span className="flex min-w-0 items-center gap-1.5">
         <span className="truncate font-mono text-xs">{run.runId}</span>
         {run.isCurrent && (
-          <Badge variant="secondary" className="shrink-0 text-2xs font-normal">
+          <Badge variant="secondary" className="shrink-0 font-normal">
             aktuell
           </Badge>
         )}
       </span>
-      <span className="text-muted-foreground block text-2xs">
+      <span className="text-muted-foreground block text-xs">
         {run.isOpen
           ? 'offen — kein Terminalereignis gemeldet'
           : `beendet: ${run.outcome ? OUTCOME_LABEL[run.outcome] : 'ohne gemeldetes Ergebnis'}`}
       </span>
-      <span className="text-muted-foreground block font-mono text-2xs">
+      <span className="pane-meta text-muted-foreground block">
         seit {formatTimestamp(run.startedAt)}
       </span>
-      <span className="text-muted-foreground block text-2xs">
+      <span className="text-muted-foreground block text-xs">
         {/*
           `RunSummary` carries no agent count — only `RunDetail.counts` does, on
           a different endpoint. The root agent is what the summary reports.

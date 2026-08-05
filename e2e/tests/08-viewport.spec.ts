@@ -132,7 +132,7 @@ test('8 · content below the fold is reachable inside its own pane, not by scrol
       'shop-platform.orders.domain.tax',
     )}`,
   )
-  await expect(page.getByTestId('agent-row-subagent-reviewer')).toBeVisible()
+  await expect(page.getByTestId('agent-row-subagent-test-engineer')).toBeVisible()
   await expect(page.getByTestId('diff-groups')).toBeVisible()
 
   // Both side panes have more content than height — otherwise this test would
@@ -152,19 +152,29 @@ test('8 · content below the fold is reachable inside its own pane, not by scrol
   expect(regions.runPane!.scrollHeight).toBeGreaterThan(regions.runPane!.clientHeight)
   expect(regions.inspector!.scrollHeight).toBeGreaterThan(regions.inspector!.clientHeight)
 
-  // The deepest agent row starts below the fold and is brought into view by
-  // scrolling the pane — the page itself stays where it is.
-  const before = await page.getByTestId('agent-row-subagent-reviewer').boundingBox()
+  // The last agent row starts below the fold and is brought into view by
+  // scrolling the pane — the page itself stays where it is. It is the last row
+  // rather than the deepest one because the rows are compact by default (#39):
+  // the reviewer now fits above the fold, the run pane still does not.
+  const before = await page.getByTestId('agent-row-subagent-test-engineer').boundingBox()
   expect(before).not.toBeNull()
   expect(
     before!.y + before!.height,
-    'the deepest agent row is expected to start below the fold',
+    'the last agent row is expected to reach past the fold',
   ).toBeGreaterThan(ACCEPTANCE_VIEWPORT.height)
 
-  await page.getByTestId('agent-row-subagent-reviewer').scrollIntoViewIfNeeded()
-  const after = await page.getByTestId('agent-row-subagent-reviewer').boundingBox()
+  await page.getByTestId('agent-row-subagent-test-engineer').scrollIntoViewIfNeeded()
+  const after = await page.getByTestId('agent-row-subagent-test-engineer').boundingBox()
   expect(after).not.toBeNull()
-  expect(after!.y).toBeLessThan(ACCEPTANCE_VIEWPORT.height - 100)
+  // Fully inside the viewport, top and bottom. Asserting the whole box rather
+  // than a fixed distance from the bottom edge keeps the check independent of
+  // how tall a row happens to be — compact rows are shorter than the margin the
+  // assertion used to assume (#39).
+  expect(after!.y, 'the row must start inside the viewport').toBeGreaterThanOrEqual(0)
+  expect(
+    after!.y + after!.height,
+    'the row must end inside the viewport',
+  ).toBeLessThanOrEqual(ACCEPTANCE_VIEWPORT.height)
 
   const pageOffset = await page.evaluate(() => ({
     x: window.scrollX,
@@ -175,7 +185,7 @@ test('8 · content below the fold is reachable inside its own pane, not by scrol
   const reports = await probeControls(page, [
     {
       name: 'deepest agent row after scrolling its pane',
-      selector: '[data-testid="agent-row-subagent-reviewer"]',
+      selector: '[data-testid="agent-row-subagent-test-engineer"]',
     },
   ])
   expect(

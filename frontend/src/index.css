@@ -154,6 +154,22 @@
   }
 
   .pane-heading {
-    @apply text-2xs text-muted-foreground font-semibold tracking-[0.08em] uppercase;
+    @apply text-muted-foreground text-xs font-semibold tracking-[0.08em] uppercase;
+  }
+
+  /*
+   * The **only** sanctioned sub-12 px type in the cockpit (#39).
+   *
+   * It is reserved for bounded technical metadata: identifiers and UTC
+   * timestamps. Both have a fixed shape, both are monospaced, and both are read
+   * by comparing them rather than by reading them as prose. Everything a user
+   * actually reads — labels, statuses, reported tasks, reported messages — is
+   * 12 px or larger.
+   *
+   * If a new piece of text does not fit "an id or a timestamp", it does not get
+   * this class.
+   */
+  .pane-meta {
+    @apply text-2xs font-mono;
   }
 }
