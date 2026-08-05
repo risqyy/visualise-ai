@@ -18,7 +18,7 @@ layer exists to prevent.
 - loading, error and empty states
 - status vocabulary from a *closed* UI set (`planned`, `active`, …)
 - help texts, accessible names, screen-reader-only text
-- date, number, percentage and plural presentation (centralised in #40)
+- date, number, percentage and plural presentation — see *Formatting* below
 
 **Never translated, never reformatted, never normalised — the agent's:**
 
@@ -74,6 +74,50 @@ Conventions:
 - Where a reported value sits next to a label, split them and let
   `<ReportedText>` render the value, rather than interpolating it into the
   sentence. Use `<Trans>` only when the value truly has to sit inside a clause.
+
+## Formatting
+
+`formatting.ts` is the only place that turns an instant, a count or a percentage
+into text. `ReportedTime.tsx` is the only place that renders an instant. The
+reasoning is [ADR 0019](../../../docs/decisions/0019-locale-aware-formatting-and-the-utc-rule.md);
+the rules a caller needs are these:
+
+**Timestamps are UTC, and they say so.** Every rendering carries the `UTC` label
+from the same `Intl` formatter that produced the digits, in both languages. The
+cockpit never shows a reported instant in the reader's local zone.
+
+```tsx
+<ReportedTime value={risk.createdAt} />                      // 04.08.2026, 09:12:00 UTC
+<ReportedTime value={agent.lastEventAt} display="relative" /> // vor 3 Minuten (+ exact UTC)
+```
+
+`display="relative"` is for "last reported" only — the places where the question
+is *how long ago*. It keeps the exact instant in `title`, in the accessible name
+and in `datetime`, so the approximation never stands alone. Both modes keep the
+reported string byte-for-byte in `datetime`.
+
+A value that was never reported renders `common:time.notReported`; a value that
+does not parse is quoted verbatim through `<ReportedText>`. Nothing is repaired,
+nothing becomes `Invalid Date`.
+
+**Counted nouns are plural keys, never string concatenation.**
+
+```tsx
+t('common:count.plan', { count: run.counts.plans })   // 0 Pläne · 1 Plan · 2 Pläne
+```
+
+`Intl.PluralRules` picks the form and `{{count, number}}` formats the number, so
+a language with more than two plural categories needs a catalogue entry and no
+code. The hand-written German table this replaced (`src/lib/plural.ts`) is gone.
+
+**Percentages and counters go through the service**, not through `${x} %`:
+German writes `90 %` with a non-breaking space, English writes `90%`.
+
+```tsx
+const language = useFormattingLanguage()
+formatPercent(progress.percent, language)
+formatNumber(count, language)
+```
 
 ## Layout
 

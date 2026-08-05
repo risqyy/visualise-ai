@@ -33,6 +33,19 @@ const HISTORICAL_URL = `/projects/${PROJECT_ID}/runs/${HISTORICAL_RUN_ID}`
 const DERIVED_VERDICTS =
   /\bstall\w*|steht still|hängt\b|hängen\b|\btimeout\b|abgelaufen|vermutlich|wahrscheinlich|inaktiv|\btot\b|abgestürzt|reagiert nicht|keine Rückmeldung seit/i
 
+/**
+ * The `<time>` a `ReportedTime` renders inside a labelled cell.
+ *
+ * A relative rendering keeps the exact UTC instant in `datetime`, `title` and
+ * its accessible name, and that is what the assertions below read: the visible
+ * phrase is an approximation, the attributes are the reported fact (#40).
+ */
+function timeElementIn(testId: string): HTMLTimeElement {
+  const element = screen.getByTestId(testId).querySelector('time')
+  if (element === null) throw new Error(`no <time> inside "${testId}"`)
+  return element
+}
+
 interface Harness {
   fetchImpl: typeof fetch
   /** Number of requests per exact path, so a narrow invalidation is provable. */
@@ -139,9 +152,13 @@ describe('agent hierarchy in the pane', () => {
       'data-status',
       'working',
     )
-    expect(screen.getByTestId('agent-last-event-subagent-implementer')).toHaveTextContent(
-      '04.08.2026, 09:06:31 UTC',
-    )
+    // "Zuletzt gemeldet" reads as a distance now (#40) — and the reported UTC
+    // instant travels with it, so the row still states exactly when the agent
+    // spoke rather than only roughly how long ago.
+    const lastEvent = timeElementIn('agent-last-event-subagent-implementer')
+    expect(lastEvent).toHaveAttribute('title', '04.08.2026, 09:06:31 UTC')
+    expect(lastEvent).toHaveAttribute('datetime', '2026-08-04T09:06:31Z')
+    expect(lastEvent).toHaveAccessibleName(/04\.08\.2026, 09:06:31 UTC/)
   })
 
   it('says so when an agent never reported a status or a number', async () => {
@@ -518,7 +535,8 @@ describe('default density of an agent row', () => {
     )
 
     // The stale timestamp is shown as what it is, without a word about it.
-    expect(screen.getByTestId('agent-last-event-subagent-implementer')).toHaveTextContent(
+    expect(timeElementIn('agent-last-event-subagent-implementer')).toHaveAttribute(
+      'title',
       '01.01.2020, 00:00:00 UTC',
     )
     expect(screen.getByTestId('pane-run-agents').textContent ?? '').not.toMatch(

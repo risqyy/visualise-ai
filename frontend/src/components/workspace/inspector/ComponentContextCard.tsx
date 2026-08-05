@@ -8,8 +8,9 @@ import type {
 } from '@/api/types'
 import { Badge } from '@/components/ui/badge'
 import { componentKindStyle } from '@/canvas/componentKinds'
+import { ReportedTime, formatPercent, useFormattingLanguage } from '@/i18n'
 
-import { AGENT_STATUS_LABELS, formatTimestamp, orNotReported } from './formatting'
+import { AGENT_STATUS_LABELS, orNotReported } from './formatting'
 
 /**
  * Who is doing what, where, in which run.
@@ -40,6 +41,8 @@ export function ComponentContextCard({
   currentWorkStep,
   runId,
 }: ComponentContextCardProps) {
+  const language = useFormattingLanguage()
+
   return (
     <section
       className="border-border space-y-2 rounded-md border p-2"
@@ -121,7 +124,8 @@ export function ComponentContextCard({
               {responsibleAgent.progress && (
                 <span className="text-muted-foreground">
                   {' '}
-                  · {responsibleAgent.progress.percent} % selbst gemeldet
+                  · {formatPercent(responsibleAgent.progress.percent, language)} selbst
+                  gemeldet
                 </span>
               )}
               {responsibleAgent.finishedOutcome && (
@@ -143,9 +147,15 @@ export function ComponentContextCard({
             <>
               <span className="font-medium">{currentWorkStep.title}</span>
               <span className="text-muted-foreground block text-2xs">
-                {currentWorkStep.completedAt
-                  ? `abgeschlossen ${formatTimestamp(currentWorkStep.completedAt)}`
-                  : `offen seit ${formatTimestamp(currentWorkStep.startedAt)}`}
+                {currentWorkStep.completedAt ? (
+                  <>
+                    abgeschlossen <ReportedTime value={currentWorkStep.completedAt} />
+                  </>
+                ) : (
+                  <>
+                    offen seit <ReportedTime value={currentWorkStep.startedAt} />
+                  </>
+                )}
               </span>
               {currentWorkStep.summary && (
                 <span className="text-muted-foreground block">{currentWorkStep.summary}</span>

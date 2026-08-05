@@ -6,7 +6,7 @@ import { useProjects } from '@/api/queries'
 import { AsyncState } from '@/components/AsyncState'
 import { Badge } from '@/components/ui/badge'
 import { ScrollArea } from '@/components/ui/scroll-area'
-import { ReportedText } from '@/i18n'
+import { ReportedText, ReportedTime } from '@/i18n'
 
 /**
  * `/projects` — entry point of the cockpit.
@@ -62,12 +62,14 @@ export function ProjectsPage() {
                         />
                         <span className="text-muted-foreground block truncate text-xs">
                           {/*
-                            Still the raw reported ISO value. Rendering it in the
-                            reader's locale is #40; a format invented here would
-                            only have to be undone there.
+                            "How long ago" is the question a project list is
+                            scanned for, so the relative phrase is what is
+                            painted — and the reported UTC instant stays with it
+                            in `datetime`, `title` and the accessible name, so
+                            nothing turns into a local-time claim (#40).
                           */}
                           {t('item.lastReported')}{' '}
-                          <ReportedText value={project.lastEventAt} />
+                          <ReportedTime value={project.lastEventAt} display="relative" />
                         </span>
                       </span>
                       <Badge variant="outline" className="text-2xs font-normal">

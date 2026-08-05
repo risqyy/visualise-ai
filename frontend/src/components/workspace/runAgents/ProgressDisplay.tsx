@@ -1,3 +1,4 @@
+import { formatPercent, useFormattingLanguage } from '@/i18n'
 import { cn } from '@/lib/utils'
 
 import { progressStatement, type ProgressStatement, type StepCompletion } from './reporting'
@@ -67,6 +68,8 @@ function CountedProgress({
   statement: ProgressStatement
   testId: string
 }) {
+  const language = useFormattingLanguage()
+  const percent = formatPercent(statement.percent, language)
   const filled = Math.round((statement.percent / 100) * METER_SEGMENTS)
 
   return (
@@ -83,7 +86,7 @@ function CountedProgress({
         aria-valuenow={statement.percent}
         aria-valuemin={0}
         aria-valuemax={100}
-        aria-label={`${statement.percent} % ${statement.subject}, ${statement.derivation}`}
+        aria-label={`${percent} ${statement.subject}, ${statement.derivation}`}
         className="flex gap-0.5"
       >
         {Array.from({ length: METER_SEGMENTS }, (_, index) => (
@@ -99,7 +102,7 @@ function CountedProgress({
         ))}
       </div>
       <p className="text-muted-foreground text-xs">
-        <span className="text-foreground font-medium">{statement.percent} %</span>{' '}
+        <span className="text-foreground font-medium">{percent}</span>{' '}
         {statement.subject} · {statement.derivation}
       </p>
     </div>
@@ -123,6 +126,8 @@ function ClaimedProgress({
   reportedBy: string
   testId: string
 }) {
+  const language = useFormattingLanguage()
+
   return (
     <div
       data-testid={testId}
@@ -137,7 +142,7 @@ function ClaimedProgress({
           ≈
         </span>{' '}
         <span data-claim-value="" className="text-foreground font-medium">
-          {statement.percent} %
+          {formatPercent(statement.percent, language)}
         </span>{' '}
         {statement.subject}
       </p>

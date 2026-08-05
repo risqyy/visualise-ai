@@ -1,5 +1,6 @@
 import { ChevronRight } from 'lucide-react'
 import { useState, type ReactNode } from 'react'
+import { useTranslation } from 'react-i18next'
 
 import { useCurrentRun } from '@/api/currentRun'
 import { useAgents, usePlans, useRun, useRuns } from '@/api/queries'
@@ -9,7 +10,7 @@ import { PaneHeader } from '@/components/workspace/PaneHeader'
 import { AgentTree } from '@/components/workspace/runAgents/AgentTree'
 import { PlanRevisions } from '@/components/workspace/runAgents/PlanRevisions'
 import { RunSelector } from '@/components/workspace/runAgents/RunSelector'
-import { OUTCOME_LABEL, formatTimestamp } from '@/components/workspace/runAgents/reporting'
+import { OUTCOME_LABEL } from '@/components/workspace/runAgents/reporting'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import {
@@ -19,7 +20,7 @@ import {
 } from '@/components/ui/collapsible'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Separator } from '@/components/ui/separator'
-import { COUNT_LABELS, counted } from '@/lib/plural'
+import { ReportedTime } from '@/i18n'
 
 export interface RunAgentPaneProps {
   projectId: ProjectId
@@ -51,6 +52,7 @@ export interface RunAgentPaneProps {
  *    reported status — never elapsed time (#39, ADR 0014).
  */
 export function RunAgentPane({ projectId, runId }: RunAgentPaneProps) {
+  const { t } = useTranslation('common')
   const runs = useRuns(projectId)
   const currentRun = useCurrentRun(projectId)
   const run = useRun(projectId, runId)
@@ -129,9 +131,7 @@ export function RunAgentPane({ projectId, runId }: RunAgentPaneProps) {
                       </span>
                     </Row>
                     <Row label="Beginn">
-                      <span className="pane-meta">
-                        {formatTimestamp(run.data.run.startedAt)}
-                      </span>
+                      <ReportedTime value={run.data.run.startedAt} className="pane-meta" />
                     </Row>
                     <Row label="Ende">
                       {/*
@@ -139,17 +139,15 @@ export function RunAgentPane({ projectId, runId }: RunAgentPaneProps) {
                         reported" is a sentence and is not (#39).
                       */}
                       {run.data.run.finishedAt ? (
-                        <span className="pane-meta">
-                          {formatTimestamp(run.data.run.finishedAt)}
-                        </span>
+                        <ReportedTime value={run.data.run.finishedAt} className="pane-meta" />
                       ) : (
                         <span className="text-muted-foreground">kein Ende gemeldet</span>
                       )}
                     </Row>
                     <Row label="Umfang">
-                      {counted(run.data.run.counts.agents, COUNT_LABELS.agent)} ·{' '}
-                      {counted(run.data.run.counts.plans, COUNT_LABELS.plan)} ·{' '}
-                      {counted(run.data.run.counts.workSteps, COUNT_LABELS.workStep)}
+                      {t('count.agent', { count: run.data.run.counts.agents })} ·{' '}
+                      {t('count.plan', { count: run.data.run.counts.plans })} ·{' '}
+                      {t('count.workStep', { count: run.data.run.counts.workSteps })}
                     </Row>
                   </dl>
                 )}

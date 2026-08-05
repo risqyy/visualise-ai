@@ -3,8 +3,9 @@ import { MessageSquareText } from 'lucide-react'
 import type { FeedbackEntry } from '@/api/types'
 import { EmptyState } from '@/components/AsyncState'
 import { Badge } from '@/components/ui/badge'
+import { ReportedTime } from '@/i18n'
 
-import { formatTimestamp, orNotReported } from './formatting'
+import { orNotReported } from './formatting'
 import { SafeMarkdown } from './SafeMarkdown'
 import { SCROLL_ANCHOR_ATTRIBUTE } from './scrollStability'
 
@@ -55,7 +56,7 @@ export function FeedbackList({ feedback }: FeedbackListProps) {
               <span aria-hidden="true"> · </span>
               Run <span className="font-mono">{entry.runId}</span>
               <span aria-hidden="true"> · </span>
-              {formatTimestamp(entry.createdAt)}
+              <ReportedTime value={entry.createdAt} />
             </p>
           </header>
 

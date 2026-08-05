@@ -62,8 +62,25 @@ describe('project list — languages', () => {
     const german = await reportedValuesOf('de')
     const english = await reportedValuesOf('en')
 
-    expect(german).toEqual([PROJECT_ID, '2026-08-04T09:12:00Z', RUN_ID])
+    expect(german).toEqual([PROJECT_ID, RUN_ID])
     expect(english).toEqual(german)
+  })
+
+  it('keeps the reported instant in the DOM behind its localised rendering', async () => {
+    // The timestamp is the one reported value whose *presentation* the contract
+    // localises (#40). The value itself still may not move, so both languages
+    // carry the reported string byte-for-byte in `datetime` and name UTC in the
+    // exact instant they offer next to the relative phrase.
+    for (const language of ['de', 'en'] as const) {
+      const { container, unmount } = renderApp('/projects', { language })
+      await screen.findAllByRole('link')
+
+      const instant = container.querySelector('time')
+      expect(instant).toHaveAttribute('datetime', '2026-08-04T09:12:00Z')
+      expect(instant?.getAttribute('title') ?? '').toContain('UTC')
+      expect(instant).toHaveAccessibleName(/UTC/)
+      unmount()
+    }
   })
 })
 

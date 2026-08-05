@@ -1,4 +1,4 @@
-import type { RunAgent, Timestamp } from '@/api/types'
+import type { RunAgent } from '@/api/types'
 
 /**
  * Small, shared display helpers of the inspector.
@@ -6,22 +6,12 @@ import type { RunAgent, Timestamp } from '@/api/types'
  * They format; they never derive. A status the agent never reported stays
  * "nicht gemeldet" instead of becoming a plausible-looking default, because the
  * cockpit shows evidence and silence changes nothing (ADR 0005).
+ *
+ * Timestamps used to be formatted here as well, with a `de-DE` formatter and a
+ * two-digit year — a second, differently shaped rendering of the same kind of
+ * fact the run/agent pane already rendered its own way. They now go through
+ * `<ReportedTime>` and `src/i18n/formatting.ts` (#40, ADR 0019).
  */
-
-/** Timestamps arrive normalised to UTC; the cockpit shows them as UTC. */
-const TIME_FORMAT = new Intl.DateTimeFormat('de-DE', {
-  dateStyle: 'short',
-  timeStyle: 'medium',
-  timeZone: 'UTC',
-})
-
-/** `2026-08-04T09:12:00Z` -> `04.08.26, 09:12:00 UTC`. Invalid input is echoed. */
-export function formatTimestamp(value: Timestamp | null | undefined): string {
-  if (!value) return 'nicht gemeldet'
-  const parsed = new Date(value)
-  if (Number.isNaN(parsed.getTime())) return value
-  return `${TIME_FORMAT.format(parsed)} UTC`
-}
 
 /**
  * German labels for the status a `RunAgent` carries.
