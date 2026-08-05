@@ -1,7 +1,9 @@
 import { describe, expect, it } from 'vitest'
 
+import { translateWith } from '@/test/translate'
+
 import {
-  DETAIL_LEVEL_LABELS,
+  DETAIL_LEVEL_LABEL_KEYS,
   DETAIL_LEVEL_THRESHOLDS,
   INITIAL_EXPANDED_DEPTH,
   MIN_LEGIBLE_FONT_SIZE_PX,
@@ -48,7 +50,11 @@ describe('progressive detail levels', () => {
     }
     // A broken zoom value must not produce an undefined level.
     expect(detailLevelForZoom(Number.NaN)).toBe('standard')
-    expect(DETAIL_LEVEL_LABELS[detailLevelForZoom(Number.POSITIVE_INFINITY)]).toBeTruthy()
+    // …and the level it produces still resolves to a real word, not a bare key.
+    const t = translateWith('canvas')
+    expect(t(DETAIL_LEVEL_LABEL_KEYS[detailLevelForZoom(Number.POSITIVE_INFINITY)])).toBe(
+      'Standard',
+    )
   })
 
   it('does not let the level influence the node box, and therefore the layout', () => {

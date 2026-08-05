@@ -1,15 +1,15 @@
 import { describe, expect, it } from 'vitest'
 
 import type { AppliedComponent, Component } from '@/api/types'
-import { createI18n, type Language } from '@/i18n'
+import { createI18n, type CanvasKey, type Language } from '@/i18n'
 import { WORK_STATES } from '@/state/workStates'
 import { appliedComponent, NESTED_COMPONENTS } from '@/test/architectureFixtures'
 
 import type { ChangeOverlay } from './changeOverlays'
-import { DISCLOSURE_LABELS } from './detailLevel'
+import { DISCLOSURE_LABEL_KEYS } from './detailLevel'
 import {
-  CANVAS_A11Y_TEXT,
-  CANVAS_ARIA_LABEL_CONFIG,
+  CANVAS_A11Y_KEYS,
+  canvasAriaLabelConfig,
   edgeAccessibleName,
   identifyingNames,
   nodeAccessibleName,
@@ -18,6 +18,7 @@ import {
   withNodeAccessibility,
   componentNamesById,
   workStatePhrase,
+  type CanvasVoice,
   type CountText,
 } from './canvasAccessibility'
 import { projectArchitecture, type ArchitectureNode } from './graphProjection'
@@ -32,20 +33,25 @@ import { projectArchitecture, type ArchitectureNode } from './graphProjection'
  */
 
 /**
- * The counting function the canvas passes in, built from the **real**
- * catalogues.
+ * The voice the canvas passes in, built from the **real** catalogues.
  *
- * Not a stub: counted nouns are the one part of an accessible name that is
- * already localised (#40), and a hand-written double here would prove that the
- * plumbing works while saying nothing about whether `count.relationship`
- * exists or whether German and English pluralise the same number the same way.
+ * Not a stub, for both halves. Counted nouns are localised (#40) and a
+ * hand-written double would prove that the plumbing works while saying nothing
+ * about whether `count.relationship` exists or whether German and English
+ * pluralise the same number the same way. The sentences around them are
+ * localised too since #42, and a stubbed `t` would hide a key that is missing
+ * from a catalogue behind a plausible-looking string.
  */
-function countTextFor(language: Language): CountText {
+function voiceFor(language: Language): CanvasVoice {
   const instance = createI18n({ language })
-  return (noun, count) => instance.t(`count.${noun}`, { count, ns: 'common' })
+  const count: CountText = (noun, value) =>
+    instance.t(`count.${noun}`, { count: value, ns: 'common' })
+  return { t: instance.getFixedT(null, 'canvas'), count }
 }
 
-const countText = countTextFor('de')
+const voice = voiceFor('de')
+/** The German rendering of a canvas key, for readable expectations. */
+const say = (key: CanvasKey): string => voice.t(key)
 
 function nodesOf(components: readonly AppliedComponent[]): ArchitectureNode[] {
   return projectArchitecture({ components, relationships: [] }).nodes
@@ -68,14 +74,14 @@ function overlay(partial: Partial<ChangeOverlay> = {}): ChangeOverlay {
 describe('canvas accessibility — every node is named', () => {
   it('names a node after the reported component name and its kind', () => {
     const nodes = nodesOf(NESTED_COMPONENTS)
-    const names = identifyingNames(nodes, countText)
+    const names = identifyingNames(nodes, voice)
 
     expect(names.get('platform.db')).toBe('Orders DB, Datenspeicher')
     expect(names.get('external.payments')).toBe('Payment Provider, Extern')
   })
 
   it('tells a container apart from a leaf, with the number of components in it', () => {
-    const names = identifyingNames(nodesOf(NESTED_COMPONENTS), countText)
+    const names = identifyingNames(nodesOf(NESTED_COMPONENTS), voice)
 
     // `platform.core` holds `orders` and `billing`.
     expect(names.get('platform.core')).toBe('Core Services, Service, Container mit 2 Komponenten')
@@ -85,7 +91,7 @@ describe('canvas accessibility — every node is named', () => {
   })
 
   it('leaves the reported name, id and kind exactly as the agent reported them', () => {
-    const names = identifyingNames(nodesOf(NESTED_COMPONENTS), countText)
+    const names = identifyingNames(nodesOf(NESTED_COMPONENTS), voice)
     for (const component of NESTED_COMPONENTS) {
       expect(names.get(component.componentId)).toContain(component.name)
     }
@@ -109,7 +115,7 @@ describe('canvas accessibility — names stay unique', () => {
   it('qualifies two identically named components with their containers', () => {
     const names = identifyingNames(
       nodesOf(SAME_NAME_IN_TWO_CONTAINERS.map((one) => appliedComponent(one))),
-      countText,
+      voice,
     )
 
     expect(names.get('a.router')).toBe('Router, Modul, in API Gateway')
@@ -124,7 +130,7 @@ describe('canvas accessibility — names stay unique', () => {
     ]
     const names = identifyingNames(
       nodesOf(withCache.map((one) => appliedComponent(one))),
-      countText,
+      voice,
     )
 
     // `Cache` is unambiguous on its own and does not drag its container along.
@@ -142,7 +148,7 @@ describe('canvas accessibility — names stay unique', () => {
     ]
     const names = identifyingNames(
       nodesOf(deep.map((one) => appliedComponent(one))),
-      countText,
+      voice,
     )
 
     expect(names.get('eu.edge.router')).toBe('Router, Modul, in Edge, in EU')
@@ -157,7 +163,7 @@ describe('canvas accessibility — names stay unique', () => {
     ]
     const names = identifyingNames(
       nodesOf(siblings.map((one) => appliedComponent(one))),
-      countText,
+      voice,
     )
 
     expect(names.get('root.one')).toBe(
@@ -170,7 +176,7 @@ describe('canvas accessibility — names stay unique', () => {
 
   it('gives every node of the nested snapshot a distinct name', () => {
     const nodes = nodesOf(NESTED_COMPONENTS)
-    const names = [...identifyingNames(nodes, countText).values()]
+    const names = [...identifyingNames(nodes, voice).values()]
 
     expect(names).toHaveLength(nodes.length)
     expect(new Set(names).size).toBe(nodes.length)
@@ -180,35 +186,35 @@ describe('canvas accessibility — names stay unique', () => {
 describe('canvas accessibility — the reported work state, in words', () => {
   it('uses the one central definition and never a second vocabulary', () => {
     for (const definition of WORK_STATES) {
-      const phrase = workStatePhrase(overlay({ state: definition.id, operation: null }), countText)
-      expect(phrase[0]).toBe(definition.label)
+      const phrase = workStatePhrase(overlay({ state: definition.id, operation: null }), voice)
+      expect(phrase[0]).toBe(say(definition.labelKey))
     }
   })
 
   it('spells out the operation, so two states of the same colour differ in words', () => {
-    expect(workStatePhrase(overlay({ state: 'planned', operation: 'add' }), countText)).toEqual([
+    expect(workStatePhrase(overlay({ state: 'planned', operation: 'add' }), voice)).toEqual([
       'geplant · hinzufügen',
     ])
-    expect(workStatePhrase(overlay({ state: 'planned', operation: 'remove' }), countText)).toEqual([
+    expect(workStatePhrase(overlay({ state: 'planned', operation: 'remove' }), voice)).toEqual([
       'geplant · entfernen',
     ])
   })
 
   it('says explicitly when nothing was reported', () => {
-    expect(workStatePhrase(null, countText)).toEqual([CANVAS_A11Y_TEXT.noWorkState])
+    expect(workStatePhrase(null, voice)).toEqual([say(CANVAS_A11Y_KEYS.noWorkState)])
   })
 
   it('marks a proposal and a ghost as not being part of the applied model', () => {
-    expect(workStatePhrase(overlay({ presence: 'proposal' }), countText)).toContain(
-      CANVAS_A11Y_TEXT.proposalNote,
+    expect(workStatePhrase(overlay({ presence: 'proposal' }), voice)).toContain(
+      say(CANVAS_A11Y_KEYS.proposalNote),
     )
     expect(
-      workStatePhrase(overlay({ state: 'removed', operation: 'remove', presence: 'ghost' }), countText),
-    ).toContain(CANVAS_A11Y_TEXT.ghostNote)
+      workStatePhrase(overlay({ state: 'removed', operation: 'remove', presence: 'ghost' }), voice),
+    ).toContain(say(CANVAS_A11Y_KEYS.ghostNote))
   })
 
   it('counts the agents instead of dropping one of them', () => {
-    expect(workStatePhrase(overlay({ agentIds: ['a', 'b'] }), countText)).toContain(
+    expect(workStatePhrase(overlay({ agentIds: ['a', 'b'] }), voice)).toContain(
       '2 Agents melden dazu',
     )
   })
@@ -217,11 +223,11 @@ describe('canvas accessibility — the reported work state, in words', () => {
     const forbidden = /gut|schlecht|falsch|richtig|riskant|Fehler|Problem/i
     const spoken = [
       ...WORK_STATES.flatMap((definition) =>
-        workStatePhrase(overlay({ state: definition.id, operation: 'remove' }), countText),
+        workStatePhrase(overlay({ state: definition.id, operation: 'remove' }), voice),
       ),
-      CANVAS_A11Y_TEXT.graphInstructions,
-      CANVAS_A11Y_TEXT.nodeInstructions,
-      CANVAS_A11Y_TEXT.edgeInstructions,
+      say(CANVAS_A11Y_KEYS.graphInstructions),
+      say(CANVAS_A11Y_KEYS.nodeInstructions),
+      say(CANVAS_A11Y_KEYS.edgeInstructions),
     ]
     for (const text of spoken) expect(text).not.toMatch(forbidden)
   })
@@ -236,10 +242,10 @@ describe('canvas accessibility — the full node name', () => {
       data: { ...node.data, overlay: overlay({ state: 'active', operation: null }) },
     }
 
-    expect(nodeAccessibleName(withState, 'Orders DB, Datenspeicher', countText)).toBe(
+    expect(nodeAccessibleName(withState, 'Orders DB, Datenspeicher', voice)).toBe(
       'Orders DB, Datenspeicher, aktiv',
     )
-    expect(nodeAccessibleName(node, 'Orders DB, Datenspeicher', countText)).toBe(
+    expect(nodeAccessibleName(node, 'Orders DB, Datenspeicher', voice)).toBe(
       'Orders DB, Datenspeicher, kein Änderungsstatus gemeldet',
     )
   })
@@ -252,7 +258,7 @@ describe('canvas accessibility — the full node name', () => {
       data: { ...node.data, collapsed: true, hiddenDescendantCount: 3 },
     }
 
-    expect(nodeAccessibleName(closed, 'API Gateway, Service, Container mit 2 Komponenten', countText)).toBe(
+    expect(nodeAccessibleName(closed, 'API Gateway, Service, Container mit 2 Komponenten', voice)).toBe(
       'API Gateway, Service, Container mit 2 Komponenten, eingeklappt, 3 Komponenten verborgen, kein Änderungsstatus gemeldet',
     )
   })
@@ -271,9 +277,9 @@ describe('canvas accessibility — the full node name', () => {
       },
     }
 
-    const name = nodeAccessibleName(rolledUp, 'API Gateway, Service', countText)
+    const name = nodeAccessibleName(rolledUp, 'API Gateway, Service', voice)
     expect(name).toContain('aktiv')
-    expect(name).toContain(CANVAS_A11Y_TEXT.rolledUpNote)
+    expect(name).toContain(say(CANVAS_A11Y_KEYS.rolledUpNote))
   })
 
   it('keeps the group role, a role description and the current-item state', () => {
@@ -281,7 +287,7 @@ describe('canvas accessibility — the full node name', () => {
       nodesOf(NESTED_COMPONENTS).map((node) =>
         node.id === 'platform.db' ? { ...node, selected: true } : node,
       ),
-      countText,
+      voice,
     )
 
     for (const node of nodes) {
@@ -291,8 +297,8 @@ describe('canvas accessibility — the full node name', () => {
       expect(node.ariaLabel).toBeTruthy()
       expect(node.domAttributes?.['aria-roledescription']).toBe(
         node.data.isCompound
-          ? CANVAS_A11Y_TEXT.containerRoleDescription
-          : CANVAS_A11Y_TEXT.componentRoleDescription,
+          ? say(CANVAS_A11Y_KEYS.containerRoleDescription)
+          : say(CANVAS_A11Y_KEYS.componentRoleDescription),
       )
     }
 
@@ -306,16 +312,20 @@ describe('canvas accessibility — the full node name', () => {
   })
 
   it('names the disclosure control after the container it opens', () => {
-    expect(nodeDisclosureLabel('API Gateway', false, countText, 3)).toBe(
+    expect(nodeDisclosureLabel('API Gateway', false, voice, 3)).toBe(
       'Aufklappen: API Gateway (3 Komponenten)',
     )
-    expect(nodeDisclosureLabel('API Gateway', false, countText)).toBe('Aufklappen: API Gateway')
-    expect(nodeDisclosureLabel('API Gateway', true, countText)).toBe('Einklappen: API Gateway')
+    expect(nodeDisclosureLabel('API Gateway', false, voice)).toBe('Aufklappen: API Gateway')
+    expect(nodeDisclosureLabel('API Gateway', true, voice)).toBe('Einklappen: API Gateway')
   })
 
   it('takes the disclosure verbs from the collection #34 already owns', () => {
-    expect(nodeDisclosureLabel('X', false, countText)).toContain(DISCLOSURE_LABELS.expand)
-    expect(nodeDisclosureLabel('X', true, countText)).toContain(DISCLOSURE_LABELS.collapse)
+    expect(nodeDisclosureLabel('X', false, voice)).toContain(
+      say(DISCLOSURE_LABEL_KEYS.expand),
+    )
+    expect(nodeDisclosureLabel('X', true, voice)).toContain(
+      say(DISCLOSURE_LABEL_KEYS.collapse),
+    )
   })
 })
 
@@ -348,7 +358,7 @@ describe('canvas accessibility — edges are named from what they carry', () => 
     })
     const edge = model.edges[0]
     expect(edge).toBeDefined()
-    expect(edgeAccessibleName(edge!, names, countText)).toBe(
+    expect(edgeAccessibleName(edge!, names, voice)).toBe(
       'Beziehung von Orders zu Orders DB, Datenzugriff SELECT/INSERT, kein Änderungsstatus gemeldet',
     )
   })
@@ -375,7 +385,7 @@ describe('canvas accessibility — edges are named from what they carry', () => 
     const edge = model.edges[0]
     expect(edge).toBeDefined()
 
-    const label = edgeAccessibleName(edge!, names, countText)
+    const label = edgeAccessibleName(edge!, names, voice)
     expect(label).toContain('Sammelkante mit 2 Beziehungen')
     // Both topics stay individually announced — a bundle is a rendering, not a
     // merge (ADR 0008).
@@ -388,10 +398,10 @@ describe('canvas accessibility — edges are named from what they carry', () => 
       components: NESTED_COMPONENTS,
       relationships: [],
     })
-    for (const edge of withEdgeAccessibility(model.edges, names, countText)) {
+    for (const edge of withEdgeAccessibility(model.edges, names, voice)) {
       expect(edge.ariaLabel).toBeTruthy()
       expect(edge.domAttributes?.['aria-roledescription']).toBe(
-        CANVAS_A11Y_TEXT.relationshipRoleDescription,
+        say(CANVAS_A11Y_KEYS.relationshipRoleDescription),
       )
     }
   })
@@ -399,48 +409,56 @@ describe('canvas accessibility — edges are named from what they carry', () => 
 
 describe('canvas accessibility — the instructions describe what is really there', () => {
   it('replaces React Flow’s English defaults on both node description keys', () => {
-    expect(CANVAS_ARIA_LABEL_CONFIG['node.a11yDescription.default']).toBe(
-      CANVAS_A11Y_TEXT.nodeInstructions,
+    const config = canvasAriaLabelConfig(voice.t)
+    expect(config['node.a11yDescription.default']).toBe(
+      say(CANVAS_A11Y_KEYS.nodeInstructions),
     )
-    expect(CANVAS_ARIA_LABEL_CONFIG['node.a11yDescription.keyboardDisabled']).toBe(
-      CANVAS_A11Y_TEXT.nodeInstructions,
+    expect(config['node.a11yDescription.keyboardDisabled']).toBe(
+      say(CANVAS_A11Y_KEYS.nodeInstructions),
     )
   })
 
   it('never offers deleting or moving — the cockpit only observes', () => {
     const spoken = [
-      CANVAS_A11Y_TEXT.graphInstructions,
-      CANVAS_A11Y_TEXT.nodeInstructions,
-      CANVAS_A11Y_TEXT.edgeInstructions,
+      say(CANVAS_A11Y_KEYS.graphInstructions),
+      say(CANVAS_A11Y_KEYS.nodeInstructions),
+      say(CANVAS_A11Y_KEYS.edgeInstructions),
     ]
     for (const text of spoken) {
       expect(text.toLowerCase()).not.toContain('löschen')
       expect(text.toLowerCase()).not.toContain('verschieben')
     }
-    expect(CANVAS_A11Y_TEXT.nodeInstructions).toContain('Enter oder Leertaste')
-    expect(CANVAS_A11Y_TEXT.graphInstructions).toContain('Tabulatortaste')
+    expect(say(CANVAS_A11Y_KEYS.nodeInstructions)).toContain('Enter oder Leertaste')
+    expect(say(CANVAS_A11Y_KEYS.graphInstructions)).toContain('Tabulatortaste')
+
+    // …and they say the same thing in English, from the same keys.
+    const english = voiceFor('en')
+    expect(english.t(CANVAS_A11Y_KEYS.nodeInstructions)).toContain('Enter or Space')
+    expect(english.t(CANVAS_A11Y_KEYS.graphInstructions)).toContain('Tab')
   })
 })
 
 /**
- * Counted nouns come from the catalogues, in the reader's language.
- *
- * This is the one part of an accessible name that is already localised (#40 /
- * ADR 0019). The surrounding scaffolding is still German until #42 migrates the
- * `canvas` namespace — but a screen reader reading English must not hear
- * "1 Komponenten", and it must not hear a German plural either.
+ * Since #42 the whole accessible name follows the language: the counted nouns
+ * come from `common:count.*` (#40) and the scaffolding around them from
+ * `canvas:a11y.*`. A screen reader reading English must hear neither
+ * "1 Komponenten" nor "Container mit 2 components".
  */
-describe('canvas accessibility — the counting follows the language', () => {
+describe('canvas accessibility — the whole name follows the language', () => {
   const containerOf = (language: Language, childCount: number): string => {
     const nodes = nodesOf(NESTED_COMPONENTS)
     const node = nodes.find((one) => one.id === 'platform.core') as ArchitectureNode
     const sized: ArchitectureNode = { ...node, data: { ...node.data, childCount } }
-    return identifyingNames([sized], countTextFor(language)).get('platform.core') ?? ''
+    return identifyingNames([sized], voiceFor(language)).get('platform.core') ?? ''
   }
 
-  it('counts components in German and in English', () => {
+  it('counts components and names the container in each language', () => {
+    // The component name and its reported kind are the agent's; only the kind
+    // *word* and the scaffolding are ours.
     expect(containerOf('de', 2)).toBe('Core Services, Service, Container mit 2 Komponenten')
-    expect(containerOf('en', 2)).toBe('Core Services, Service, Container mit 2 components')
+    expect(containerOf('en', 2)).toBe(
+      'Core Services, Service, container holding 2 components',
+    )
   })
 
   it('uses the singular form of each language for exactly one', () => {
@@ -458,15 +476,15 @@ describe('canvas accessibility — the counting follows the language', () => {
       data: { ...node.data, collapsed: true, hiddenDescendantCount: 3 },
     }
 
-    expect(nodeAccessibleName(closed, 'API Gateway', countTextFor('de'))).toContain(
+    expect(nodeAccessibleName(closed, 'API Gateway', voiceFor('de'))).toContain(
       'eingeklappt, 3 Komponenten verborgen',
     )
-    expect(nodeAccessibleName(closed, 'API Gateway', countTextFor('en'))).toContain(
-      'eingeklappt, 3 components verborgen',
+    expect(nodeAccessibleName(closed, 'API Gateway', voiceFor('en'))).toContain(
+      'collapsed, 3 components hidden',
     )
   })
 
-  it('counts the relationships of a bundle — the key #40 had no caller for', () => {
+  it('counts and names the relationships of a bundle', () => {
     const topics = ['a', 'b'].map((channel, index) => ({
       relationshipId: `r-2${index}`,
       sourceComponentId: 'platform.core.orders' as const,
@@ -489,26 +507,32 @@ describe('canvas accessibility — the counting follows the language', () => {
     expect(edge).toBeDefined()
     const names = componentNamesById(model.nodes)
 
-    expect(edgeAccessibleName(edge!, names, countTextFor('de'))).toContain(
-      'Sammelkante mit 2 Beziehungen',
-    )
-    expect(edgeAccessibleName(edge!, names, countTextFor('en'))).toContain(
-      'Sammelkante mit 2 relationships',
-    )
+    const german = edgeAccessibleName(edge!, names, voiceFor('de'))
+    const english = edgeAccessibleName(edge!, names, voiceFor('en'))
+
+    expect(german).toContain('Sammelkante mit 2 Beziehungen')
+    expect(english).toContain('bundled edge with 2 relationships')
+    // The reported NATS topics themselves are identical in both languages.
+    for (const channel of ['a', 'b']) {
+      expect(german).toContain(`NATS-Topic ${channel}`)
+      expect(english).toContain(`NATS topic ${channel}`)
+    }
   })
 
   it('counts the agents behind one element, in both languages', () => {
     const twoAgents = overlay({ agentIds: ['a', 'b'] })
-    expect(workStatePhrase(twoAgents, countTextFor('de'))).toContain('2 Agents melden dazu')
-    expect(workStatePhrase(twoAgents, countTextFor('en'))).toContain('2 agents melden dazu')
+    expect(workStatePhrase(twoAgents, voiceFor('de'))).toContain('2 Agents melden dazu')
+    expect(workStatePhrase(twoAgents, voiceFor('en'))).toContain(
+      '2 agents are reporting on it',
+    )
   })
 
   it('names the disclosure control with a localised count', () => {
-    expect(nodeDisclosureLabel('Backend', false, countTextFor('de'), 10)).toBe(
+    expect(nodeDisclosureLabel('Backend', false, voiceFor('de'), 10)).toBe(
       'Aufklappen: Backend (10 Komponenten)',
     )
-    expect(nodeDisclosureLabel('Backend', false, countTextFor('en'), 10)).toBe(
-      'Aufklappen: Backend (10 components)',
+    expect(nodeDisclosureLabel('Backend', false, voiceFor('en'), 10)).toBe(
+      'Expand: Backend (10 components)',
     )
   })
 })

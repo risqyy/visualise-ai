@@ -10,7 +10,7 @@ import { PaneHeader } from '@/components/workspace/PaneHeader'
 import { AgentTree } from '@/components/workspace/runAgents/AgentTree'
 import { PlanRevisions } from '@/components/workspace/runAgents/PlanRevisions'
 import { RunSelector } from '@/components/workspace/runAgents/RunSelector'
-import { OUTCOME_LABEL } from '@/components/workspace/runAgents/reporting'
+import { OUTCOME_LABEL_KEY } from '@/components/workspace/runAgents/reporting'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import {
@@ -20,7 +20,7 @@ import {
 } from '@/components/ui/collapsible'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Separator } from '@/components/ui/separator'
-import { ReportedTime } from '@/i18n'
+import { ReportedText, ReportedTime } from '@/i18n'
 
 export interface RunAgentPaneProps {
   projectId: ProjectId
@@ -52,7 +52,9 @@ export interface RunAgentPaneProps {
  *    reported status — never elapsed time (#39, ADR 0014).
  */
 export function RunAgentPane({ projectId, runId }: RunAgentPaneProps) {
-  const { t } = useTranslation('common')
+  const { t } = useTranslation('agents')
+  const { t: tWorkspace } = useTranslation('workspace')
+  const { t: tCommon } = useTranslation('common')
   const runs = useRuns(projectId)
   const currentRun = useCurrentRun(projectId)
   const run = useRun(projectId, runId)
@@ -71,17 +73,19 @@ export function RunAgentPane({ projectId, runId }: RunAgentPaneProps) {
   return (
     <section
       className="pane-surface"
-      aria-label="Run- und Agent-Bereich"
+      aria-label={tWorkspace('pane.leftLabel')}
       data-testid="pane-run-agents"
       data-run-id={runId}
     >
-      <PaneHeader title="Runs und Agents" subtitle={projectId} />
+      <PaneHeader title={t('pane.title')} subtitle={<ReportedText value={projectId} />} />
 
       <ScrollArea className="min-h-0 flex-1">
         <div className="space-y-4 p-3">
           <Section
-            title="Runs"
-            count={runList.length > 0 ? `${runList.length} geladen` : null}
+            title={t('runs.title')}
+            count={
+              runList.length > 0 ? t('runs.loadedCount', { count: runList.length }) : null
+            }
           >
             <RunSelector
               projectId={projectId}
@@ -100,40 +104,40 @@ export function RunAgentPane({ projectId, runId }: RunAgentPaneProps) {
 
           <Separator />
 
-          <section aria-label="Gemeldeter Runzustand" data-testid="run-state">
-            <span className="pane-heading">Runzustand</span>
+          <section aria-label={t('runState.sectionLabel')} data-testid="run-state">
+            <span className="pane-heading">{t('runState.title')}</span>
             <div className="pt-1">
               <AsyncState
                 isPending={run.isPending}
                 isError={run.isError}
                 error={run.error}
-                emptyTitle="Run nicht verfügbar"
+                emptyTitle={t('runState.emptyTitle')}
                 onRetry={() => void run.refetch()}
                 skeletonRows={2}
               >
                 {run.data && (
                   <dl className="space-y-0.5 text-xs">
-                    <Row label="Run">
-                      <span className="pane-meta">{run.data.run.runId}</span>
+                    <Row label={t('runState.runLabel')}>
+                      <ReportedText value={run.data.run.runId} className="pane-meta" />
                     </Row>
-                    <Row label="Zustand">
+                    <Row label={t('runState.stateLabel')}>
                       <span
                         data-testid="run-openness"
                         data-open={run.data.run.isOpen ? 'true' : 'false'}
                       >
                         {run.data.run.isOpen
-                          ? 'offen — kein Terminalereignis gemeldet'
-                          : `beendet: ${
-                              run.data.run.outcome
-                                ? OUTCOME_LABEL[run.data.run.outcome]
-                                : 'ohne gemeldetes Ergebnis'
-                            }`}
+                          ? t('runs.openState')
+                          : t('runs.finishedState', {
+                              outcome: run.data.run.outcome
+                                ? t(OUTCOME_LABEL_KEY[run.data.run.outcome])
+                                : t('runs.noOutcome'),
+                            })}
                       </span>
                     </Row>
-                    <Row label="Beginn">
+                    <Row label={t('runState.startLabel')}>
                       <ReportedTime value={run.data.run.startedAt} className="pane-meta" />
                     </Row>
-                    <Row label="Ende">
+                    <Row label={t('runState.endLabel')}>
                       {/*
                         A timestamp is metadata and may be 11 px; "nothing was
                         reported" is a sentence and is not (#39).
@@ -141,13 +145,13 @@ export function RunAgentPane({ projectId, runId }: RunAgentPaneProps) {
                       {run.data.run.finishedAt ? (
                         <ReportedTime value={run.data.run.finishedAt} className="pane-meta" />
                       ) : (
-                        <span className="text-muted-foreground">kein Ende gemeldet</span>
+                        <span className="text-muted-foreground">{t('runState.noEnd')}</span>
                       )}
                     </Row>
-                    <Row label="Umfang">
-                      {t('count.agent', { count: run.data.run.counts.agents })} ·{' '}
-                      {t('count.plan', { count: run.data.run.counts.plans })} ·{' '}
-                      {t('count.workStep', { count: run.data.run.counts.workSteps })}
+                    <Row label={t('runState.scopeLabel')}>
+                      {tCommon('count.agent', { count: run.data.run.counts.agents })} ·{' '}
+                      {tCommon('count.plan', { count: run.data.run.counts.plans })} ·{' '}
+                      {tCommon('count.workStep', { count: run.data.run.counts.workSteps })}
                     </Row>
                   </dl>
                 )}
@@ -157,12 +161,12 @@ export function RunAgentPane({ projectId, runId }: RunAgentPaneProps) {
 
           <Separator />
 
-          <section aria-label="Agenthierarchie" data-testid="agent-tree-region">
+          <section aria-label={t('tree.label')} data-testid="agent-tree-region">
             <div className="flex items-center justify-between gap-2">
-              <span className="pane-heading">Agenthierarchie</span>
+              <span className="pane-heading">{t('tree.label')}</span>
               {agents.isSuccess && (
                 <Badge variant="outline" className="font-normal">
-                  {agentList.length} gemeldet
+                  {t('tree.reportedCount', { count: agentList.length })}
                 </Badge>
               )}
             </div>
@@ -173,8 +177,11 @@ export function RunAgentPane({ projectId, runId }: RunAgentPaneProps) {
                 isError={agents.isError}
                 error={agents.error}
                 isEmpty={agentList.length === 0}
-                emptyTitle="Keine Agents gemeldet"
-                emptyDescription={`Für Run ${runId} liegt noch kein agent.started-Ereignis vor.`}
+                emptyTitle={t('tree.emptyTitle')}
+                // `runId` is reported data. `EmptyState.description` is a
+                // string, so it is interpolated rather than wrapped, which
+                // i18next passes through byte for byte (ADR 0014).
+                emptyDescription={t('tree.emptyDescription', { runId })}
                 onRetry={() => void agents.refetch()}
                 skeletonRows={4}
               >
@@ -189,14 +196,17 @@ export function RunAgentPane({ projectId, runId }: RunAgentPaneProps) {
 
           <Separator />
 
-          <Section title="Pläne" count={planList.length > 0 ? `${planList.length}` : null}>
+          <Section
+            title={t('plans.title')}
+            count={planList.length > 0 ? `${planList.length}` : null}
+          >
             <AsyncState
               isPending={plans.isPending}
               isError={plans.isError}
               error={plans.error}
               isEmpty={planList.length === 0}
-              emptyTitle="Kein Plan veröffentlicht"
-              emptyDescription={`Für Run ${runId} liegt noch kein plan.published-Ereignis vor.`}
+              emptyTitle={t('plans.emptyTitle')}
+              emptyDescription={t('plans.emptyDescription', { runId })}
               onRetry={() => void plans.refetch()}
               skeletonRows={3}
             >

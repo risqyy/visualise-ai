@@ -47,13 +47,24 @@ function DialogOverlay({
   )
 }
 
+/**
+ * Accessible name of the close control.
+ *
+ * shadcn ships `<span className="sr-only">Close</span>` hard-coded, which is the
+ * only English text the cockpit ever rendered in German (#42). It is a required
+ * prop rather than a defaulted one on purpose: a default would be a literal in
+ * this file again, and the whole point is that this component has no words of
+ * its own. The caller passes `t('common:action.close')`.
+ */
 function DialogContent({
   className,
   children,
   showCloseButton = true,
+  closeLabel,
   ...props
 }: React.ComponentProps<typeof DialogPrimitive.Content> & {
   showCloseButton?: boolean
+  closeLabel: string
 }) {
   return (
     <DialogPortal data-slot="dialog-portal">
@@ -73,7 +84,7 @@ function DialogContent({
             className="absolute top-4 right-4 rounded-xs opacity-70 ring-offset-background transition-opacity hover:opacity-100 focus:ring-2 focus:ring-ring focus:ring-offset-2 focus:outline-hidden disabled:pointer-events-none data-[state=open]:bg-accent data-[state=open]:text-muted-foreground [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4"
           >
             <XIcon />
-            <span className="sr-only">Close</span>
+            <span className="sr-only">{closeLabel}</span>
           </DialogPrimitive.Close>
         )}
       </DialogPrimitive.Content>
@@ -94,10 +105,13 @@ function DialogHeader({ className, ...props }: React.ComponentProps<"div">) {
 function DialogFooter({
   className,
   showCloseButton = false,
+  closeLabel,
   children,
   ...props
 }: React.ComponentProps<"div"> & {
   showCloseButton?: boolean
+  /** Required whenever `showCloseButton` is set; see `DialogContent`. */
+  closeLabel?: string
 }) {
   return (
     <div
@@ -109,9 +123,9 @@ function DialogFooter({
       {...props}
     >
       {children}
-      {showCloseButton && (
+      {showCloseButton && closeLabel !== undefined && (
         <DialogPrimitive.Close asChild>
-          <Button variant="outline">Close</Button>
+          <Button variant="outline">{closeLabel}</Button>
         </DialogPrimitive.Close>
       )}
     </div>

@@ -1,4 +1,5 @@
 import { Radio, RefreshCw, WifiOff } from 'lucide-react'
+import { useTranslation } from 'react-i18next'
 
 import type { LiveConnectionState } from '@/api/liveStream'
 import { Badge } from '@/components/ui/badge'
@@ -7,40 +8,44 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from '@/components/ui/tooltip'
+import { ReportedText, type WorkspaceKey } from '@/i18n'
 import { cn } from '@/lib/utils'
 import { useLiveConnectionStore } from '@/state/liveConnectionStore'
 
+/**
+ * The four connection states, as icon, colour and **translation keys**.
+ *
+ * `connecting`, `live`, `reconnecting` and `offline` on the left are the states
+ * of the SSE client and never change; the words on the right are the cockpit's
+ * own vocabulary and come from the catalogue (#42).
+ */
 const PRESENTATION: Record<
   LiveConnectionState,
-  { label: string; icon: typeof Radio; className: string; hint: string }
+  { labelKey: WorkspaceKey; icon: typeof Radio; className: string; hintKey: WorkspaceKey }
 > = {
   connecting: {
-    label: 'verbindet',
+    labelKey: 'live.connectingLabel',
     icon: RefreshCw,
     className: 'text-live-reconnecting',
-    hint: 'Die Live-Verbindung wird aufgebaut.',
+    hintKey: 'live.connectingHint',
   },
   live: {
-    label: 'live',
+    labelKey: 'live.liveLabel',
     icon: Radio,
     className: 'text-live-connected',
-    hint: 'Ereignisse treffen in Echtzeit ein.',
+    hintKey: 'live.liveHint',
   },
   reconnecting: {
-    label: 'verbindet neu',
+    labelKey: 'live.reconnectingLabel',
     icon: RefreshCw,
     className: 'text-live-reconnecting',
-    hint:
-      'Die Live-Verbindung ist unterbrochen und wird ab der zuletzt gesehenen Position ' +
-      'fortgesetzt. Die angezeigten Daten bleiben erhalten.',
+    hintKey: 'live.reconnectingHint',
   },
   offline: {
-    label: 'offline',
+    labelKey: 'live.offlineLabel',
     icon: WifiOff,
     className: 'text-live-offline',
-    hint:
-      'Keine Live-Verbindung. Angezeigt wird der zuletzt geladene Stand — er wird ' +
-      'nicht mehr aktualisiert.',
+    hintKey: 'live.offlineHint',
   },
 }
 
@@ -51,10 +56,12 @@ const PRESENTATION: Record<
  * last loaded snapshot, which is what the acceptance criteria require.
  */
 export function LiveConnectionBadge({ className }: { className?: string }) {
+  const { t } = useTranslation('workspace')
   const state = useLiveConnectionStore((store) => store.state)
   const lastEventPosition = useLiveConnectionStore((store) => store.lastEventPosition)
   const presentation = PRESENTATION[state]
   const Icon = presentation.icon
+  const label = t(presentation.labelKey)
 
   return (
     <Tooltip>
@@ -64,7 +71,7 @@ export function LiveConnectionBadge({ className }: { className?: string }) {
           className={cn('gap-1.5 font-normal', className)}
           data-testid="live-connection-state"
           data-state={state}
-          aria-label={`Live-Verbindung: ${presentation.label}`}
+          aria-label={t('live.label', { state: label })}
         >
           <Icon
             aria-hidden="true"
@@ -74,14 +81,16 @@ export function LiveConnectionBadge({ className }: { className?: string }) {
               state === 'reconnecting' || state === 'connecting' ? 'animate-spin' : '',
             )}
           />
-          {presentation.label}
+          {label}
         </Badge>
       </TooltipTrigger>
       <TooltipContent className="max-w-xs">
-        <p>{presentation.hint}</p>
+        <p>{t(presentation.hintKey)}</p>
         {lastEventPosition !== null && (
           <p className="mt-1 opacity-80">
-            Zuletzt verarbeitete Position: {lastEventPosition}
+            {/* The position is the server's own event number — reported data. */}
+            {t('live.lastPositionLabel')}{' '}
+            <ReportedText value={String(lastEventPosition)} />
           </p>
         )}
       </TooltipContent>

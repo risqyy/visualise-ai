@@ -1,8 +1,7 @@
 import { useId, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 
 import { cn } from '@/lib/utils'
-
-import { AGENT_PANE_TEXT, textToggleLabel } from './paneText'
 
 /**
  * A reported text that is **clipped, never shortened**.
@@ -44,10 +43,10 @@ const CLAMP_CLASS = {
   3: 'line-clamp-3',
 } as const
 
-export interface ReportedTextProps {
+export interface ClippedReportedTextProps {
   /** The reported string, quoted verbatim. */
   text: string
-  /** Names the reported text in the control's accessible name. */
+  /** Already-translated name of *which* reported text this is. */
   subject: string
   /** Whose report it is; also part of the accessible name. */
   agentName: string
@@ -56,13 +55,21 @@ export interface ReportedTextProps {
   testId: string
 }
 
-export function ReportedText({
+/**
+ * Named `ClippedReportedText` since #42, so it cannot be confused with the
+ * one-element `<ReportedText>` of `src/i18n`. Both mark reported data — this
+ * one adds the clipping and the disclosure control, and it emits the same
+ * `translate="no"` / `data-reported` pair, so a task description is out of
+ * reach of a browser's own page translation as well.
+ */
+export function ClippedReportedText({
   text,
   subject,
   agentName,
   lines,
   testId,
-}: ReportedTextProps) {
+}: ClippedReportedTextProps) {
+  const { t } = useTranslation('agents')
   const [expanded, setExpanded] = useState(false)
   const textId = useId()
 
@@ -76,6 +83,8 @@ export function ReportedText({
         data-testid={testId}
         data-clipped={clipped ? 'true' : 'false'}
         data-full-length={text.length}
+        translate="no"
+        data-reported=""
         className={cn('block', clipped && CLAMP_CLASS[lines])}
       >
         {text}
@@ -85,7 +94,12 @@ export function ReportedText({
           type="button"
           aria-expanded={expanded}
           aria-controls={textId}
-          aria-label={textToggleLabel(subject, agentName, expanded)}
+          // Both the subject and the reported agent name are interpolated into
+          // one sentence per language: the word order differs between them.
+          aria-label={t(expanded ? 'row.textCollapse' : 'row.textExpand', {
+            subject,
+            agent: agentName,
+          })}
           data-testid={`${testId}-toggle`}
           onClick={() => setExpanded((current) => !current)}
           className={cn(
@@ -94,7 +108,7 @@ export function ReportedText({
             'focus-visible:ring-2 focus-visible:outline-none',
           )}
         >
-          {expanded ? AGENT_PANE_TEXT.showLessText : AGENT_PANE_TEXT.showFullText}
+          {expanded ? t('row.showLess') : t('row.showFull')}
         </button>
       )}
     </>

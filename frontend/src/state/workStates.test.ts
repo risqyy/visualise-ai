@@ -1,5 +1,8 @@
 import { describe, expect, it } from 'vitest'
 
+import { MISSING_KEY_PREFIX } from '@/i18n'
+import { translateWith } from '@/test/translate'
+
 import { WORK_STATE_BY_ID, resolveWorkState } from './workStates'
 
 describe('resolveWorkState', () => {
@@ -50,9 +53,16 @@ describe('resolveWorkState', () => {
     ).toBe('active')
   })
 
-  it('exposes a label for every state', () => {
-    for (const definition of Object.values(WORK_STATE_BY_ID)) {
-      expect(definition.label.length).toBeGreaterThan(0)
+  it('exposes a label for every state, in both languages', () => {
+    // The label is the colour-independent channel, so it may not be missing in
+    // either catalogue — and a bare key would not be a label.
+    for (const language of ['de', 'en'] as const) {
+      const t = translateWith('canvas', language)
+      for (const definition of Object.values(WORK_STATE_BY_ID)) {
+        const label = t(definition.labelKey)
+        expect(label.length).toBeGreaterThan(0)
+        expect(label).not.toContain(MISSING_KEY_PREFIX)
+      }
     }
   })
 })

@@ -11,7 +11,10 @@ import {
   type LucideIcon,
 } from 'lucide-react'
 
+import type { TFunction } from 'i18next'
+
 import type { Component, ComponentKind, Technology } from '@/api/types'
+import type { CanvasKey } from '@/i18n'
 
 import { reported } from './relationshipKinds'
 
@@ -25,24 +28,35 @@ import { reported } from './relationshipKinds'
  */
 export interface ComponentKindStyle {
   id: ComponentKind
-  label: string
+  /**
+   * Key of the badge text. `null` for a kind the contract gained after this
+   * table was written — that one is drawn with its reported value, because a
+   * word the cockpit does not know is still a fact the agent reported.
+   */
+  labelKey: CanvasKey | null
   icon: LucideIcon
 }
 
 export const COMPONENT_KIND_STYLES: Record<ComponentKind, ComponentKindStyle> = {
-  system: { id: 'system', label: 'System', icon: Boxes },
-  service: { id: 'service', label: 'Service', icon: Server },
-  module: { id: 'module', label: 'Modul', icon: Package },
-  datastore: { id: 'datastore', label: 'Datenspeicher', icon: Database },
-  queue: { id: 'queue', label: 'Queue', icon: Inbox },
-  topic: { id: 'topic', label: 'Topic', icon: Radio },
-  ui: { id: 'ui', label: 'UI', icon: Layers },
-  external: { id: 'external', label: 'Extern', icon: Globe },
-  library: { id: 'library', label: 'Bibliothek', icon: Library },
+  system: { id: 'system', labelKey: 'componentKind.system', icon: Boxes },
+  service: { id: 'service', labelKey: 'componentKind.service', icon: Server },
+  module: { id: 'module', labelKey: 'componentKind.module', icon: Package },
+  datastore: { id: 'datastore', labelKey: 'componentKind.datastore', icon: Database },
+  queue: { id: 'queue', labelKey: 'componentKind.queue', icon: Inbox },
+  topic: { id: 'topic', labelKey: 'componentKind.topic', icon: Radio },
+  ui: { id: 'ui', labelKey: 'componentKind.ui', icon: Layers },
+  external: { id: 'external', labelKey: 'componentKind.external', icon: Globe },
+  library: { id: 'library', labelKey: 'componentKind.library', icon: Library },
 }
 
 export function componentKindStyle(kind: ComponentKind): ComponentKindStyle {
-  return COMPONENT_KIND_STYLES[kind] ?? { id: kind, label: kind, icon: Package }
+  return COMPONENT_KIND_STYLES[kind] ?? { id: kind, labelKey: null, icon: Package }
+}
+
+/** Badge text of a component kind; the reported value when we have no word. */
+export function componentKindLabel(kind: ComponentKind, t: TFunction<'canvas'>): string {
+  const key = componentKindStyle(kind).labelKey
+  return key === null ? kind : t(key)
 }
 
 /**

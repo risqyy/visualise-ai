@@ -1,5 +1,6 @@
 {
   "action": {
+    "close": "Schließen",
     "retry": "Erneut versuchen"
   },
   "count": {
@@ -29,7 +30,8 @@
     "workStep_other": "{{count, number}} Arbeitsschritte"
   },
   "state": {
-    "loading": "Daten werden geladen…"
+    "loading": "Daten werden geladen…",
+    "loadingMore": "Lädt…"
   },
   "time": {
     "notReported": "nicht gemeldet",

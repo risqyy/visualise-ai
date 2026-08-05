@@ -12,7 +12,8 @@
     "test": "vitest run",
     "generate:contract": "node scripts/generate-contract.mjs",
     "check:contract": "node scripts/generate-contract.mjs --check",
-    "check:locales": "node scripts/check-locales.mjs"
+    "check:locales": "node scripts/check-locales.mjs",
+    "check:ui-strings": "node scripts/check-ui-strings.mjs"
   },
   "dependencies": {
     "@tanstack/react-query": "^5.101.4",

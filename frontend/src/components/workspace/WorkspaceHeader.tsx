@@ -1,11 +1,13 @@
 import { Link } from '@tanstack/react-router'
 import { PanelLeftClose, PanelLeftOpen, PanelRightClose, PanelRightOpen } from 'lucide-react'
+import { useTranslation } from 'react-i18next'
 
 import type { ProjectId, RunId } from '@/api/types'
 import { LiveConnectionBadge } from '@/components/LiveConnectionBadge'
 import { Button } from '@/components/ui/button'
 import { Separator } from '@/components/ui/separator'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
+import { ReportedText } from '@/i18n'
 import { useUiStore } from '@/state/uiStore'
 
 export interface WorkspaceHeaderProps {
@@ -18,9 +20,11 @@ export interface WorkspaceHeaderProps {
  * two independent pane toggles.
  *
  * The project is shown as its slug. The contract carries no display name for a
- * project, and the cockpit does not invent one.
+ * project, and the cockpit does not invent one — so the slug and the run id go
+ * through `ReportedText` rather than through the catalogue.
  */
 export function WorkspaceHeader({ projectId, runId }: WorkspaceHeaderProps) {
+  const { t } = useTranslation('workspace')
   const leftCollapsed = useUiStore((state) => state.leftCollapsed)
   const rightCollapsed = useUiStore((state) => state.rightCollapsed)
   const toggleLeft = useUiStore((state) => state.toggleLeftCollapsed)
@@ -29,7 +33,7 @@ export function WorkspaceHeader({ projectId, runId }: WorkspaceHeaderProps) {
   return (
     <header className="border-border bg-card flex h-11 shrink-0 items-center gap-3 border-b px-3">
       <PaneToggle
-        label="Run- und Agent-Bereich"
+        label={t('pane.leftLabel')}
         collapsed={leftCollapsed}
         onToggle={toggleLeft}
         openIcon={PanelLeftClose}
@@ -38,28 +42,34 @@ export function WorkspaceHeader({ projectId, runId }: WorkspaceHeaderProps) {
 
       <Separator orientation="vertical" className="h-5" />
 
-      <nav aria-label="Kontext" className="flex min-w-0 items-baseline gap-2">
+      <nav
+        aria-label={t('header.contextLabel')}
+        className="flex min-w-0 items-baseline gap-2"
+      >
         <Link
           to="/projects"
           className="text-muted-foreground hover:text-foreground rounded-sm text-xs"
         >
-          Projekte
+          {t('header.projectsLink')}
         </Link>
         <span aria-hidden="true" className="text-muted-foreground text-xs">
           /
         </span>
-        <span className="truncate font-mono text-sm font-medium">{projectId}</span>
+        <ReportedText value={projectId} className="truncate font-mono text-sm font-medium" />
         <span aria-hidden="true" className="text-muted-foreground text-xs">
           /
         </span>
-        <span className="text-muted-foreground truncate font-mono text-xs">{runId}</span>
+        <ReportedText
+          value={runId}
+          className="text-muted-foreground truncate font-mono text-xs"
+        />
       </nav>
 
       <div className="ml-auto flex shrink-0 items-center gap-2">
         <LiveConnectionBadge />
         <Separator orientation="vertical" className="h-5" />
         <PaneToggle
-          label="Inspector"
+          label={t('pane.rightLabel')}
           collapsed={rightCollapsed}
           onToggle={toggleRight}
           openIcon={PanelRightClose}
@@ -83,8 +93,15 @@ function PaneToggle({
   openIcon: typeof PanelLeftClose
   closedIcon: typeof PanelLeftOpen
 }) {
+  const { t } = useTranslation('workspace')
   const Icon = collapsed ? ClosedIcon : OpenIcon
-  const action = collapsed ? 'ausklappen' : 'einklappen'
+  // The pane's own name is interpolated into a whole sentence rather than
+  // concatenated with a verb: German puts the verb last ("Inspector
+  // ausklappen"), English puts it first ("Expand the inspector"), and only one
+  // sentence per language can carry both.
+  const tooltip = collapsed
+    ? t('pane.expand', { pane: label })
+    : t('pane.collapse', { pane: label })
 
   return (
     <Tooltip>
@@ -100,9 +117,7 @@ function PaneToggle({
           <Icon aria-hidden="true" />
         </Button>
       </TooltipTrigger>
-      <TooltipContent>
-        {label} {action}
-      </TooltipContent>
+      <TooltipContent>{tooltip}</TooltipContent>
     </Tooltip>
   )
 }

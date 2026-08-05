@@ -1,3 +1,5 @@
+import type { TFunction } from 'i18next'
+
 import {
   changeSnapshot,
   type ActiveChange,
@@ -12,6 +14,7 @@ import {
   type RunId,
   type Timestamp,
 } from '@/api/types'
+import type { CanvasKey } from '@/i18n'
 import {
   openWorkSteps as openWorkStepsOf,
   recentAppliedChanges,
@@ -59,8 +62,15 @@ export interface OverlayContribution {
   position: number
   /** Change id, work step id, or `null` when the agent reported none. */
   reference: Identifier | null
-  /** Short human-readable description of what was reported. */
-  detail: string
+  /**
+   * Title of the work step, exactly as the agent reported it. `null` for the
+   * two change sources, which report an `operation` instead.
+   *
+   * This module used to assemble a German sentence here. It no longer does:
+   * building the words is `overlayTitle`'s job, so the *data* stays free of a
+   * language and the reported title travels through untouched (#42).
+   */
+  workStepTitle: string | null
 }
 
 export interface ChangeOverlay {
@@ -124,21 +134,22 @@ export const EMPTY_OVERLAY_MODEL: ChangeOverlayModel = {
 }
 
 /**
- * German verbs for the three contract operations.
+ * Verbs for the three contract operations, as translation keys.
  *
- * They describe the operation and nothing else. No word here may suggest a
- * verdict: the cockpit reports what an agent is doing, it does not grade it.
+ * They describe the operation and nothing else. No word behind these keys may
+ * suggest a verdict: the cockpit reports what an agent is doing, it does not
+ * grade it.
  */
-export const CHANGE_OPERATION_LABELS: Record<ChangeOperation, string> = {
-  add: 'hinzufügen',
-  modify: 'ändern',
-  remove: 'entfernen',
+export const CHANGE_OPERATION_LABEL_KEYS: Record<ChangeOperation, CanvasKey> = {
+  add: 'overlay.operation.add',
+  modify: 'overlay.operation.modify',
+  remove: 'overlay.operation.remove',
 }
 
-export const CHANGE_OPERATION_PARTICIPLES: Record<ChangeOperation, string> = {
-  add: 'hinzugefügt',
-  modify: 'geändert',
-  remove: 'entfernt',
+export const CHANGE_OPERATION_PARTICIPLE_KEYS: Record<ChangeOperation, CanvasKey> = {
+  add: 'overlay.applied.add',
+  modify: 'overlay.applied.modify',
+  remove: 'overlay.applied.remove',
 }
 
 /**
@@ -148,13 +159,14 @@ export const CHANGE_OPERATION_PARTICIPLES: Record<ChangeOperation, string> = {
  * same border style; the operation is what tells them apart, so it is spelled
  * out rather than encoded.
  */
-export function overlayLabel(overlay: ChangeOverlay): string {
-  const state = WORK_STATE_BY_ID[overlay.state].label
+export function overlayLabel(overlay: ChangeOverlay, t: TFunction<'canvas'>): string {
+  const state = t(WORK_STATE_BY_ID[overlay.state].labelKey)
   if (overlay.operation === null) return state
-  const operation =
+  const operation = t(
     overlay.state === 'planned'
-      ? CHANGE_OPERATION_LABELS[overlay.operation]
-      : CHANGE_OPERATION_PARTICIPLES[overlay.operation]
+      ? CHANGE_OPERATION_LABEL_KEYS[overlay.operation]
+      : CHANGE_OPERATION_PARTICIPLE_KEYS[overlay.operation],
+  )
   return `${state} · ${operation}`
 }
 
@@ -195,22 +207,42 @@ export function dominantOverlay(
  * summarised into one. The text is plain prose and states phases only — it
  * never says whether a change is good, risky or right.
  */
-export function overlayTitle(overlay: ChangeOverlay): string {
+export function overlayTitle(overlay: ChangeOverlay, t: TFunction<'canvas'>): string {
   const definition = WORK_STATE_BY_ID[overlay.state]
-  const lines = [`${overlayLabel(overlay)} — ${definition.description}`]
+  const lines = [`${overlayLabel(overlay, t)} — ${t(definition.descriptionKey)}`]
   if (overlay.presence === 'proposal') {
-    lines.push('Vorschlag: nicht Teil des angewandten Architekturmodells.')
+    lines.push(t('overlay.proposalNote'))
   }
   if (overlay.presence === 'ghost') {
-    lines.push('Nicht mehr Teil des angewandten Architekturmodells.')
+    lines.push(t('overlay.ghostNote'))
   }
   if (overlay.agentIds.length > 1) {
-    lines.push(`${overlay.agentIds.length} Agents melden zu diesem Element:`)
+    lines.push(t('overlay.agentsReportingCount', { count: overlay.agentIds.length }))
   }
   for (const contribution of overlay.contributions) {
-    lines.push(`• ${contribution.agentId}: ${contribution.detail}`)
+    // The agent id and the work-step title are reported values and are
+    // interpolated, never rewritten — a `title` attribute has no room for an
+    // element, so this is the interpolation half of the contract (ADR 0014).
+    lines.push(`• ${contribution.agentId}: ${contributionDetail(contribution, t)}`)
   }
   return lines.join('\n')
+}
+
+/** One reported contribution as a sentence. Reported parts stay verbatim. */
+function contributionDetail(
+  contribution: OverlayContribution,
+  t: TFunction<'canvas'>,
+): string {
+  if (contribution.source === 'work_step') {
+    return t('overlay.workStepRunning', { title: contribution.workStepTitle ?? '' })
+  }
+  const operation = contribution.operation
+  if (operation === null) return t('overlay.workStepRunning', { title: '' })
+  return contribution.source === 'planned_change'
+    ? t('overlay.changePlanned', { operation: t(CHANGE_OPERATION_LABEL_KEYS[operation]) })
+    : t('overlay.changeApplied', {
+        operation: t(CHANGE_OPERATION_PARTICIPLE_KEYS[operation]),
+      })
 }
 
 export interface ChangeOverlayInput {
@@ -287,7 +319,7 @@ export function buildChangeOverlays(input: ChangeOverlayInput): ChangeOverlayMod
       at: change.plannedAt ?? '',
       position: change.position,
       reference: change.changeId,
-      detail: `Änderung angekündigt: ${CHANGE_OPERATION_LABELS[change.operation]}`,
+      workStepTitle: null,
     })
     recordChange(
       draft,
@@ -309,7 +341,7 @@ export function buildChangeOverlays(input: ChangeOverlayInput): ChangeOverlayMod
       at: entry.occurredAt,
       position: entry.position,
       reference: entry.changeId,
-      detail: `Änderung angewandt: ${CHANGE_OPERATION_PARTICIPLES[entry.operation]}`,
+      workStepTitle: null,
     })
     recordChange(draft, 'applied', entry.operation, entry.position, entry.snapshot)
   }
@@ -327,7 +359,7 @@ export function buildChangeOverlays(input: ChangeOverlayInput): ChangeOverlayMod
         at: step.occurredAt,
         position: step.position,
         reference: step.workStepId,
-        detail: `Arbeitsschritt läuft: ${step.title}`,
+        workStepTitle: step.title,
       })
     }
   }

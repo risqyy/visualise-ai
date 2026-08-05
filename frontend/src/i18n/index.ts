@@ -20,6 +20,15 @@ export {
   resolveInitialLanguage,
 } from './languages'
 export type { Language } from './languages'
+export type {
+  AgentsKey,
+  CanvasKey,
+  CommonKey,
+  ErrorsKey,
+  InspectorKey,
+  ProjectsKey,
+  WorkspaceKey,
+} from './keys'
 export { DEFAULT_NAMESPACE, NAMESPACES } from './resources'
 export type { AppResources, Namespace } from './resources'
 export { ReportedText } from './ReportedText'

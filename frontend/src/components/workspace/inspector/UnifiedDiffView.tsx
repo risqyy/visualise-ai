@@ -1,5 +1,7 @@
 import { useMemo } from 'react'
+import { useTranslation } from 'react-i18next'
 
+import { ReportedText, type InspectorKey } from '@/i18n'
 import { cn } from '@/lib/utils'
 
 import { formatDiffStat } from './formatting'
@@ -31,12 +33,12 @@ const LINE_CLASSES: Record<DiffLineKind, string> = {
 }
 
 /** Screen-reader prefix, so a diff is not read as one run-on paragraph. */
-const LINE_ROLE_LABELS: Record<DiffLineKind, string> = {
-  addition: 'hinzugefügt',
-  removal: 'entfernt',
-  context: 'unverändert',
-  hunk: 'Abschnitt',
-  meta: 'Kopfzeile',
+const LINE_ROLE_LABEL_KEY: Record<DiffLineKind, InspectorKey> = {
+  addition: 'diff.lineAddition',
+  removal: 'diff.lineRemoval',
+  context: 'diff.lineContext',
+  hunk: 'diff.lineHunk',
+  meta: 'diff.lineMeta',
 }
 
 export interface UnifiedDiffViewProps {
@@ -50,6 +52,7 @@ export function UnifiedDiffView({
   unifiedDiff,
   className,
 }: UnifiedDiffViewProps) {
+  const { t } = useTranslation('inspector')
   const parsed = useMemo(() => parseUnifiedDiff(unifiedDiff), [unifiedDiff])
 
   return (
@@ -60,7 +63,8 @@ export function UnifiedDiffView({
     >
       <figcaption className="bg-muted/50 border-border flex items-center gap-2 border-b px-2 py-1">
         <code className="min-w-0 flex-1 truncate font-mono text-xs" title={filePath}>
-          {filePath}
+          {/* A repository path. Never translated, never normalised. */}
+          <ReportedText value={filePath} />
         </code>
         <span className="text-2xs shrink-0 tabular-nums">
           <span className="text-state-applied">+{parsed.additions}</span>
@@ -68,11 +72,21 @@ export function UnifiedDiffView({
           <span className="text-state-removed">−{parsed.removals}</span>
         </span>
         <span className="sr-only">
-          {formatDiffStat(parsed.additions, parsed.removals)} in {filePath}
+          {t('diff.stat', {
+            stat: formatDiffStat(parsed.additions, parsed.removals),
+          })}{' '}
+          <ReportedText value={filePath} />
         </span>
       </figcaption>
 
-      <div className="max-h-[28rem] overflow-auto">
+      {/*
+        The diff body is source code, so the whole box is marked `translate="no"`
+        against a browser's own page translation. It deliberately does **not**
+        carry `data-reported`: the box also holds the screen-reader prefixes,
+        which are ours and do change with the language. `data-reported` marks the
+        reported bytes exactly — one per line, below.
+      */}
+      <div className="max-h-[28rem] overflow-auto" translate="no">
         <table className="w-full border-collapse font-mono text-xs">
           <tbody>
             {parsed.lines.map((line, index) => (
@@ -88,8 +102,10 @@ export function UnifiedDiffView({
                   {line.newNumber ?? ''}
                 </td>
                 <td className="px-2 whitespace-pre">
-                  <span className="sr-only">{LINE_ROLE_LABELS[line.kind]}: </span>
-                  {line.content === '' ? ' ' : line.content}
+                  <span className="sr-only" translate="yes">
+                    {t(LINE_ROLE_LABEL_KEY[line.kind])}:{' '}
+                  </span>
+                  <ReportedText value={line.content === '' ? ' ' : line.content} />
                 </td>
               </tr>
             ))}

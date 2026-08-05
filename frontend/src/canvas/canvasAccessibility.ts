@@ -1,8 +1,11 @@
+import type { TFunction } from 'i18next'
+
 import type { ComponentId } from '@/api/types'
+import type { CanvasKey } from '@/i18n'
 
 import { dominantOverlay, overlayLabel, type ChangeOverlay } from './changeOverlays'
-import { componentKindStyle } from './componentKinds'
-import { DISCLOSURE_LABELS } from './detailLevel'
+import { componentKindLabel } from './componentKinds'
+import { DISCLOSURE_LABEL_KEYS } from './detailLevel'
 import type { ArchitectureEdge, ArchitectureNode } from './graphProjection'
 import { RELATIONSHIP_KIND_STYLE_BY_ID, relationshipDiscriminator } from './relationshipKinds'
 
@@ -36,11 +39,12 @@ import { RELATIONSHIP_KIND_STYLE_BY_ID, relationshipDiscriminator } from './rela
  *    state as words, which is the same information the visible label, icon and
  *    border style carry (ADR 0003).
  *
- * All German strings the canvas speaks live in `CANVAS_A11Y_TEXT` so the
- * translation work of #42 has a single place to pull from. Counted nouns are
- * the exception and deliberately so: they are already localised, and this
- * module takes them as a `CountText` from its caller rather than owning a
- * second plural table (ADR 0019).
+ * Everything the canvas says is injected as a `CanvasVoice`: `t` for the
+ * sentences (`canvas:a11y.*`, #42) and `count` for the counted nouns
+ * (`common:count.*`, #40). This module is pure and free of React by design —
+ * the same discipline `graphProjection.ts` follows — so it can hold neither a
+ * `t` of its own nor a plural table of its own. One injected seam keeps both
+ * out and keeps the module testable without rendering anything.
  */
 
 // ---------------------------------------------------------------------------
@@ -63,88 +67,66 @@ export type CanvasCountNoun = 'component' | 'relationship' | 'agent'
  */
 export type CountText = (noun: CanvasCountNoun, count: number) => string
 
+/**
+ * Everything the canvas needs in order to speak.
+ *
+ * Two halves, from two issues, injected as one value:
+ *
+ * * `t` — the `canvas` namespace, which holds every sentence the graph says
+ *   about itself (`a11y.*`, `tool.*`, the component and relationship
+ *   vocabularies). #42 moved them out of this file and into the catalogues.
+ * * `count` — counted nouns from `common:count.*`, which #40 made
+ *   locale-aware. A second plural table here is exactly what that issue removed.
+ *
+ * Passed in rather than looked up, because this module is pure and free of
+ * React by design (it is the counterpart of `graphProjection`). The two React
+ * callers — `ArchitectureCanvas` and `ComponentNode` — get theirs from
+ * `useCanvasVoice`, which resolves both against the catalogues.
+ */
+export interface CanvasVoice {
+  t: TFunction<'canvas'>
+  count: CountText
+}
+
 // ---------------------------------------------------------------------------
 // The texts
 // ---------------------------------------------------------------------------
 
 /**
- * Every accessible string of the canvas, in one object.
+ * Keys of every accessible string of the canvas, in one object.
  *
- * Hard-coded German for now — the i18n migration is #42, and the translation
- * contract of #38 already records that accessible names have to travel with it.
+ * The entries that take a value are **key plus interpolation**, not string
+ * concatenation: German and English put the noun, the verb and the container
+ * in different places, and only a whole sentence per language can carry that.
+ * The interpolated values are either already-counted nouns or reported project
+ * data — a component name, a component id — and i18next passes an interpolated
+ * value through byte for byte (ADR 0014).
  */
-export const CANVAS_A11Y_TEXT = {
-  /** Accessible name of the whole drawing surface. */
-  graphLabel: 'Interaktiver Architekturgraph',
+export const CANVAS_A11Y_KEYS = {
+  graphLabel: 'graph.label',
+  graphInstructions: 'graph.instructions',
+  nodeInstructions: 'graph.nodeInstructions',
+  edgeInstructions: 'graph.edgeInstructions',
 
-  /**
-   * Read out when the graph is entered. It describes what is there and how to
-   * operate it — and it stops at what the cockpit can actually do: v0 observes,
-   * it does not let anyone edit the reported architecture.
-   */
-  graphInstructions:
-    'Architekturgraph des Projekts. Mit der Tabulatortaste zwischen den Komponenten ' +
-    'und Beziehungen wechseln. Enter oder Leertaste wählt die fokussierte Komponente ' +
-    'aus und zeigt sie im Inspector; eine erneute Aktivierung hebt die Auswahl auf, ' +
-    'Escape ebenfalls. Jede Komponente nennt ihren gemeldeten Namen, ihre Art, ob sie ' +
-    'weitere Komponenten enthält, in welchem Container sie liegt und welchen ' +
-    'Änderungsstatus ein Agent für sie gemeldet hat. Der Graph ist eine Beobachtung: ' +
-    'das gemeldete Architekturmodell lässt sich hier nicht bearbeiten.',
+  containerRoleDescription: 'a11y.containerRole',
+  componentRoleDescription: 'a11y.componentRole',
+  relationshipRoleDescription: 'a11y.relationshipRole',
 
-  /** Description attached to every node by React Flow. */
-  nodeInstructions:
-    'Enter oder Leertaste wählt diese Komponente aus und zeigt sie im Inspector. ' +
-    'Escape hebt die Auswahl auf. Die Komponente lässt sich nicht bearbeiten oder ' +
-    'entfernen — das Cockpit beobachtet nur.',
+  contains: 'a11y.contains',
+  collapsedNote: 'a11y.collapsedNote',
+  inContainer: 'a11y.inContainer',
+  identifiedBy: 'a11y.identifiedBy',
 
-  /** Description attached to every edge by React Flow. */
-  edgeInstructions:
-    'Enter oder Leertaste wählt diese Beziehung aus; bei einer Sammelkante klappt sie ' +
-    'die enthaltenen Beziehungen auf und wieder zu. Escape hebt die Auswahl auf.',
+  noWorkState: 'a11y.noWorkState',
+  proposalNote: 'a11y.proposalNote',
+  ghostNote: 'a11y.ghostNote',
+  rolledUpNote: 'a11y.rolledUpNote',
 
-  /** `aria-roledescription` of a component that contains other components. */
-  containerRoleDescription: 'Architekturcontainer',
-  /** `aria-roledescription` of a component without children. */
-  componentRoleDescription: 'Architekturkomponente',
-  /** `aria-roledescription` of a drawn relationship. */
-  relationshipRoleDescription: 'Architekturbeziehung',
-
-  /** Container part of a node name. Takes the already-counted noun. */
-  contains: (components: string) => `Container mit ${components}`,
-  /**
-   * Said by a container whose children are not drawn right now. Mirrors the
-   * "… eingeklappt" line the closed box shows, so the two channels say the same
-   * thing (#34 / ADR 0017).
-   */
-  collapsedNote: (components: string) => `eingeklappt, ${components} verborgen`,
-  /** One step of the container path. */
-  inContainer: (containerName: string) => `in ${containerName}`,
-  /** Last-resort qualifier when name, kind and container path still collide. */
-  identifiedBy: (componentId: ComponentId) => `Komponenten-ID ${componentId}`,
-
-  /** Said when an agent reported nothing about this element. */
-  noWorkState: 'kein Änderungsstatus gemeldet',
-  /** Said for an announced element that the applied model does not contain. */
-  proposalNote: 'angekündigt, noch nicht Teil des angewandten Architekturmodells',
-  /** Said for an element an applied change removed. */
-  ghostNote: 'nicht mehr Teil des angewandten Architekturmodells',
-  /**
-   * Said when the state on a closed container was reported for something
-   * *inside* it. Without this the name would claim the container itself is the
-   * element an agent is working on (`rollUpOverlay` in `collapse.ts`).
-   */
-  rolledUpNote: 'gemeldet für eine eingeklappte Komponente darin',
-
-  /** Direction part of an edge name. */
-  fromTo: (sourceName: string, targetName: string) =>
-    `Beziehung von ${sourceName} zu ${targetName}`,
-  /** Said for an edge that renders more than one reported relationship. */
-  bundleOf: (relationships: string) => `Sammelkante mit ${relationships}`,
-  /** Tail of a bundle name that is too long to read out in full. */
-  furtherRelationships: (relationships: string) => `und ${relationships} weitere`,
-  /** Said when more than one agent reported for the same element. */
-  agentsReporting: (agents: string) => `${agents} melden dazu`,
-} as const
+  fromTo: 'a11y.fromTo',
+  bundleOf: 'a11y.bundleOf',
+  furtherRelationships: 'a11y.furtherRelationships',
+  agentsReporting: 'a11y.agentsReporting',
+} as const satisfies Record<string, CanvasKey>
 
 /**
  * German replacements for React Flow's built-in English a11y strings.
@@ -155,21 +137,23 @@ export const CANVAS_A11Y_TEXT = {
  * read-only view of what an agent reported. Announcing an action that does not
  * exist is the same defect as not announcing one that does.
  */
-export const CANVAS_ARIA_LABEL_CONFIG = {
-  // React Flow renders the `keyboardDisabled` variant while keyboard a11y is
-  // *enabled*; both keys carry the same text so the rendered one is right
-  // either way.
-  'node.a11yDescription.default': CANVAS_A11Y_TEXT.nodeInstructions,
-  'node.a11yDescription.keyboardDisabled': CANVAS_A11Y_TEXT.nodeInstructions,
-  'edge.a11yDescription.default': CANVAS_A11Y_TEXT.edgeInstructions,
-  'controls.ariaLabel': 'Zoomsteuerung des Architekturgraphen',
-  'controls.zoomIn.ariaLabel': 'Hineinzoomen',
-  'controls.zoomOut.ariaLabel': 'Herauszoomen',
-  'controls.fitView.ariaLabel': 'Ansicht einpassen',
-  'controls.interactive.ariaLabel': 'Interaktivität umschalten',
-  'minimap.ariaLabel': 'Übersichtskarte der Architektur',
-  'handle.ariaLabel': 'Verbindungspunkt',
-} as const
+export function canvasAriaLabelConfig(t: TFunction<'canvas'>) {
+  return {
+    // React Flow renders the `keyboardDisabled` variant while keyboard a11y is
+    // *enabled*; both keys carry the same text so the rendered one is right
+    // either way.
+    'node.a11yDescription.default': t(CANVAS_A11Y_KEYS.nodeInstructions),
+    'node.a11yDescription.keyboardDisabled': t(CANVAS_A11Y_KEYS.nodeInstructions),
+    'edge.a11yDescription.default': t(CANVAS_A11Y_KEYS.edgeInstructions),
+    'controls.ariaLabel': t('a11y.zoomControls'),
+    'controls.zoomIn.ariaLabel': t('a11y.zoomIn'),
+    'controls.zoomOut.ariaLabel': t('a11y.zoomOut'),
+    'controls.fitView.ariaLabel': t('a11y.fitView'),
+    'controls.interactive.ariaLabel': t('a11y.toggleInteractive'),
+    'minimap.ariaLabel': t('graph.minimapLabel'),
+    'handle.ariaLabel': t('a11y.handle'),
+  } as const
+}
 
 // ---------------------------------------------------------------------------
 // Work state as words
@@ -184,17 +168,19 @@ export const CANVAS_ARIA_LABEL_CONFIG = {
  */
 export function workStatePhrase(
   overlay: ChangeOverlay | null,
-  countText: CountText,
+  voice: CanvasVoice,
   rolledUp = false,
 ): string[] {
-  if (!overlay) return [CANVAS_A11Y_TEXT.noWorkState]
-  const parts = [overlayLabel(overlay)]
-  if (rolledUp) parts.push(CANVAS_A11Y_TEXT.rolledUpNote)
-  if (overlay.presence === 'proposal') parts.push(CANVAS_A11Y_TEXT.proposalNote)
-  if (overlay.presence === 'ghost') parts.push(CANVAS_A11Y_TEXT.ghostNote)
+  if (!overlay) return [voice.t(CANVAS_A11Y_KEYS.noWorkState)]
+  const parts = [overlayLabel(overlay, voice.t)]
+  if (rolledUp) parts.push(voice.t(CANVAS_A11Y_KEYS.rolledUpNote))
+  if (overlay.presence === 'proposal') parts.push(voice.t(CANVAS_A11Y_KEYS.proposalNote))
+  if (overlay.presence === 'ghost') parts.push(voice.t(CANVAS_A11Y_KEYS.ghostNote))
   if (overlay.agentIds.length > 1) {
     parts.push(
-      CANVAS_A11Y_TEXT.agentsReporting(countText('agent', overlay.agentIds.length)),
+      voice.t(CANVAS_A11Y_KEYS.agentsReporting, {
+        agents: voice.count('agent', overlay.agentIds.length),
+      }),
     )
   }
   return parts
@@ -215,20 +201,28 @@ interface NameCandidate {
   ancestors: string[]
 }
 
-function baseName(node: ArchitectureNode, countText: CountText): string {
+function baseName(node: ArchitectureNode, voice: CanvasVoice): string {
   const { component, isCompound, childCount } = node.data
-  const parts = [component.name, componentKindStyle(component.kind).label]
+  const parts = [component.name, componentKindLabel(component.kind, voice.t)]
   if (isCompound) {
-    parts.push(CANVAS_A11Y_TEXT.contains(countText('component', childCount)))
+    parts.push(
+      voice.t(CANVAS_A11Y_KEYS.contains, {
+        components: voice.count('component', childCount),
+      }),
+    )
   }
   return parts.join(', ')
 }
 
-function qualified(candidate: NameCandidate, depth: number): string {
+function qualified(
+  candidate: NameCandidate,
+  depth: number,
+  t: TFunction<'canvas'>,
+): string {
   if (depth === 0) return candidate.base
   const path = candidate.ancestors
     .slice(0, depth)
-    .map((name) => CANVAS_A11Y_TEXT.inContainer(name))
+    .map((container) => t(CANVAS_A11Y_KEYS.inContainer, { container }))
   return [candidate.base, ...path].join(', ')
 }
 
@@ -247,7 +241,7 @@ function qualified(candidate: NameCandidate, depth: number): string {
  */
 export function identifyingNames(
   nodes: readonly ArchitectureNode[],
-  countText: CountText,
+  voice: CanvasVoice,
 ): Map<ComponentId, string> {
   const nameById = new Map<ComponentId, string>()
   const parentById = new Map<ComponentId, ComponentId | undefined>()
@@ -265,7 +259,7 @@ export function identifyingNames(
       ancestors.push(nameById.get(current) ?? current)
       current = parentById.get(current)
     }
-    return { id: node.id, base: baseName(node, countText), ancestors }
+    return { id: node.id, base: baseName(node, voice), ancestors }
   })
 
   const result = new Map<ComponentId, string>()
@@ -275,7 +269,7 @@ export function identifyingNames(
   while (pending.length > 0) {
     const groups = new Map<string, NameCandidate[]>()
     for (const candidate of pending) {
-      const label = qualified(candidate, depth)
+      const label = qualified(candidate, depth, voice.t)
       const group = groups.get(label)
       if (group) group.push(candidate)
       else groups.set(label, [candidate])
@@ -300,7 +294,10 @@ export function identifyingNames(
       for (const candidate of group) {
         result.set(
           candidate.id,
-          `${qualified(candidate, depth)}, ${CANVAS_A11Y_TEXT.identifiedBy(candidate.id)}`,
+          `${qualified(candidate, depth, voice.t)}, ${voice.t(
+            CANVAS_A11Y_KEYS.identifiedBy,
+            { componentId: candidate.id },
+          )}`,
         )
       }
     }
@@ -322,7 +319,7 @@ export function identifyingNames(
 export function nodeAccessibleName(
   node: ArchitectureNode,
   identity: string,
-  countText: CountText,
+  voice: CanvasVoice,
 ): string {
   const { collapsed, hiddenDescendantCount, childCount, overlay, overlayRolledUp } =
     node.data
@@ -331,19 +328,19 @@ export function nodeAccessibleName(
   // behind it is not on screen and is not a tab stop either.
   if (collapsed === true) {
     parts.push(
-      CANVAS_A11Y_TEXT.collapsedNote(
-        countText('component', hiddenDescendantCount ?? childCount),
-      ),
+      voice.t(CANVAS_A11Y_KEYS.collapsedNote, {
+        components: voice.count('component', hiddenDescendantCount ?? childCount),
+      }),
     )
   }
-  parts.push(...workStatePhrase(overlay, countText, overlayRolledUp === true))
+  parts.push(...workStatePhrase(overlay, voice, overlayRolledUp === true))
   return parts.join(', ')
 }
 
 /**
  * The accessible name of the control that expands or collapses a container.
  *
- * The verbs come from `DISCLOSURE_LABELS`, the collection #34 created for the
+ * The verbs come from `DISCLOSURE_LABEL_KEYS`, the collection #34 created for the
  * same reason this module exists — one place per vocabulary, so the button, its
  * tooltip and its accessible name cannot drift into three different words. What
  * this function adds is the *component*: a canvas full of buttons that all say
@@ -353,13 +350,15 @@ export function nodeAccessibleName(
 export function nodeDisclosureLabel(
   componentName: string,
   expanded: boolean,
-  countText: CountText,
+  voice: CanvasVoice,
   hiddenCount?: number,
 ): string {
-  if (expanded) return `${DISCLOSURE_LABELS.collapse}: ${componentName}`
+  if (expanded) {
+    return `${voice.t(DISCLOSURE_LABEL_KEYS.collapse)}: ${componentName}`
+  }
   const suffix =
-    hiddenCount === undefined ? '' : ` (${countText('component', hiddenCount)})`
-  return `${DISCLOSURE_LABELS.expand}: ${componentName}${suffix}`
+    hiddenCount === undefined ? '' : ` (${voice.count('component', hiddenCount)})`
+  return `${voice.t(DISCLOSURE_LABEL_KEYS.expand)}: ${componentName}${suffix}`
 }
 
 /**
@@ -381,17 +380,17 @@ export function nodeDisclosureLabel(
  */
 export function withNodeAccessibility(
   nodes: readonly ArchitectureNode[],
-  countText: CountText,
+  voice: CanvasVoice,
 ): ArchitectureNode[] {
-  const identities = identifyingNames(nodes, countText)
+  const identities = identifyingNames(nodes, voice)
   return nodes.map((node) => ({
     ...node,
     ariaRole: 'group',
-    ariaLabel: nodeAccessibleName(node, identities.get(node.id) ?? node.id, countText),
+    ariaLabel: nodeAccessibleName(node, identities.get(node.id) ?? node.id, voice),
     domAttributes: {
       'aria-roledescription': node.data.isCompound
-        ? CANVAS_A11Y_TEXT.containerRoleDescription
-        : CANVAS_A11Y_TEXT.componentRoleDescription,
+        ? voice.t(CANVAS_A11Y_KEYS.containerRoleDescription)
+        : voice.t(CANVAS_A11Y_KEYS.componentRoleDescription),
       ...(node.selected === true ? { 'aria-current': true as const } : {}),
     },
   }))
@@ -421,43 +420,42 @@ const MAX_NAMED_RELATIONSHIPS = 6
 export function edgeAccessibleName(
   edge: ArchitectureEdge,
   names: ReadonlyMap<ComponentId, string>,
-  countText: CountText,
+  voice: CanvasVoice,
 ): string {
   const relationships = edge.data?.relationships ?? []
   const parts = [
-    CANVAS_A11Y_TEXT.fromTo(
-      names.get(edge.source) ?? edge.source,
-      names.get(edge.target) ?? edge.target,
-    ),
+    voice.t(CANVAS_A11Y_KEYS.fromTo, {
+      source: names.get(edge.source) ?? edge.source,
+      target: names.get(edge.target) ?? edge.target,
+    }),
   ]
 
   if (relationships.length > 1) {
     parts.push(
-      CANVAS_A11Y_TEXT.bundleOf(countText('relationship', relationships.length)),
+      voice.t(CANVAS_A11Y_KEYS.bundleOf, {
+        relationships: voice.count('relationship', relationships.length),
+      }),
     )
   }
   for (const relationship of relationships.slice(0, MAX_NAMED_RELATIONSHIPS)) {
     const kind = RELATIONSHIP_KIND_STYLE_BY_ID[relationship.kind]
+    const label = kind ? voice.t(kind.labelKey) : relationship.kind
     const discriminator = relationshipDiscriminator(relationship)
-    parts.push(
-      discriminator
-        ? `${kind?.label ?? relationship.kind} ${discriminator}`
-        : (kind?.label ?? relationship.kind),
-    )
+    parts.push(discriminator ? `${label} ${discriminator}` : label)
   }
   if (relationships.length > MAX_NAMED_RELATIONSHIPS) {
     parts.push(
-      CANVAS_A11Y_TEXT.furtherRelationships(
-        countText('relationship', relationships.length - MAX_NAMED_RELATIONSHIPS),
-      ),
+      voice.t(CANVAS_A11Y_KEYS.furtherRelationships, {
+        relationships: voice.count(
+          'relationship',
+          relationships.length - MAX_NAMED_RELATIONSHIPS,
+        ),
+      }),
     )
   }
 
   parts.push(
-    ...workStatePhrase(
-      dominantOverlay(Object.values(edge.data?.overlays ?? {})),
-      countText,
-    ),
+    ...workStatePhrase(dominantOverlay(Object.values(edge.data?.overlays ?? {})), voice),
   )
   return parts.join(', ')
 }
@@ -475,13 +473,13 @@ export function edgeAccessibleName(
 export function withEdgeAccessibility(
   edges: readonly ArchitectureEdge[],
   names: ReadonlyMap<ComponentId, string>,
-  countText: CountText,
+  voice: CanvasVoice,
 ): ArchitectureEdge[] {
   return edges.map((edge) => ({
     ...edge,
-    ariaLabel: edgeAccessibleName(edge, names, countText),
+    ariaLabel: edgeAccessibleName(edge, names, voice),
     domAttributes: {
-      'aria-roledescription': CANVAS_A11Y_TEXT.relationshipRoleDescription,
+      'aria-roledescription': voice.t(CANVAS_A11Y_KEYS.relationshipRoleDescription),
     },
   }))
 }

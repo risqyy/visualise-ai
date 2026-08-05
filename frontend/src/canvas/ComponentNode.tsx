@@ -1,20 +1,27 @@
 import { Handle, Position, type NodeProps } from '@xyflow/react'
+import type { TFunction } from 'i18next'
 import { ChevronDown, ChevronRight } from 'lucide-react'
 import { memo, use } from 'react'
 import { useTranslation } from 'react-i18next'
 
 import type { ComponentId } from '@/api/types'
+import { ReportedText } from '@/i18n'
 import { cn } from '@/lib/utils'
 import { WORK_STATE_BY_ID } from '@/state/workStates'
 
 import { ChangeOverlayMark } from './ChangeOverlayMark'
 import { nodeDisclosureLabel } from './canvasAccessibility'
 import type { ChangeOverlay } from './changeOverlays'
-import { componentKindStyle, componentTags, technologyParts } from './componentKinds'
-import { DISCLOSURE_LABELS, showsTags, showsTechnology } from './detailLevel'
+import {
+  componentKindLabel,
+  componentKindStyle,
+  componentTags,
+  technologyParts,
+} from './componentKinds'
+import { DISCLOSURE_LABEL_KEYS, showsTags, showsTechnology } from './detailLevel'
 import { HANDLE_IDS, type ArchitectureNode } from './graphProjection'
 import { CanvasNodeActionsContext } from './nodeActions'
-import { useCanvasCountText } from './useCanvasCountText'
+import { useCanvasVoice } from './useCanvasVoice'
 import { useDetailLevel } from './useDetailLevel'
 
 /**
@@ -34,7 +41,11 @@ import { useDetailLevel } from './useDetailLevel'
  */
 
 /** Border, tint and data attributes an overlay puts on a node box. */
-function overlayBoxProps(overlay: ChangeOverlay | null, applied: boolean) {
+function overlayBoxProps(
+  overlay: ChangeOverlay | null,
+  applied: boolean,
+  t: TFunction<'canvas'>,
+) {
   if (!overlay) {
     return {
       className: '',
@@ -52,7 +63,9 @@ function overlayBoxProps(overlay: ChangeOverlay | null, applied: boolean) {
     attributes: {
       'data-applied': applied ? 'true' : 'false',
       'data-work-state': overlay.state,
-      'data-work-state-label': definition.label,
+      // The word next to the colour, in the active language. It is the
+      // colour-independent channel the acceptance suite reads.
+      'data-work-state-label': t(definition.labelKey),
       'data-border-style': definition.borderStyle,
       'data-operation': overlay.operation ?? 'none',
       'data-presence': overlay.presence,
@@ -88,19 +101,21 @@ function DisclosureToggle({
   collapsed,
   hiddenCount,
 }: DisclosureToggleProps) {
-  const { t } = useTranslation('common')
-  const countText = useCanvasCountText()
+  const voice = useCanvasVoice()
   const { toggleCollapsed } = use(CanvasNodeActionsContext)
   const Icon = collapsed ? ChevronRight : ChevronDown
-  // The visible title counts through the locale-aware formatter (#40); the
-  // accessible name additionally says *which* container (#35).
+  // The visible title is the short action and counts through the locale-aware
+  // formatter (#40); the accessible name additionally says *which* container
+  // (#35). Both sentences come out of the catalogue (#42).
   const title = collapsed
-    ? `${DISCLOSURE_LABELS.expand} (${t('count.component', { count: hiddenCount })})`
-    : DISCLOSURE_LABELS.collapse
+    ? voice.t(DISCLOSURE_LABEL_KEYS.expandHidden, {
+        hidden: voice.count('component', hiddenCount),
+      })
+    : voice.t(DISCLOSURE_LABEL_KEYS.collapse)
   const label = nodeDisclosureLabel(
     componentName,
     !collapsed,
-    countText,
+    voice,
     collapsed ? hiddenCount : undefined,
   )
 
@@ -164,6 +179,7 @@ function KindBadge({ label, className }: KindBadgeProps) {
   )
 }
 
+/** The reported technology metadata — the agent's words, never translated. */
 function TechnologyRow({ parts }: { parts: string[] }) {
   if (parts.length === 0) return null
   return (
@@ -172,11 +188,12 @@ function TechnologyRow({ parts }: { parts: string[] }) {
       data-testid="node-technology"
       title={parts.join(' · ')}
     >
-      {parts.join(' · ')}
+      <ReportedText value={parts.join(' · ')} />
     </p>
   )
 }
 
+/** Reported tags. Same rule as the technology row. */
 function TagRow({ tags }: { tags: string[] }) {
   if (tags.length === 0) return null
   return (
@@ -186,7 +203,7 @@ function TagRow({ tags }: { tags: string[] }) {
           key={tag}
           className="bg-secondary/70 text-muted-foreground rounded-sm px-1 text-[10px] leading-tight"
         >
-          {tag}
+          <ReportedText value={tag} />
         </li>
       ))}
     </ul>
@@ -197,13 +214,14 @@ export const ComponentNode = memo(function ComponentNode({
   data,
   selected,
 }: NodeProps<ArchitectureNode>) {
+  const { t } = useTranslation('canvas')
   const level = useDetailLevel()
   const { component, overlay, applied } = data
   const kind = componentKindStyle(component.kind)
   const Icon = kind.icon
   const technology = technologyParts(component.technology)
   const tags = componentTags(component)
-  const box = overlayBoxProps(overlay, applied)
+  const box = overlayBoxProps(overlay, applied, t)
 
   return (
     <div
@@ -230,9 +248,10 @@ export const ComponentNode = memo(function ComponentNode({
           title={component.name}
           data-testid="node-name"
         >
-          {component.name}
+          {/* The component's reported name. Not ours, so never translated. */}
+          <ReportedText value={component.name} />
         </span>
-        <KindBadge label={kind.label} />
+        <KindBadge label={componentKindLabel(component.kind, t)} />
       </div>
 
       {overlay && <ChangeOverlayMark overlay={overlay} className="self-start" />}
@@ -248,14 +267,15 @@ export const CompoundNode = memo(function CompoundNode({
   data,
   selected,
 }: NodeProps<ArchitectureNode>) {
-  const { t } = useTranslation('common')
+  const { t } = useTranslation('canvas')
+  const { t: tCommon } = useTranslation('common')
   const level = useDetailLevel()
   const { component, childCount, overlay, applied, collapsed, hiddenDescendantCount } =
     data
   const kind = componentKindStyle(component.kind)
   const Icon = kind.icon
   const technology = technologyParts(component.technology)
-  const box = overlayBoxProps(overlay, applied)
+  const box = overlayBoxProps(overlay, applied, t)
   const hiddenCount = hiddenDescendantCount ?? 0
 
   return (
@@ -306,7 +326,7 @@ export const CompoundNode = memo(function CompoundNode({
           title={component.name}
           data-testid="node-name"
         >
-          {component.name}
+          <ReportedText value={component.name} />
         </span>
         {/* A closed container is only as wide as a leaf, so the metadata moves
             out of the header — squeezed between a technology string and two
@@ -317,16 +337,16 @@ export const CompoundNode = memo(function CompoundNode({
             className="text-muted-foreground max-w-40 truncate font-mono text-[10px]"
             data-testid="node-technology"
           >
-            {technology.join(' · ')}
+            <ReportedText value={technology.join(' · ')} />
           </span>
         )}
         {overlay && <ChangeOverlayMark overlay={overlay} />}
         {!collapsed && (
           <span className="text-muted-foreground shrink-0 text-[10px]">
-            {t('count.child', { count: childCount })}
+            {tCommon('count.child', { count: childCount })}
           </span>
         )}
-        <KindBadge label={kind.label} />
+        <KindBadge label={componentKindLabel(component.kind, t)} />
       </div>
 
       {collapsed && (
@@ -335,7 +355,9 @@ export const CompoundNode = memo(function CompoundNode({
             className="text-muted-foreground text-[10px] leading-tight"
             data-testid="node-hidden-count"
           >
-            {t('count.component', { count: hiddenCount })} eingeklappt
+            {t('node.collapsed', {
+              components: tCommon('count.component', { count: hiddenCount }),
+            })}
           </p>
           {showsTechnology(level) && <TechnologyRow parts={technology} />}
         </div>

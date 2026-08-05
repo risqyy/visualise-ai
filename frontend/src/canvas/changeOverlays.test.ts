@@ -11,6 +11,7 @@ import {
   activeChange,
 } from '@/test/architectureFixtures'
 import { streamedEvent } from '@/test/fixtures'
+import { translateWith } from '@/test/translate'
 
 import {
   buildChangeOverlays,
@@ -18,6 +19,13 @@ import {
   overlayTitle,
   type ChangeOverlayInput,
 } from './changeOverlays'
+
+/**
+ * The German `t` of the real catalogue. `overlayLabel` and `overlayTitle` build
+ * their sentence from it since #42, so these assertions still check the exact
+ * words a reader sees — they just no longer live in the source file.
+ */
+const t = translateWith('canvas')
 
 function fold(...events: StreamedEvent[]): ChangeLedger {
   return events.reduce(ingestEvent, EMPTY_LEDGER)
@@ -177,7 +185,7 @@ describe('change overlays — concurrent agents', () => {
 
   it('names every contributing agent in the text of the overlay', () => {
     const overlay = twoAgents().components.get('platform.core.orders')
-    const title = overlayTitle(overlay!)
+    const title = overlayTitle(overlay!, t)
 
     expect(title).toContain('2 Agents')
     expect(title).toContain('subagent-implementer')
@@ -293,7 +301,9 @@ describe('change overlays — retraction and replacing snapshots', () => {
 
 describe('change overlays — readable without colour', () => {
   it('gives every state a distinct label, icon and line style', () => {
-    const labels = WORK_STATES.map((state) => state.label)
+    // The rendered words, not the keys: what has to be distinct is what the
+    // reader sees.
+    const labels = WORK_STATES.map((state) => t(state.labelKey))
     const icons = WORK_STATES.map((state) => state.icon)
     const borders = WORK_STATES.map((state) => state.borderStyle)
     const dashes = WORK_STATES.map((state) => state.strokeDasharray)
@@ -316,8 +326,8 @@ describe('change overlays — readable without colour', () => {
       }),
     ).components.get('platform.db')
 
-    expect(added && overlayLabel(added)).toBe('geplant · hinzufügen')
-    expect(removedProposal && overlayLabel(removedProposal)).toBe('geplant · entfernen')
+    expect(added && overlayLabel(added, t)).toBe('geplant · hinzufügen')
+    expect(removedProposal && overlayLabel(removedProposal, t)).toBe('geplant · entfernen')
     // Same state, same colour — the words are what tells them apart.
     expect(added?.state).toBe(removedProposal?.state)
   })
@@ -326,7 +336,7 @@ describe('change overlays — readable without colour', () => {
     const model = buildChangeOverlays(
       input({ activeChanges: [activeChange({ operation: 'remove', targetId: 'platform.db' })] }),
     )
-    const text = overlayTitle(model.components.get('platform.db')!)
+    const text = overlayTitle(model.components.get('platform.db')!, t)
 
     for (const verdict of ['Fehler', 'falsch', 'schlecht', 'Risiko', 'gefährlich', 'gut']) {
       expect(text.toLowerCase()).not.toContain(verdict.toLowerCase())

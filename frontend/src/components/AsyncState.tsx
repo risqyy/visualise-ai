@@ -2,10 +2,12 @@ import { RefreshCw, TriangleAlert } from 'lucide-react'
 import type { ReactNode } from 'react'
 import { useTranslation } from 'react-i18next'
 
-import { describeError, isProblemError } from '@/api/problem'
+import { isProblemError } from '@/api/problem'
+import { ErrorDescription } from '@/components/ErrorDescription'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
+import { ReportedText } from '@/i18n'
 import { cn } from '@/lib/utils'
 
 export interface AsyncStateProps {
@@ -70,17 +72,21 @@ export function AsyncState({
         <AlertTitle>{t('errors:load.title')}</AlertTitle>
         <AlertDescription>
           {/*
-            `describeError` mostly surfaces what the backend reported — the
-            problem title and its stable code. That is reported data and stays
-            as it is; only its two generic fallbacks are ours, and they move
-            into the catalogues with the rest of the app in #42.
+            `ErrorDescription` mostly surfaces what the backend reported — the
+            problem title and its stable code. That is reported data and is
+            rendered verbatim; only its two generic fallbacks are ours and come
+            from the catalogue.
           */}
-          <p>{describeError(error)}</p>
+          <p>
+            <ErrorDescription error={error} />
+          </p>
           {isProblemError(error) && error.errors.length > 0 && (
             <ul className="list-disc space-y-0.5 pl-4">
+              {/* Field, code and message are the backend's words throughout. */}
               {error.errors.map((violation) => (
                 <li key={`${violation.field}:${violation.code}`}>
-                  <code className="font-mono">{violation.field}</code>: {violation.message}
+                  <ReportedText value={violation.field} className="font-mono" />:{' '}
+                  <ReportedText value={violation.message} />
                 </li>
               ))}
             </ul>
