@@ -1,0 +1,8 @@
+{
+  "action": {
+    "retry": "Erneut versuchen"
+  },
+  "state": {
+    "loading": "Daten werden geladen…"
+  }
+}
