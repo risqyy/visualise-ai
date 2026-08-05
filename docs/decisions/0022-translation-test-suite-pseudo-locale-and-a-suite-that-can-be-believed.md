@@ -345,9 +345,10 @@ suite.
   package boundary on purpose — the e2e project has its own `package.json` and
   `tsconfig.json` and does not import from the frontend — and each asserts the
   30–40 % band for itself.
-- **The acceptance run grew from 21 checks to 25** and by roughly a minute:
-  three extra page loads for the pseudo-locale, two for the language sweep. It
-  still runs one worker, no retries, no fixed sleeps.
+- **The acceptance run grew from 21 checks to 25**, and by about six seconds:
+  the four new checks measured 1.3 s, 1.3 s, 1.8 s and 1.1 s against a two-minute
+  run whose cost is dominated by the Compose build and the two 30-second
+  simulator sequences. It still runs one worker, no retries, no fixed sleeps.
 - **Screenshots accumulate in the report artefact.** Nine images per run
   (three widths × German, English, pseudo), retained for 14 days by the existing
   upload step. Nothing fails because of them, and nothing has to be regenerated
