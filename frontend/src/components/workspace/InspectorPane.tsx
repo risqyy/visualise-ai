@@ -1,5 +1,6 @@
 import { Maximize2, Minimize2 } from 'lucide-react'
 import { useMemo, type ReactNode } from 'react'
+import { useTranslation } from 'react-i18next'
 
 import { useComponentHistory, useComponentInspector } from '@/api/queries'
 import type { ComponentId, ProjectId, RunId } from '@/api/types'
@@ -19,7 +20,6 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Separator } from '@/components/ui/separator'
 import { cn } from '@/lib/utils'
-import { COUNT_LABELS, counted } from '@/lib/plural'
 import type { DeepFocusTarget } from '@/routes/searchParams'
 
 export interface InspectorPaneProps {
@@ -66,6 +66,7 @@ export function InspectorPane({
   onSetFocus,
   onSetHistoryMode,
 }: InspectorPaneProps) {
+  const { t } = useTranslation('common')
   const inspector = useComponentInspector(projectId, componentId, runId)
   const history = useComponentHistory(projectId, componentId, { enabled: historyMode })
 
@@ -203,16 +204,16 @@ export function InspectorPane({
                   {showSecondary && head && (
                     <div className="flex flex-wrap gap-1">
                       <Badge variant="outline" className="text-2xs font-normal">
-                        {counted(head.feedback.length, COUNT_LABELS.feedback)}
+                        {t('count.feedback', { count: head.feedback.length })}
                       </Badge>
                       <Badge variant="outline" className="text-2xs font-normal">
-                        {counted(diffs.length, COUNT_LABELS.diff)}
+                        {t('count.diff', { count: diffs.length })}
                       </Badge>
                       <Badge variant="outline" className="text-2xs font-normal">
-                        {counted(head.risks.length, COUNT_LABELS.risk)}
+                        {t('count.risk', { count: head.risks.length })}
                       </Badge>
                       <Badge variant="outline" className="text-2xs font-normal">
-                        {counted(head.problems.length, COUNT_LABELS.problem)}
+                        {t('count.problem', { count: head.problems.length })}
                       </Badge>
                     </div>
                   )}

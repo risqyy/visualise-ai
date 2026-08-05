@@ -4,7 +4,6 @@ import type {
   PlanStepState,
   RunAgent,
   RunPlanRevision,
-  Timestamp,
 } from '@/api/types'
 
 /**
@@ -167,28 +166,17 @@ export function statusTally(
 }
 
 // ---------------------------------------------------------------------------
-// Timestamps
+// Timestamps: not here
 // ---------------------------------------------------------------------------
 
 /**
- * Formats a contract timestamp in UTC.
- *
- * The API normalises every timestamp to UTC (ADR 0005) and the cockpit renders
- * it that way, labelled: a local-time rendering of an agent report is a
- * different claim than the one the agent made, and the difference is invisible
- * until it matters. Built from `Date.getUTC*` rather than `Intl`, so the output
- * does not depend on the host's locale data.
+ * This module used to carry its own `formatTimestamp`, built from `Date.getUTC*`
+ * so that it did not depend on the host's locale data — and the inspector
+ * carried a second, differently shaped one. Both are gone: a reported instant is
+ * rendered by `<ReportedTime>` and formatted by `src/i18n/formatting.ts`, which
+ * keeps `timeZone: 'UTC'` and the visible `UTC` label that this pane always had
+ * (#40, ADR 0019).
  */
-export function formatTimestamp(value: Timestamp): string {
-  const date = new Date(value)
-  if (Number.isNaN(date.getTime())) return value
-
-  const pad = (part: number) => String(part).padStart(2, '0')
-  return (
-    `${pad(date.getUTCDate())}.${pad(date.getUTCMonth() + 1)}.${date.getUTCFullYear()}` +
-    `, ${pad(date.getUTCHours())}:${pad(date.getUTCMinutes())}:${pad(date.getUTCSeconds())} UTC`
-  )
-}
 
 // ---------------------------------------------------------------------------
 // Progress: two kinds of statement, never one

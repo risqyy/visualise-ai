@@ -1,12 +1,14 @@
+import { useTranslation } from 'react-i18next'
+
 import type { RunPlan, RunPlanRevision } from '@/api/types'
 import { Badge } from '@/components/ui/badge'
+import { ReportedTime } from '@/i18n'
 import { cn } from '@/lib/utils'
 
 import { CompletedStepsMeter } from './ProgressDisplay'
 import {
   PLAN_STEP_STATE_GLYPH,
   PLAN_STEP_STATE_LABEL,
-  formatTimestamp,
   stepCompletion,
 } from './reporting'
 
@@ -29,6 +31,8 @@ export interface PlanRevisionsProps {
  * without an interaction.
  */
 export function PlanRevisions({ plans }: PlanRevisionsProps) {
+  const { t } = useTranslation('common')
+
   return (
     <div data-testid="plan-revisions" className="space-y-3">
       {plans.map((plan) => (
@@ -41,7 +45,7 @@ export function PlanRevisions({ plans }: PlanRevisionsProps) {
           <header className="border-border flex items-baseline gap-1.5 border-b px-2 py-1.5">
             <h4 className="truncate font-mono text-xs font-medium">{plan.planId}</h4>
             <span className="text-muted-foreground shrink-0 text-xs">
-              {plan.revisions.length} Revision{plan.revisions.length === 1 ? '' : 'en'}
+              {t('count.revision', { count: plan.revisions.length })}
             </span>
           </header>
 
@@ -92,7 +96,8 @@ function PlanRevisionEntry({
       </div>
 
       <p className="pane-meta text-muted-foreground">
-        {formatTimestamp(revision.createdAt)} · {revision.createdByAgentId}
+        <ReportedTime value={revision.createdAt} className="pane-meta" /> ·{' '}
+        {revision.createdByAgentId}
       </p>
 
       <CompletedStepsMeter

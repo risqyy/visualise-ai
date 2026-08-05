@@ -4,6 +4,7 @@ import { useId, type ReactNode } from 'react'
 import type { AgentId } from '@/api/types'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
+import { ReportedTime } from '@/i18n'
 import { cn } from '@/lib/utils'
 
 import type { AgentTreeNode } from './agentHierarchy'
@@ -20,7 +21,6 @@ import {
   AGENT_STATUS_GLYPH,
   AGENT_STATUS_LABEL,
   OUTCOME_LABEL,
-  formatTimestamp,
   reportedWorkState,
 } from './reporting'
 
@@ -274,11 +274,21 @@ export function AgentTreeItem({
 
             <dl className="space-y-0.5 text-xs">
               <DetailRow label={AGENT_PANE_TEXT.lastEventLabel}>
+                {/*
+                  "Zuletzt gemeldet" asks how long ago, so the relative phrase
+                  leads and the exact UTC instant travels with it in `title`,
+                  `aria-label` and `datetime` (#40). It is a rendering of the
+                  reported instant and never a verdict about it.
+                */}
                 <span
                   data-testid={`agent-last-event-${agent.agentId}`}
                   className="pane-meta text-muted-foreground"
                 >
-                  {formatTimestamp(agent.lastEventAt)}
+                  <ReportedTime
+                    value={agent.lastEventAt}
+                    display="relative"
+                    className="pane-meta"
+                  />
                 </span>
               </DetailRow>
               <DetailRow label={AGENT_PANE_TEXT.outcomeLabel}>

@@ -1,10 +1,10 @@
 import { Handle, Position, type NodeProps } from '@xyflow/react'
 import { ChevronDown, ChevronRight } from 'lucide-react'
 import { memo, use } from 'react'
+import { useTranslation } from 'react-i18next'
 
 import type { ComponentId } from '@/api/types'
 import { cn } from '@/lib/utils'
-import { COUNT_LABELS, counted } from '@/lib/plural'
 import { WORK_STATE_BY_ID } from '@/state/workStates'
 
 import { ChangeOverlayMark } from './ChangeOverlayMark'
@@ -74,10 +74,11 @@ interface DisclosureToggleProps {
  * opening a container and choosing one are two different intents.
  */
 function DisclosureToggle({ componentId, collapsed, hiddenCount }: DisclosureToggleProps) {
+  const { t } = useTranslation('common')
   const { toggleCollapsed } = use(CanvasNodeActionsContext)
   const Icon = collapsed ? ChevronRight : ChevronDown
   const label = collapsed
-    ? `${DISCLOSURE_LABELS.expand} (${counted(hiddenCount, COUNT_LABELS.component)})`
+    ? `${DISCLOSURE_LABELS.expand} (${t('count.component', { count: hiddenCount })})`
     : DISCLOSURE_LABELS.collapse
 
   return (
@@ -224,6 +225,7 @@ export const CompoundNode = memo(function CompoundNode({
   data,
   selected,
 }: NodeProps<ArchitectureNode>) {
+  const { t } = useTranslation('common')
   const level = useDetailLevel()
   const { component, childCount, overlay, applied, collapsed, hiddenDescendantCount } =
     data
@@ -297,7 +299,7 @@ export const CompoundNode = memo(function CompoundNode({
         {overlay && <ChangeOverlayMark overlay={overlay} />}
         {!collapsed && (
           <span className="text-muted-foreground shrink-0 text-[10px]">
-            {counted(childCount, COUNT_LABELS.child)}
+            {t('count.child', { count: childCount })}
           </span>
         )}
         <KindBadge label={kind.label} />
@@ -309,7 +311,7 @@ export const CompoundNode = memo(function CompoundNode({
             className="text-muted-foreground text-[10px] leading-tight"
             data-testid="node-hidden-count"
           >
-            {counted(hiddenCount, COUNT_LABELS.component)} eingeklappt
+            {t('count.component', { count: hiddenCount })} eingeklappt
           </p>
           {showsTechnology(level) && <TechnologyRow parts={technology} />}
         </div>

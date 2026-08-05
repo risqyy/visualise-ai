@@ -5,9 +5,10 @@ import type { ProjectId, RunDetail, RunId, RunSummary } from '@/api/types'
 import { AsyncState, EmptyState } from '@/components/AsyncState'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
+import { ReportedTime } from '@/i18n'
 import { cn } from '@/lib/utils'
 
-import { OUTCOME_LABEL, formatTimestamp } from './reporting'
+import { OUTCOME_LABEL } from './reporting'
 
 export interface RunSelectorProps {
   projectId: ProjectId
@@ -175,7 +176,7 @@ function RunLink({
           : `beendet: ${run.outcome ? OUTCOME_LABEL[run.outcome] : 'ohne gemeldetes Ergebnis'}`}
       </span>
       <span className="pane-meta text-muted-foreground block">
-        seit {formatTimestamp(run.startedAt)}
+        seit <ReportedTime value={run.startedAt} className="pane-meta" />
       </span>
       <span className="text-muted-foreground block text-xs">
         {/*

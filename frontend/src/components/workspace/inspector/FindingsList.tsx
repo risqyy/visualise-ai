@@ -3,8 +3,7 @@ import { CircleAlert, CircleDashed, TriangleAlert } from 'lucide-react'
 import type { ActiveChange, ReportedProblem, ReportedRisk, RiskSeverity } from '@/api/types'
 import { EmptyState } from '@/components/AsyncState'
 import { Badge } from '@/components/ui/badge'
-
-import { formatTimestamp } from './formatting'
+import { ReportedTime } from '@/i18n'
 
 /**
  * Risks, problems and pending proposals of the selected run.
@@ -51,7 +50,7 @@ export function RiskList({ risks }: { risks: readonly ReportedRisk[] }) {
           <p className="text-muted-foreground text-2xs mt-0.5">
             <span className="font-mono">{risk.agentId}</span>
             <span aria-hidden="true"> · </span>
-            {formatTimestamp(risk.createdAt)}
+            <ReportedTime value={risk.createdAt} />
           </p>
         </li>
       ))}
@@ -89,7 +88,7 @@ export function ProblemList({ problems }: { problems: readonly ReportedProblem[]
           <p className="text-muted-foreground text-2xs mt-0.5">
             <span className="font-mono">{problem.agentId}</span>
             <span aria-hidden="true"> · </span>
-            {formatTimestamp(problem.createdAt)}
+            <ReportedTime value={problem.createdAt} />
           </p>
         </li>
       ))}
@@ -130,7 +129,7 @@ export function ActiveChangeList({ changes }: { changes: readonly ActiveChange[]
           <p className="text-muted-foreground text-2xs mt-0.5">
             <span className="font-mono">{change.agentId}</span>
             <span aria-hidden="true"> · </span>
-            geplant {formatTimestamp(change.plannedAt)}
+            geplant <ReportedTime value={change.plannedAt} />
           </p>
         </li>
       ))}

@@ -4,9 +4,9 @@ import type { ComponentHistoryEntry, RunId } from '@/api/types'
 import { EmptyState } from '@/components/AsyncState'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
+import { ReportedTime } from '@/i18n'
 import { cn } from '@/lib/utils'
 
-import { formatTimestamp } from './formatting'
 import {
   buildHistoryItems,
   EVENT_TYPE_LABELS,
@@ -120,7 +120,7 @@ function HistoryRow({ item, isCurrentRun }: { item: HistoryItem; isCurrentRun: b
         Run <span className="font-mono">{entry.runId}</span>
         {isCurrentRun && <span> (aktueller Run)</span>}
         <span aria-hidden="true"> · </span>
-        {formatTimestamp(entry.occurredAt)}
+        <ReportedTime value={entry.occurredAt} />
       </p>
 
       {item.reason !== null && (

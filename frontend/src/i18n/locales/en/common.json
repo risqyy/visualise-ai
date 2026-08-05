@@ -2,7 +2,35 @@
   "action": {
     "retry": "Try again"
   },
+  "count": {
+    "agent_one": "{{count, number}} agent",
+    "agent_other": "{{count, number}} agents",
+    "child_one": "{{count, number}} child",
+    "child_other": "{{count, number}} children",
+    "component_one": "{{count, number}} component",
+    "component_other": "{{count, number}} components",
+    "diff_one": "{{count, number}} diff",
+    "diff_other": "{{count, number}} diffs",
+    "feedback_one": "{{count, number}} feedback entry",
+    "feedback_other": "{{count, number}} feedback entries",
+    "file_one": "{{count, number}} file",
+    "file_other": "{{count, number}} files",
+    "plan_one": "{{count, number}} plan",
+    "plan_other": "{{count, number}} plans",
+    "problem_one": "{{count, number}} problem",
+    "problem_other": "{{count, number}} problems",
+    "revision_one": "{{count, number}} revision",
+    "revision_other": "{{count, number}} revisions",
+    "risk_one": "{{count, number}} risk",
+    "risk_other": "{{count, number}} risks",
+    "workStep_one": "{{count, number}} work step",
+    "workStep_other": "{{count, number}} work steps"
+  },
   "state": {
     "loading": "Loading data…"
+  },
+  "time": {
+    "notReported": "not reported",
+    "relativeWithExact": "{{relative}}, reported {{absolute}}"
   }
 }

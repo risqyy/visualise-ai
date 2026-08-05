@@ -1,12 +1,13 @@
 import { FileDiff, GitCommitVertical } from 'lucide-react'
+import { useTranslation } from 'react-i18next'
 
 import type { ReportedDiff } from '@/api/types'
 import { EmptyState } from '@/components/AsyncState'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
+import { ReportedTime } from '@/i18n'
 
 import { groupDiffs, type DiffGroup } from './diffGroups'
-import { formatTimestamp } from './formatting'
 import { SCROLL_ANCHOR_ATTRIBUTE } from './scrollStability'
 import { UnifiedDiffView } from './UnifiedDiffView'
 
@@ -66,6 +67,7 @@ export function DiffGroupList({
 }
 
 function DiffGroupCard({ group }: { group: DiffGroup }) {
+  const { t } = useTranslation('common')
   const isAttributed = group.changeId !== null
   const heading = isAttributed
     ? `Änderung ${group.changeId}`
@@ -92,7 +94,7 @@ function DiffGroupCard({ group }: { group: DiffGroup }) {
             {heading}
           </h4>
           <Badge variant="outline" className="text-2xs shrink-0 font-normal tabular-nums">
-            {group.files.length} {group.files.length === 1 ? 'Datei' : 'Dateien'}
+            {t('count.file', { count: group.files.length })}
           </Badge>
         </div>
         <p className="text-muted-foreground text-2xs">
@@ -105,7 +107,7 @@ function DiffGroupCard({ group }: { group: DiffGroup }) {
           <span aria-hidden="true"> · </span>
           Run <span className="font-mono">{group.runId}</span>
           <span aria-hidden="true"> · </span>
-          {formatTimestamp(group.reportedAt)}
+          <ReportedTime value={group.reportedAt} />
           <span aria-hidden="true"> · </span>
           <span className="text-state-applied">+{group.additions}</span>
           <span> / </span>
