@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next'
 
 import { useProjects } from '@/api/queries'
 import { AsyncState } from '@/components/AsyncState'
+import { LanguageSwitcher } from '@/components/LanguageSwitcher'
 import { Badge } from '@/components/ui/badge'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { ReportedText, ReportedTime } from '@/i18n'
@@ -25,8 +26,20 @@ export function ProjectsPage() {
     <main className="min-h-0 flex-1">
       <ScrollArea className="h-full">
         <div className="mx-auto w-full max-w-3xl px-6 py-10">
-          <h1 className="text-xl font-semibold">{t('list.title')}</h1>
-          <p className="text-muted-foreground mt-1 text-sm">{t('list.description')}</p>
+          {/*
+            The project list is the cockpit's entry point and the page every
+            other one links back to, so it carries the second — and last —
+            language switch. Choosing the language before opening a workspace
+            has to be possible; repeating the control on every screen would not
+            make it more reachable, only louder.
+          */}
+          <div className="flex items-start justify-between gap-4">
+            <div className="min-w-0">
+              <h1 className="text-xl font-semibold">{t('list.title')}</h1>
+              <p className="text-muted-foreground mt-1 text-sm">{t('list.description')}</p>
+            </div>
+            <LanguageSwitcher className="mt-0.5 shrink-0" />
+          </div>
 
           <div className="mt-6">
             <AsyncState

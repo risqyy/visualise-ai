@@ -29,6 +29,19 @@
     "workStep_one": "{{count, number}} Arbeitsschritt",
     "workStep_other": "{{count, number}} Arbeitsschritte"
   },
+  "language": {
+    "code": {
+      "de": "DE",
+      "en": "EN"
+    },
+    "current": "Aktuelle Sprache: {{language}}",
+    "label": "Sprache",
+    "name": {
+      "de": "Deutsch",
+      "en": "English"
+    },
+    "switchTo": "Auf {{language}} umschalten"
+  },
   "state": {
     "loading": "Daten werden geladen…",
     "loadingMore": "Lädt…"

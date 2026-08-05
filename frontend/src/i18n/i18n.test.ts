@@ -8,6 +8,7 @@ import {
   LANGUAGE_STORAGE_KEY,
   isSupportedLanguage,
   resolveInitialLanguage,
+  storeLanguage,
 } from './languages'
 
 /**
@@ -43,6 +44,35 @@ describe('language resolution', () => {
     expect(isSupportedLanguage('fr')).toBe(false)
   })
 
+  it('discards a stored language the cockpit no longer supports', () => {
+    // Somebody chose French; a later release dropped it. The cockpit comes up
+    // in German — and does not keep a preference around that nothing can act
+    // on and nothing can show.
+    localStorage.setItem(LANGUAGE_STORAGE_KEY, 'fr')
+
+    expect(resolveInitialLanguage(localStorage)).toBe('de')
+    expect(localStorage.getItem(LANGUAGE_STORAGE_KEY)).toBeNull()
+    // …and the next start reads a clean slate rather than repeating the fall-back.
+    expect(resolveInitialLanguage(localStorage)).toBe('de')
+  })
+
+  it('leaves a supported choice and an empty storage alone', () => {
+    const removed: string[] = []
+    const storage = {
+      getItem: (key: string) => localStorage.getItem(key),
+      removeItem: (key: string) => removed.push(key),
+    }
+
+    expect(resolveInitialLanguage(storage)).toBe('de')
+    localStorage.setItem(LANGUAGE_STORAGE_KEY, 'en')
+    expect(resolveInitialLanguage(storage)).toBe('en')
+
+    // Nothing was stored the first time and the second value is supported, so
+    // the clean-up never ran: it is a reaction to a dropped language, not a
+    // write on every start-up.
+    expect(removed).toEqual([])
+  })
+
   it('starts in German when storage cannot be read at all', () => {
     const blocked = {
       getItem() {
@@ -52,6 +82,29 @@ describe('language resolution', () => {
 
     expect(resolveInitialLanguage(blocked)).toBe('de')
     expect(resolveInitialLanguage(null)).toBe('de')
+  })
+
+  it('starts in the language that was last chosen', () => {
+    storeLanguage('en', localStorage)
+
+    expect(localStorage.getItem(LANGUAGE_STORAGE_KEY)).toBe('en')
+    expect(resolveInitialLanguage(localStorage)).toBe('en')
+    // The default path — the one `main.tsx` takes — reads the same value.
+    expect(createI18n().language).toBe('en')
+  })
+
+  it('keeps working when the preference cannot be written', () => {
+    const blocked = {
+      getItem: () => null,
+      setItem() {
+        throw new Error('quota exceeded')
+      },
+    }
+
+    // The language the user asked for is already on screen; refusing the switch
+    // because it could not be remembered would trade a session for a byte.
+    expect(() => storeLanguage('en', blocked)).not.toThrow()
+    expect(() => storeLanguage('en', null)).not.toThrow()
   })
 })
 
