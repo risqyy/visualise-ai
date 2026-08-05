@@ -65,6 +65,23 @@ jobs:
       # frontend would be typed against a document nobody published.
       - run: npm run check:contract
         working-directory: frontend
+
+      # The two catalogue guards run as steps of their own, before the suite.
+      #
+      # Both are also executed by Vitest (`src/i18n/catalogues.test.ts`,
+      # `src/i18n/uiStrings.test.ts`), which is what proves they *work* — those
+      # tests run them against deliberately broken catalogues as well. What a
+      # named step adds is the failure being readable: "check locale catalogues"
+      # in red says a key is missing in one language, where "frontend (react)"
+      # in red says something among 400-odd tests went wrong. Issue #37 asks for
+      # catalogue parity to be validated in CI; this is where that happens.
+      - name: Check locale catalogues (key parity across languages)
+        run: npm run check:locales
+        working-directory: frontend
+      - name: Check for UI text outside the catalogues
+        run: npm run check:ui-strings
+        working-directory: frontend
+
       - run: npm run lint
         working-directory: frontend
       - run: npm run typecheck

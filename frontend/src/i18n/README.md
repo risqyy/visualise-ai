@@ -365,6 +365,63 @@ a stored value is compared against the supported set and a second implementation
 of that comparison is a second chance to get it wrong. A value that is simply
 absent causes no write.
 
+## What the tests guarantee
+
+The reasoning is [ADR 0022](../../../docs/decisions/0022-translation-test-suite-pseudo-locale-and-a-suite-that-can-be-believed.md);
+this is the map.
+
+| file | what it holds up |
+| --- | --- |
+| `i18n.test.ts` | start-up, the stored choice, `fallbackLng`, and both halves of the missing-key rule |
+| `formatting.test.ts` | plurals, instants, percentages and counters in both languages — and, read out of the catalogue itself, *every* counted noun, so the one added next week is covered without anybody editing this file |
+| `catalogues.test.ts` | `check:locales`, against the real catalogues and against five deliberately broken ones |
+| `uiStrings.test.ts` | `check:ui-strings`, likewise against six deliberately broken trees |
+| `accessibleNames.test.tsx` | every `aria-label`, `title`, `placeholder` and `sr-only` text on both surfaces, in both languages: nothing resolves to a key, every operable control has a name, and the two languages really differ |
+| `ProjectsPage.i18n.test.tsx`, `WorkspacePage.i18n.test.tsx` | the same components rendered German and English, and every `data-reported` value compared character for character |
+| `WorkspacePage.pseudo.test.tsx` | the same screen with every one of our words 35 % longer |
+| `pseudoLocale.test.ts` | the generator behind it |
+| `e2e/tests/09-i18n-layout.spec.ts` | the pixels: 1920, 1440 and 1280, German, English and 35 % longer, against the real deployment |
+
+### The pseudo-locale
+
+`src/test/pseudoLocale.ts` derives a **third catalogue from the German one** by
+lengthening every string by 35 %. Its purpose is the question no real catalogue
+can ask today: what happens when a translation is longer than anything either
+catalogue currently contains.
+
+It is deliberately **not a language**:
+
+- not in `SUPPORTED_LANGUAGES`, so it cannot reach the switch, `<html lang>` or
+  a stored preference — the product speaks two languages;
+- not a directory under `locales/`, so `check:locales` never sees it;
+- not in the bundle — it lives under `src/test/`.
+
+It is installed onto the German slot of one i18next instance, so the application
+renders exactly as it renders in German, with every one of its own words longer:
+
+```tsx
+renderApp('/projects', { i18n: createPseudoI18n() })
+```
+
+Two things it does **not** touch: `{{interpolations}}` and the `<agent/>`,
+`<run/>`, `<field/>` slots of `<Trans>` — the padding is appended, never woven
+in — and anything carrying `data-reported`. The last one is why the pseudo
+rendering is a *third* proof of the byte-identity rule rather than a repetition
+of the German/English one: in it, every translated string on screen differs from
+both catalogues, so a reported value accidentally routed through `t()` could not
+come out unchanged.
+
+`createPseudoI18n` clones the instance's resource store before writing to it,
+and that line is load-bearing. `i18next.init({ resources })` keeps a *reference*
+to the module-level catalogue, so `addResourceBundle` would otherwise replace
+the real German texts for the rest of the worker process — and the failure would
+show up in an unrelated test three files later.
+
+The acceptance run needs the same locale in a real browser, where a generated
+catalogue cannot reach. `e2e/src/pseudoLocale.ts` therefore lengthens the text of
+the running page instead, with the same 35 % and the same filler. Two
+implementations of one rule; each asserts the 30–40 % band for itself.
+
 ## Using it
 
 ```tsx

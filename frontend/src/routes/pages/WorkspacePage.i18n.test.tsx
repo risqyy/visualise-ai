@@ -2,25 +2,15 @@ import { screen } from '@testing-library/react'
 import { describe, expect, it } from 'vitest'
 
 import type { Language } from '@/i18n'
-import { PROJECT_ID, RUN_ID, component, createFakeFetch } from '@/test/fixtures'
-import {
-  COMPONENT_ID,
-  FEEDBACK_MARKDOWN,
-  HISTORY_PATH,
-  INSPECTOR_PATH,
-  historyPage,
-  inspectorPage,
-} from '@/test/inspectorFixtures'
-import {
-  CHAINED_TASK,
-  PARAGRAPH_TASK,
-  longTaskAgentsResponse,
-  openRunResponse,
-  runPaths,
-  runsWithHistoryResponse,
-  twoRevisionPlansResponse,
-} from '@/test/runFixtures'
+import { RUN_ID } from '@/test/fixtures'
+import { COMPONENT_ID, FEEDBACK_MARKDOWN } from '@/test/inspectorFixtures'
+import { CHAINED_TASK, PARAGRAPH_TASK } from '@/test/runFixtures'
 import { renderApp } from '@/test/renderApp'
+import {
+  WORKSPACE_SCENE_URL,
+  renderWorkspaceScene,
+  workspaceSceneServer,
+} from '@/test/workspaceScene'
 
 /**
  * The whole workspace, rendered twice.
@@ -42,28 +32,6 @@ import { renderApp } from '@/test/renderApp'
  * up to date.
  */
 
-const WORKSPACE_URL = `/projects/${PROJECT_ID}/runs/${RUN_ID}?component=${COMPONENT_ID}`
-
-/** The three panes, each with real reported content in them. */
-function workspaceServer(): typeof fetch {
-  const base = createFakeFetch({
-    [runPaths.runs]: runsWithHistoryResponse,
-    [runPaths.currentRun]: openRunResponse,
-    [runPaths.runDetail]: openRunResponse,
-    [runPaths.agents]: longTaskAgentsResponse,
-    [runPaths.plans]: twoRevisionPlansResponse,
-    [runPaths.architecture]: {
-      projectPosition: 42,
-      components: [component({ componentId: COMPONENT_ID, name: 'Tax', kind: 'module' })],
-      relationships: [],
-      activeChanges: [],
-    },
-    [INSPECTOR_PATH]: inspectorPage(),
-    [HISTORY_PATH]: historyPage(),
-  })
-  return base
-}
-
 interface Rendered {
   reported: string[]
   translatable: string[]
@@ -72,14 +40,7 @@ interface Rendered {
 
 /** Renders the workspace and separates what is ours from what is the agent's. */
 async function renderWorkspace(language: Language): Promise<Rendered> {
-  const { container, unmount } = renderApp(WORKSPACE_URL, {
-    language,
-    fetchImpl: workspaceServer(),
-  })
-
-  // Wait for all three panes: the inspector arrives last.
-  await screen.findByTestId('inspector-context')
-  await screen.findByTestId('agent-tree')
+  const { container, unmount } = await renderWorkspaceScene({ language })
 
   const reported = [...container.querySelectorAll('[data-reported]')].map(
     (node) => node.textContent ?? '',
@@ -251,7 +212,9 @@ describe('workspace — reported project data is identical in both languages', (
 
   it('marks every reported value untranslatable for the browser as well', async () => {
     const { reported, unmount } = await renderWorkspace('de')
-    const { container } = renderApp(WORKSPACE_URL, { fetchImpl: workspaceServer() })
+    const { container } = renderApp(WORKSPACE_SCENE_URL, {
+      fetchImpl: workspaceSceneServer(),
+    })
 
     // `data-reported` and `translate="no"` are one and the same marker: a value
     // that is greppable but that Chrome would still rewrite protects nothing.

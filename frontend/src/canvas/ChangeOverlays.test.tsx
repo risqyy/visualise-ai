@@ -87,6 +87,16 @@ async function waitForCanvas(): Promise<HTMLElement> {
   await waitFor(() => expect(canvas.getAttribute('data-layouting')).toBe('false'), {
     timeout: CANVAS_TIMEOUT,
   })
+  // `data-layouting: false` only says that ELK is done. The automatic camera
+  // placement runs in an effect *after* the layout, so the first `fitView` —
+  // and with it `data-fit-view-count`, the viewport transform and the stored
+  // camera — is still one commit away when the flag flips. Reading any of them
+  // synchronously at that moment is a race that goes red exactly when the
+  // machine is busy.
+  await waitFor(
+    () => expect(Number(canvas.getAttribute('data-fit-view-count'))).toBeGreaterThan(0),
+    { timeout: CANVAS_TIMEOUT },
+  )
   return canvas
 }
 
