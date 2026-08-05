@@ -5,9 +5,11 @@ holds the whole localisation layer: the catalogues, the i18next factory, and the
 one component that marks text which must never be translated.
 
 The reasoning behind all of it is
-[ADR 0014](../../../docs/decisions/0014-localisation-architecture-and-translation-contract.md)
-and, for the migration of every text into it,
-[ADR 0020](../../../docs/decisions/0020-ui-text-migration-and-the-technical-glossary.md).
+[ADR 0014](../../../docs/decisions/0014-localisation-architecture-and-translation-contract.md),
+for the migration of every text into it
+[ADR 0020](../../../docs/decisions/0020-ui-text-migration-and-the-technical-glossary.md),
+and for the switch between the two languages
+[ADR 0021](../../../docs/decisions/0021-persistent-language-switch-and-state-preservation.md).
 
 ## The translation contract
 
@@ -321,9 +323,47 @@ already in the final language: no flash, no visible switch.
 
 Without a stored choice the language is German. `Accept-Language` is
 deliberately not consulted — German is the default, and a navigator sniff would
-break exactly that for a user who never asked for English. The persisted
-language switch itself is #36; `LANGUAGE_STORAGE_KEY` is defined here so the
-reader and the future writer cannot drift apart.
+break exactly that for a user who never asked for English.
+
+## Switching at runtime
+
+`<LanguageSwitcher>` (`src/components/LanguageSwitcher.tsx`) sits in the
+workspace header and next to the project list's heading — the cockpit's two
+persistent surfaces. Two segments, `DE` and `EN`, each an `aria-pressed` toggle
+button inside a `role="group"` with a translated accessible name. The segments
+are named in their **own** language, identical in both catalogues, so a reader
+who ended up in a language they cannot read can still find the way out.
+
+```tsx
+const { language, choose } = useLanguagePreference()
+choose('en')   // stores the choice, then i18n.changeLanguage('en')
+```
+
+That is the whole of it, and everything #36 promises follows from what it does
+*not* do — see [ADR 0021](../../../docs/decisions/0021-persistent-language-switch-and-state-preservation.md):
+
+| preserved | because |
+| --- | --- |
+| the URL, byte for byte | nothing navigates |
+| pane sizes and collapse flags | nothing writes `uiStore` |
+| camera, container disclosure, selection | nothing unmounts, so the *transient* half of `uiStore` is never re-initialised |
+| the canvas viewport | ELK is keyed on the projection signature and the collapsed set — neither is language-dependent — so no re-layout runs and `fitView` is never called |
+| agent feedback and code diffs | they never went through the translation layer at all |
+| the focus | the pressed segment is not remounted, so it keeps it |
+
+There is **no `location.reload()`**. A reload would throw away exactly the
+transient state `uiStore.ts` deliberately does not persist.
+
+`storeLanguage()` is the only writer of `LANGUAGE_STORAGE_KEY`. Every storage
+access is guarded: a browser that refuses to read, write or remove still gets a
+working cockpit, in German if need be.
+
+**A stored language that is no longer supported** — somebody chose `fr` and a
+later release dropped it — resolves to German *and is removed*.
+`resolveInitialLanguage` does both, because there is exactly one moment at which
+a stored value is compared against the supported set and a second implementation
+of that comparison is a second chance to get it wrong. A value that is simply
+absent causes no write.
 
 ## Using it
 

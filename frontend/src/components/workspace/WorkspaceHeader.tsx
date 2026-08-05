@@ -3,6 +3,7 @@ import { PanelLeftClose, PanelLeftOpen, PanelRightClose, PanelRightOpen } from '
 import { useTranslation } from 'react-i18next'
 
 import type { ProjectId, RunId } from '@/api/types'
+import { LanguageSwitcher } from '@/components/LanguageSwitcher'
 import { LiveConnectionBadge } from '@/components/LiveConnectionBadge'
 import { Button } from '@/components/ui/button'
 import { Separator } from '@/components/ui/separator'
@@ -67,6 +68,15 @@ export function WorkspaceHeader({ projectId, runId }: WorkspaceHeaderProps) {
 
       <div className="ml-auto flex shrink-0 items-center gap-2">
         <LiveConnectionBadge />
+        <Separator orientation="vertical" className="h-5" />
+        {/*
+          The workspace header is the cockpit's only persistent chrome, so the
+          language switch sits here rather than in a settings screen — and it
+          sits in the header's right cluster, next to the other two controls
+          that are about *how* the cockpit is looked at rather than about the
+          data. The pane toggle stays at the very edge, mirroring the left one.
+        */}
+        <LanguageSwitcher />
         <Separator orientation="vertical" className="h-5" />
         <PaneToggle
           label={t('pane.rightLabel')}

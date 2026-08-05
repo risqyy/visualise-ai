@@ -18,8 +18,11 @@ export {
   SUPPORTED_LANGUAGES,
   isSupportedLanguage,
   resolveInitialLanguage,
+  storeLanguage,
 } from './languages'
-export type { Language } from './languages'
+export type { Language, LanguageStorage } from './languages'
+export { useLanguagePreference } from './useLanguagePreference'
+export type { LanguagePreference } from './useLanguagePreference'
 export type {
   AgentsKey,
   CanvasKey,
