@@ -8,11 +8,13 @@ import { cn } from '@/lib/utils'
 import { WORK_STATE_BY_ID } from '@/state/workStates'
 
 import { ChangeOverlayMark } from './ChangeOverlayMark'
+import { nodeDisclosureLabel } from './canvasAccessibility'
 import type { ChangeOverlay } from './changeOverlays'
 import { componentKindStyle, componentTags, technologyParts } from './componentKinds'
 import { DISCLOSURE_LABELS, showsTags, showsTechnology } from './detailLevel'
 import { HANDLE_IDS, type ArchitectureNode } from './graphProjection'
 import { CanvasNodeActionsContext } from './nodeActions'
+import { useCanvasCountText } from './useCanvasCountText'
 import { useDetailLevel } from './useDetailLevel'
 
 /**
@@ -61,6 +63,8 @@ function overlayBoxProps(overlay: ChangeOverlay | null, applied: boolean) {
 
 interface DisclosureToggleProps {
   componentId: ComponentId
+  /** Reported name of the container this toggle belongs to. */
+  componentName: string
   collapsed: boolean
   /** Components hidden behind this container right now. */
   hiddenCount: number
@@ -72,20 +76,39 @@ interface DisclosureToggleProps {
  * `nodrag`/`nopan` stop React Flow from turning the press into a node drag or a
  * canvas pan, and `stopPropagation` keeps it from also selecting the node —
  * opening a container and choosing one are two different intents.
+ *
+ * The visible `title` stays the short action; the **accessible** name names the
+ * container as well (`nodeDisclosureLabel`, #35). A screen reader reaches this
+ * button out of context — a canvas full of controls that all announce
+ * "Aufklappen" says what would happen but never to what.
  */
-function DisclosureToggle({ componentId, collapsed, hiddenCount }: DisclosureToggleProps) {
+function DisclosureToggle({
+  componentId,
+  componentName,
+  collapsed,
+  hiddenCount,
+}: DisclosureToggleProps) {
   const { t } = useTranslation('common')
+  const countText = useCanvasCountText()
   const { toggleCollapsed } = use(CanvasNodeActionsContext)
   const Icon = collapsed ? ChevronRight : ChevronDown
-  const label = collapsed
+  // The visible title counts through the locale-aware formatter (#40); the
+  // accessible name additionally says *which* container (#35).
+  const title = collapsed
     ? `${DISCLOSURE_LABELS.expand} (${t('count.component', { count: hiddenCount })})`
     : DISCLOSURE_LABELS.collapse
+  const label = nodeDisclosureLabel(
+    componentName,
+    !collapsed,
+    countText,
+    collapsed ? hiddenCount : undefined,
+  )
 
   return (
     <button
       type="button"
       className="nodrag nopan text-muted-foreground hover:text-foreground hover:bg-secondary/70 focus-visible:ring-ring -m-0.5 flex shrink-0 items-center gap-0.5 rounded-sm p-0.5 focus-visible:ring-2 focus-visible:outline-none"
-      title={label}
+      title={title}
       aria-label={label}
       aria-expanded={!collapsed}
       data-testid={`node-disclosure-${componentId}`}
@@ -273,6 +296,7 @@ export const CompoundNode = memo(function CompoundNode({
       >
         <DisclosureToggle
           componentId={component.componentId}
+          componentName={component.name}
           collapsed={collapsed === true}
           hiddenCount={collapsed ? hiddenCount : childCount}
         />
