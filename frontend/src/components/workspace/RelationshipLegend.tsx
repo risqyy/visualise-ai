@@ -1,3 +1,5 @@
+import { useTranslation } from 'react-i18next'
+
 import type { RelationshipKind } from '@/api/types'
 import { RELATIONSHIP_KIND_STYLES } from '@/canvas/relationshipKinds'
 import { cn } from '@/lib/utils'
@@ -27,6 +29,7 @@ export function RelationshipLegend({
    */
   kinds?: readonly RelationshipKind[]
 }) {
+  const { t } = useTranslation('canvas')
   const present = kinds && kinds.length > 0 ? new Set(kinds) : null
   const styles = present
     ? RELATIONSHIP_KIND_STYLES.filter((style) => present.has(style.id))
@@ -36,7 +39,7 @@ export function RelationshipLegend({
 
   return (
     <div className={cn('flex flex-wrap items-center gap-x-4 gap-y-1.5', className)}>
-      <span className="pane-heading">Beziehungsarten</span>
+      <span className="pane-heading">{t('legend.relationshipTitle')}</span>
       <ul
         className="flex flex-wrap items-center gap-x-4 gap-y-1.5"
         data-testid="relationship-legend"
@@ -59,8 +62,8 @@ export function RelationshipLegend({
                 </span>
               </TooltipTrigger>
               <TooltipContent>
-                <p className="font-medium">{style.label}</p>
-                <p className="text-xs">{style.description}</p>
+                <p className="font-medium">{t(style.labelKey)}</p>
+                <p className="text-xs">{t(style.descriptionKey)}</p>
               </TooltipContent>
             </Tooltip>
           </li>

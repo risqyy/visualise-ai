@@ -1,13 +1,24 @@
 import { Link } from '@tanstack/react-router'
 import { ChevronRight } from 'lucide-react'
+import { useTranslation } from 'react-i18next'
 
 import { useProjects } from '@/api/queries'
 import { AsyncState } from '@/components/AsyncState'
-import { ScrollArea } from '@/components/ui/scroll-area'
+import { LanguageSwitcher } from '@/components/LanguageSwitcher'
 import { Badge } from '@/components/ui/badge'
+import { ScrollArea } from '@/components/ui/scroll-area'
+import { ReportedText, ReportedTime } from '@/i18n'
 
-/** `/projects` — entry point of the cockpit. */
+/**
+ * `/projects` — entry point of the cockpit.
+ *
+ * The first area migrated onto the translation catalogues (#38), and the worked
+ * example of the translation contract: every label here is ours and goes
+ * through `t()`, every project id, run id and timestamp is the agent's and goes
+ * through `ReportedText` unchanged. The rest of the app follows in #42.
+ */
 export function ProjectsPage() {
+  const { t } = useTranslation('projects')
   const projects = useProjects()
   const list = projects.data?.projects ?? []
 
@@ -15,10 +26,20 @@ export function ProjectsPage() {
     <main className="min-h-0 flex-1">
       <ScrollArea className="h-full">
         <div className="mx-auto w-full max-w-3xl px-6 py-10">
-          <h1 className="text-xl font-semibold">Projekte</h1>
-          <p className="text-muted-foreground mt-1 text-sm">
-            Beobachtete Projekte. Ein Projekt öffnet direkt seinen aktuellen Run.
-          </p>
+          {/*
+            The project list is the cockpit's entry point and the page every
+            other one links back to, so it carries the second — and last —
+            language switch. Choosing the language before opening a workspace
+            has to be possible; repeating the control on every screen would not
+            make it more reachable, only louder.
+          */}
+          <div className="flex items-start justify-between gap-4">
+            <div className="min-w-0">
+              <h1 className="text-xl font-semibold">{t('list.title')}</h1>
+              <p className="text-muted-foreground mt-1 text-sm">{t('list.description')}</p>
+            </div>
+            <LanguageSwitcher className="mt-0.5 shrink-0" />
+          </div>
 
           <div className="mt-6">
             <AsyncState
@@ -26,8 +47,8 @@ export function ProjectsPage() {
               isError={projects.isError}
               error={projects.error}
               isEmpty={list.length === 0}
-              emptyTitle="Noch keine Projekte gemeldet"
-              emptyDescription="Ein Projekt entsteht, sobald ein Agent das erste Ereignis an /api/v1/events sendet."
+              emptyTitle={t('empty.title')}
+              emptyDescription={t('empty.description')}
               onRetry={() => void projects.refetch()}
               skeletonRows={4}
             >
@@ -37,6 +58,10 @@ export function ProjectsPage() {
                     <Link
                       to="/projects/$projectId"
                       params={{ projectId: project.projectId }}
+                      // An accessible name has no room for markup, so the
+                      // reported id is interpolated into the translated
+                      // sentence instead — i18next passes it through verbatim.
+                      aria-label={t('item.openLabel', { projectId: project.projectId })}
                       className="border-border bg-card hover:bg-accent focus-visible:ring-ring flex items-center gap-3 rounded-lg border px-4 py-3 focus-visible:ring-2 focus-visible:outline-none"
                     >
                       <span className="min-w-0 flex-1">
@@ -44,15 +69,28 @@ export function ProjectsPage() {
                           The contract knows no display name for a project: a
                           project is its slug. Nothing is invented here.
                         */}
-                        <span className="block truncate font-mono font-medium">
-                          {project.projectId}
-                        </span>
+                        <ReportedText
+                          value={project.projectId}
+                          className="block truncate font-mono font-medium"
+                        />
                         <span className="text-muted-foreground block truncate text-xs">
-                          zuletzt gemeldet {project.lastEventAt}
+                          {/*
+                            "How long ago" is the question a project list is
+                            scanned for, so the relative phrase is what is
+                            painted — and the reported UTC instant stays with it
+                            in `datetime`, `title` and the accessible name, so
+                            nothing turns into a local-time claim (#40).
+                          */}
+                          {t('item.lastReported')}{' '}
+                          <ReportedTime value={project.lastEventAt} display="relative" />
                         </span>
                       </span>
                       <Badge variant="outline" className="text-2xs font-normal">
-                        {project.currentRunId ?? 'kein aktueller Run'}
+                        {project.currentRunId ? (
+                          <ReportedText value={project.currentRunId} />
+                        ) : (
+                          t('item.noCurrentRun')
+                        )}
                       </Badge>
                       <ChevronRight className="size-4 shrink-0" aria-hidden="true" />
                     </Link>

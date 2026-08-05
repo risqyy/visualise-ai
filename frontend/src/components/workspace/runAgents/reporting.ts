@@ -4,8 +4,8 @@ import type {
   PlanStepState,
   RunAgent,
   RunPlanRevision,
-  Timestamp,
 } from '@/api/types'
+import type { AgentsKey } from '@/i18n'
 
 /**
  * The role and status vocabularies of the **read model**, which are wider than
@@ -32,32 +32,59 @@ type ReportedStatus = RunAgent['status']
 // Closed vocabularies
 // ---------------------------------------------------------------------------
 
-export const AGENT_ROLE_LABEL: Record<ReportedRole, string> = {
-  '': 'keine Rolle gemeldet',
-  orchestrator: 'Orchestrator',
-  subagent: 'Subagent',
+export const AGENT_ROLE_LABEL_KEY: Record<ReportedRole, AgentsKey> = {
+  '': 'role.unreported',
+  orchestrator: 'role.orchestrator',
+  subagent: 'role.subagent',
 }
 
-export const AGENT_STATUS_LABEL: Record<ReportedStatus, string> = {
-  '': 'kein Status gemeldet',
-  working: 'arbeitet',
-  waiting: 'wartet',
-  blocked: 'blockiert',
-  idle: 'untätig',
-  done: 'fertig',
+/**
+ * The reported status word, mapped onto a display word.
+ *
+ * This is the sharp edge of the translation contract, and it falls on the
+ * translated side: `working` is a **contract value** and stays `working` in
+ * every payload, in every id and in every `data-status` attribute; the word the
+ * cockpit paints next to it is the cockpit's own vocabulary and reads
+ * "arbeitet" or "working". Mapping a closed value onto a display word is not a
+ * change to the value (ADR 0014).
+ */
+export const AGENT_STATUS_LABEL_KEY: Record<ReportedStatus, AgentsKey> = {
+  '': 'status.unreported',
+  working: 'status.working',
+  waiting: 'status.waiting',
+  blocked: 'status.blocked',
+  idle: 'status.idle',
+  done: 'status.done',
 }
 
-export const OUTCOME_LABEL: Record<Outcome, string> = {
-  completed: 'abgeschlossen',
-  failed: 'fehlgeschlagen',
-  cancelled: 'abgebrochen',
+/**
+ * Second, colour-independent channel for a reported agent status.
+ *
+ * Same rule as `PLAN_STEP_STATE_GLYPH` and `src/state/workStates.ts` (ADR 0003):
+ * the information has to survive greyscale, so every status is carried by a
+ * glyph **and** its label, never by a hue alone. The glyphs are neutral marks,
+ * not verdicts — `blocked` gets the same kind of geometric symbol as `working`.
+ */
+export const AGENT_STATUS_GLYPH: Record<ReportedStatus, string> = {
+  '': '–',
+  working: '▶',
+  waiting: '⋯',
+  blocked: '⊘',
+  idle: '○',
+  done: '●',
 }
 
-export const PLAN_STEP_STATE_LABEL: Record<PlanStepState, string> = {
-  pending: 'offen',
-  in_progress: 'in Arbeit',
-  done: 'abgeschlossen',
-  skipped: 'übersprungen',
+export const OUTCOME_LABEL_KEY: Record<Outcome, AgentsKey> = {
+  completed: 'outcome.completed',
+  failed: 'outcome.failed',
+  cancelled: 'outcome.cancelled',
+}
+
+export const PLAN_STEP_STATE_LABEL_KEY: Record<PlanStepState, AgentsKey> = {
+  pending: 'planStep.pending',
+  in_progress: 'planStep.inProgress',
+  done: 'planStep.done',
+  skipped: 'planStep.skipped',
 }
 
 /**
@@ -73,28 +100,94 @@ export const PLAN_STEP_STATE_GLYPH: Record<PlanStepState, string> = {
 }
 
 // ---------------------------------------------------------------------------
-// Timestamps
+// How much of a row to paint: read off the reported status, never off a clock
 // ---------------------------------------------------------------------------
 
 /**
- * Formats a contract timestamp in UTC.
+ * Whether an agent's **own last reported status** names work that is still
+ * going on.
  *
- * The API normalises every timestamp to UTC (ADR 0005) and the cockpit renders
- * it that way, labelled: a local-time rendering of an agent report is a
- * different claim than the one the agent made, and the difference is invisible
- * until it matters. Built from `Date.getUTC*` rather than `Intl`, so the output
- * does not depend on the host's locale data.
+ * This is the input for the pane's default density (#39): a row whose agent
+ * reported ongoing work opens with its details, every other row starts compact.
+ * Three properties make that a rendering decision rather than a verdict:
+ *
+ * * **No clock is consulted.** `lastEventAt`, `startedAt` and the current time
+ *   are not read here and are not compared anywhere in this module (ADR 0011).
+ *   An agent that reported `working` an hour ago is `ongoing`, exactly like one
+ *   that reported it a second ago — because that is what it reported.
+ * * **The mapping is the reported vocabulary, nothing else.** `working`,
+ *   `waiting` and `blocked` are the three statuses that describe work in flight;
+ *   `done` and `idle` are what an agent says when it is not working. A reported
+ *   `finishedOutcome` wins over the status field, because an outcome is the
+ *   later and more specific statement.
+ * * **Nothing is hidden.** A compact row still shows the agent, its status, its
+ *   role and its assigned task, and one keystroke opens the rest. Density is
+ *   about what is painted first, never about what is available.
+ *
+ * `unreported` is kept apart from `settled` on purpose: "the agent said it is
+ * idle" and "the agent never said anything" are different statements, and the
+ * row labels them differently.
  */
-export function formatTimestamp(value: Timestamp): string {
-  const date = new Date(value)
-  if (Number.isNaN(date.getTime())) return value
+export type ReportedWorkState = 'ongoing' | 'settled' | 'unreported'
 
-  const pad = (part: number) => String(part).padStart(2, '0')
-  return (
-    `${pad(date.getUTCDate())}.${pad(date.getUTCMonth() + 1)}.${date.getUTCFullYear()}` +
-    `, ${pad(date.getUTCHours())}:${pad(date.getUTCMinutes())}:${pad(date.getUTCSeconds())} UTC`
+/** The reported statuses that describe work still in flight. */
+const ONGOING_STATUSES: ReadonlySet<ReportedStatus> = new Set<ReportedStatus>([
+  'working',
+  'waiting',
+  'blocked',
+])
+
+export function reportedWorkState(
+  agent: Pick<RunAgent, 'status' | 'finishedOutcome'>,
+): ReportedWorkState {
+  if (agent.finishedOutcome !== null) return 'settled'
+  if (agent.status === '') return 'unreported'
+  return ONGOING_STATUSES.has(agent.status) ? 'ongoing' : 'settled'
+}
+
+/**
+ * How often each status was reported across a list of agents, in the fixed
+ * order of the vocabulary.
+ *
+ * A count of reported values — the same kind of statement as `run.counts` — and
+ * deliberately not a percentage, not a share and not an aggregate of the agents'
+ * own progress numbers. ADR 0011 forbids the latter; counting how many agents
+ * reported which word is a fact about the log.
+ */
+const STATUS_TALLY_ORDER: readonly ReportedStatus[] = [
+  'working',
+  'waiting',
+  'blocked',
+  'idle',
+  'done',
+  '',
+]
+
+export function statusTally(
+  agents: readonly Pick<RunAgent, 'status'>[],
+): { status: ReportedStatus; count: number }[] {
+  const counts = new Map<ReportedStatus, number>()
+  for (const agent of agents) {
+    counts.set(agent.status, (counts.get(agent.status) ?? 0) + 1)
+  }
+
+  return STATUS_TALLY_ORDER.filter((status) => (counts.get(status) ?? 0) > 0).map(
+    (status) => ({ status, count: counts.get(status) as number }),
   )
 }
+
+// ---------------------------------------------------------------------------
+// Timestamps: not here
+// ---------------------------------------------------------------------------
+
+/**
+ * This module used to carry its own `formatTimestamp`, built from `Date.getUTC*`
+ * so that it did not depend on the host's locale data — and the inspector
+ * carried a second, differently shaped one. Both are gone: a reported instant is
+ * rendered by `<ReportedTime>` and formatted by `src/i18n/formatting.ts`, which
+ * keeps `timeZone: 'UTC'` and the visible `UTC` label that this pane always had
+ * (#40, ADR 0019).
+ */
 
 // ---------------------------------------------------------------------------
 // Progress: two kinds of statement, never one
@@ -124,10 +217,10 @@ export interface ProgressStatement {
   /** Contract value, or `'unreported'` when the agent did not send one. */
   scope: 'own_task' | 'overall_estimate' | 'unreported'
   basis: 'reported_estimate' | 'completed_steps' | 'unreported'
-  /** What the number is about, as a sentence fragment. */
-  subject: string
-  /** How the agent arrived at it. */
-  derivation: string
+  /** Key of what the number is about, as a sentence fragment. */
+  subjectKey: AgentsKey
+  /** Key of how the agent arrived at it. */
+  derivationKey: AgentsKey
 }
 
 export function progressStatement(progress: AgentProgress): ProgressStatement {
@@ -141,21 +234,21 @@ export function progressStatement(progress: AgentProgress): ProgressStatement {
     percent: progress.percent,
     scope,
     basis,
-    subject: PROGRESS_SUBJECT[scope],
-    derivation: PROGRESS_DERIVATION[basis],
+    subjectKey: PROGRESS_SUBJECT_KEY[scope],
+    derivationKey: PROGRESS_DERIVATION_KEY[basis],
   }
 }
 
-const PROGRESS_SUBJECT: Record<ProgressStatement['scope'], string> = {
-  own_task: 'für den eigenen Task',
-  overall_estimate: 'für den gesamten Run',
-  unreported: 'ohne gemeldeten Bezug',
+const PROGRESS_SUBJECT_KEY: Record<ProgressStatement['scope'], AgentsKey> = {
+  own_task: 'progress.subjectOwnTask',
+  overall_estimate: 'progress.subjectOverallEstimate',
+  unreported: 'progress.subjectUnreported',
 }
 
-const PROGRESS_DERIVATION: Record<ProgressStatement['basis'], string> = {
-  completed_steps: 'aus abgeschlossenen Schritten gezählt',
-  reported_estimate: 'frei geschätzt',
-  unreported: 'ohne gemeldete Herleitung',
+const PROGRESS_DERIVATION_KEY: Record<ProgressStatement['basis'], AgentsKey> = {
+  completed_steps: 'progress.basisCompletedSteps',
+  reported_estimate: 'progress.basisReportedEstimate',
+  unreported: 'progress.basisUnreported',
 }
 
 // ---------------------------------------------------------------------------

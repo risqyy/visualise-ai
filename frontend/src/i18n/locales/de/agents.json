@@ -1,0 +1,120 @@
+{
+  "outcome": {
+    "cancelled": "abgebrochen",
+    "completed": "abgeschlossen",
+    "failed": "fehlgeschlagen"
+  },
+  "pane": {
+    "title": "Runs und Agents"
+  },
+  "plan": {
+    "currentBadge": "aktuell",
+    "earlierBadge": "frühere Fassung",
+    "revisionTitle": "Revision {{revision}}",
+    "revisionsLabel": "Revisionen von {{planId}}"
+  },
+  "planStep": {
+    "done": "abgeschlossen",
+    "inProgress": "in Arbeit",
+    "pending": "offen",
+    "skipped": "übersprungen"
+  },
+  "plans": {
+    "emptyDescription": "Für Run {{runId}} liegt noch kein plan.published-Ereignis vor.",
+    "emptyTitle": "Kein Plan veröffentlicht",
+    "title": "Pläne"
+  },
+  "progress": {
+    "basisCompletedSteps": "aus abgeschlossenen Schritten gezählt",
+    "basisReportedEstimate": "frei geschätzt",
+    "basisUnreported": "ohne gemeldete Herleitung",
+    "claimNote": "Gemeldete Selbsteinschätzung von <agent/> · {{derivation}}. Kein gemessener Fortschritt.",
+    "meterLabel": "{{percent}} {{subject}}, {{derivation}}",
+    "none": "Kein Fortschritt gemeldet",
+    "subjectOverallEstimate": "für den gesamten Run",
+    "subjectOwnTask": "für den eigenen Task",
+    "subjectUnreported": "ohne gemeldeten Bezug"
+  },
+  "role": {
+    "orchestrator": "Orchestrator",
+    "subagent": "Subagent",
+    "unreported": "keine Rolle gemeldet"
+  },
+  "row": {
+    "agentIdLabel": "Agent-Id",
+    "cycleBroken": "Die gemeldete Parent-Kette läuft im Kreis. Die Kante zu „{{parent}}“ wurde hier getrennt; der Agent wird als eigene Wurzel gezeigt.",
+    "detailHide": "Details von {{agent}} ausblenden",
+    "detailShow": "Details von {{agent}} anzeigen",
+    "lastEventLabel": "Zuletzt gemeldet",
+    "noOutcome": "kein Abschluss gemeldet",
+    "noTask": "keine Aufgabe gemeldet",
+    "orphaned": "Gemeldeter Parent „{{parent}}“ gehört nicht zu diesem Run. Der Agent wird als eigene Wurzel gezeigt.",
+    "outcomeLabel": "Abschluss",
+    "showFull": "Mehr anzeigen",
+    "showLess": "Weniger anzeigen",
+    "statusLabel": "Status",
+    "subjectStatusNote": "Statusmeldung",
+    "subjectTask": "Aufgabe",
+    "subtreeCollapse": "Subagents von {{agent}} einklappen",
+    "subtreeExpand": "Subagents von {{agent}} ausklappen",
+    "taskLabel": "Aufgabe",
+    "textCollapse": "{{subject}} von {{agent}} wieder kürzen",
+    "textExpand": "{{subject}} von {{agent}} vollständig anzeigen"
+  },
+  "runState": {
+    "emptyTitle": "Run nicht verfügbar",
+    "endLabel": "Ende",
+    "noEnd": "kein Ende gemeldet",
+    "runLabel": "Run",
+    "scopeLabel": "Umfang",
+    "sectionLabel": "Gemeldeter Runzustand",
+    "startLabel": "Beginn",
+    "stateLabel": "Zustand",
+    "title": "Runzustand"
+  },
+  "runs": {
+    "currentBadge": "aktuell",
+    "currentBanner": "Aktueller Run des Projekts",
+    "emptyDescription": "Sobald ein Orchestrator Ereignisse sendet, erscheint sein Run hier.",
+    "emptyTitle": "Keine Runs gemeldet",
+    "finishedState": "beendet: {{outcome}}",
+    "historicalDescription": "Diese Ansicht zeigt einen abgelegten Run, nicht den aktuellen. Aktuell ist <run/>.",
+    "historicalTitle": "Historischer Run",
+    "listLabel": "Runs des Projekts",
+    "loadOlder": "Ältere Runs laden",
+    "loadedCount": "{{count}} geladen",
+    "noCurrentDescription": "Für dieses Projekt hat noch kein Root-Orchestrator einen Run eröffnet.",
+    "noCurrentTitle": "Kein aktueller Run",
+    "noOutcome": "ohne gemeldetes Ergebnis",
+    "noRootAgent": "kein Root-Agent gemeldet",
+    "openState": "offen — kein Terminalereignis gemeldet",
+    "rootLabel": "Root:",
+    "since": "seit",
+    "switchToCurrent": "Zum aktuellen Run wechseln",
+    "title": "Runs"
+  },
+  "status": {
+    "blocked": "blockiert",
+    "done": "fertig",
+    "idle": "untätig",
+    "unreported": "kein Status gemeldet",
+    "waiting": "wartet",
+    "working": "arbeitet"
+  },
+  "steps": {
+    "completed": "{{done, number}} von {{total, number}} Schritten abgeschlossen",
+    "meterLabel": "{{label}}: {{done, number}} von {{total, number}} Schritten abgeschlossen"
+  },
+  "tree": {
+    "collapseAll": "Alle Subagents einklappen",
+    "emptyDescription": "Für Run {{runId}} liegt noch kein agent.started-Ereignis vor.",
+    "emptyTitle": "Keine Agents gemeldet",
+    "expandAll": "Alle Subagents ausklappen",
+    "filterEmptyDescription": "Kein Agent dieses Runs enthält „{{filter}}“.",
+    "filterEmptyTitle": "Kein Agent passt zum Filter",
+    "filterLabel": "Agents filtern",
+    "label": "Agenthierarchie",
+    "reportedCount": "{{count}} gemeldet",
+    "statusTally": "Gemeldete Status"
+  }
+}

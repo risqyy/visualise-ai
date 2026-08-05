@@ -1,4 +1,5 @@
 import type { Relationship, RelationshipKind } from '@/api/types'
+import type { CanvasKey } from '@/i18n'
 
 /**
  * The visual vocabulary of a typed relationship.
@@ -21,12 +22,18 @@ import type { Relationship, RelationshipKind } from '@/api/types'
  */
 export interface RelationshipKindStyle {
   id: RelationshipKind
-  /** Badge text. The strongest colour-independent channel: it is just text. */
+  /**
+   * Badge text. The strongest colour-independent channel: it is just text.
+   *
+   * Deliberately **not** translated — `HTTP`, `gRPC` and `NATS` are protocol
+   * names, and `DATA`, `ASYNC` and `DEP` are the same token in both languages.
+   * See the technical glossary in `frontend/src/i18n/README.md`.
+   */
   abbreviation: string
-  /** Full German label used in tooltips and the legend. */
-  label: string
-  /** One sentence explaining what the kind means. */
-  description: string
+  /** Key of the full label used in tooltips and the legend. */
+  labelKey: CanvasKey
+  /** Key of the sentence explaining what the kind means. */
+  descriptionKey: CanvasKey
   /**
    * SVG `stroke-dasharray`. Unique across all kinds, so the line alone already
    * distinguishes them.
@@ -45,8 +52,8 @@ export const RELATIONSHIP_KIND_STYLES: readonly RelationshipKindStyle[] = [
   {
     id: 'http',
     abbreviation: 'HTTP',
-    label: 'HTTP-Aufruf',
-    description: 'Synchroner HTTP-Aufruf von der Quelle zum Ziel.',
+    labelKey: 'relationshipKind.http.label',
+    descriptionKey: 'relationshipKind.http.description',
     strokeDasharray: '0',
     marker: 'arrowclosed',
     discriminatorField: 'operation',
@@ -54,8 +61,8 @@ export const RELATIONSHIP_KIND_STYLES: readonly RelationshipKindStyle[] = [
   {
     id: 'grpc',
     abbreviation: 'gRPC',
-    label: 'gRPC-Aufruf',
-    description: 'Synchroner gRPC-Aufruf von der Quelle zum Ziel.',
+    labelKey: 'relationshipKind.grpc.label',
+    descriptionKey: 'relationshipKind.grpc.description',
     strokeDasharray: '11 4',
     marker: 'arrowclosed',
     discriminatorField: 'operation',
@@ -63,8 +70,8 @@ export const RELATIONSHIP_KIND_STYLES: readonly RelationshipKindStyle[] = [
   {
     id: 'data',
     abbreviation: 'DATA',
-    label: 'Datenzugriff',
-    description: 'Lesender oder schreibender Zugriff auf einen Datenspeicher.',
+    labelKey: 'relationshipKind.data.label',
+    descriptionKey: 'relationshipKind.data.description',
     strokeDasharray: '2 4',
     marker: 'arrow',
     discriminatorField: 'operation',
@@ -72,8 +79,8 @@ export const RELATIONSHIP_KIND_STYLES: readonly RelationshipKindStyle[] = [
   {
     id: 'async',
     abbreviation: 'ASYNC',
-    label: 'Asynchrone Nachricht',
-    description: 'Asynchroner Nachrichtenfluss ohne unmittelbare Antwort.',
+    labelKey: 'relationshipKind.async.label',
+    descriptionKey: 'relationshipKind.async.description',
     strokeDasharray: '14 4 2 4',
     marker: 'arrow',
     discriminatorField: 'channel',
@@ -81,9 +88,8 @@ export const RELATIONSHIP_KIND_STYLES: readonly RelationshipKindStyle[] = [
   {
     id: 'nats_topic',
     abbreviation: 'NATS',
-    label: 'NATS-Topic',
-    description:
-      'Ein einzelnes NATS-Topic. Jedes Topic bleibt eine eigene Beziehung und wird nie zusammengefasst.',
+    labelKey: 'relationshipKind.natsTopic.label',
+    descriptionKey: 'relationshipKind.natsTopic.description',
     strokeDasharray: '6 3',
     marker: 'arrowclosed',
     discriminatorField: 'channel',
@@ -91,8 +97,8 @@ export const RELATIONSHIP_KIND_STYLES: readonly RelationshipKindStyle[] = [
   {
     id: 'dependency',
     abbreviation: 'DEP',
-    label: 'Abhängigkeit',
-    description: 'Strukturelle Abhängigkeit ohne konkretes Laufzeitprotokoll.',
+    labelKey: 'relationshipKind.dependency.label',
+    descriptionKey: 'relationshipKind.dependency.description',
     strokeDasharray: '1 6',
     marker: 'arrow',
     discriminatorField: 'label',

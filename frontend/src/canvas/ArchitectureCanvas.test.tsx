@@ -44,9 +44,22 @@ function architectureFetch(initial: ArchitectureResponse) {
   }
 }
 
+/**
+ * Renders the canvas with every container open.
+ *
+ * A project opens on its top levels with deeper containers collapsed (#34 /
+ * ADR 0017), which is what `ArchitectureZoom.test.tsx` covers. The assertions
+ * in this file are about bundling, selection and the camera on components that
+ * sit three and four levels down, so they start from the state the user reaches
+ * with "Gesamtes Modell einpassen" — a real, reachable state, and the one these
+ * tests have always described.
+ */
 function renderCanvas(url = WORKSPACE_URL, initial = nestedArchitectureResponse) {
   const architecture = architectureFetch(initial)
-  const app = renderApp(url, { fetchImpl: architecture.fetchImpl })
+  const app = renderApp(url, {
+    fetchImpl: architecture.fetchImpl,
+    expandAllComponents: true,
+  })
   return { ...app, ...architecture }
 }
 
@@ -59,7 +72,24 @@ async function waitForCanvas(): Promise<HTMLElement> {
     () => expect(canvas.getAttribute('data-layouting')).toBe('false'),
     { timeout: CANVAS_TIMEOUT },
   )
+  await waitForInitialFit(canvas)
   return canvas
+}
+
+/**
+ * `data-layouting: false` only says that ELK is done.
+ *
+ * The automatic camera placement runs in an effect *after* the layout, so the
+ * first `fitView` — and with it `data-fit-view-count`, the viewport transform
+ * and the stored camera — is still one commit away when the flag flips.
+ * Reading any of the three synchronously at that moment is a race that goes red
+ * exactly when the machine is busy and green on every quiet developer laptop.
+ */
+async function waitForInitialFit(canvas: HTMLElement): Promise<void> {
+  await waitFor(
+    () => expect(Number(canvas.getAttribute('data-fit-view-count'))).toBeGreaterThan(0),
+    { timeout: CANVAS_TIMEOUT },
+  )
 }
 
 /** The rendered zoom and pan — the ground truth of where the camera is. */

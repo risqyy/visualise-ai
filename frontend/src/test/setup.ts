@@ -3,6 +3,7 @@ import '@testing-library/jest-dom/vitest'
 import { cleanup } from '@testing-library/react'
 import { afterEach, beforeEach, vi } from 'vitest'
 
+import { DEFAULT_LANGUAGE, createI18n } from '@/i18n'
 import { useChangeLedgerStore } from '@/state/changeLedgerStore'
 import { useLiveConnectionStore } from '@/state/liveConnectionStore'
 import { resetUiStore } from '@/state/uiStore'
@@ -52,6 +53,13 @@ beforeEach(() => {
   resetUiStore()
   useLiveConnectionStore.getState().reset()
   useChangeLedgerStore.getState().reset()
+
+  // A fresh German instance per test. `initReactI18next` registers it as
+  // react-i18next's default, so a component test that renders a translated
+  // component directly — without `renderApp` and without a provider — still
+  // gets German instead of bare keys. `renderApp` overrides it with its own
+  // instance through `I18nextProvider`.
+  createI18n({ language: DEFAULT_LANGUAGE })
 })
 
 afterEach(() => {

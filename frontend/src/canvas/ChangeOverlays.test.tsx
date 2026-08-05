@@ -5,6 +5,7 @@ import type { ArchitectureResponse, Component } from '@/api/types'
 import { applyLiveEvent } from '@/api/useLiveStream'
 import { DEFAULT_CAMERA, useUiStore } from '@/state/uiStore'
 import { WORK_STATES } from '@/state/workStates'
+import { translateWith } from '@/test/translate'
 import {
   NESTED_COMPONENTS,
   NESTED_RELATIONSHIPS,
@@ -65,9 +66,17 @@ function architectureFetch(initial: ArchitectureResponse) {
   }
 }
 
+/**
+ * Every container open: the proposals and ghosts these tests assert on sit two
+ * levels down, and the progressive disclosure of #34 is not what is under test
+ * here. See `renderApp`'s `expandAllComponents`.
+ */
 function renderCanvas(url = WORKSPACE_URL, initial = nestedArchitectureResponse) {
   const architecture = architectureFetch(initial)
-  const app = renderApp(url, { fetchImpl: architecture.fetchImpl })
+  const app = renderApp(url, {
+    fetchImpl: architecture.fetchImpl,
+    expandAllComponents: true,
+  })
   return { ...app, ...architecture }
 }
 
@@ -78,6 +87,16 @@ async function waitForCanvas(): Promise<HTMLElement> {
   await waitFor(() => expect(canvas.getAttribute('data-layouting')).toBe('false'), {
     timeout: CANVAS_TIMEOUT,
   })
+  // `data-layouting: false` only says that ELK is done. The automatic camera
+  // placement runs in an effect *after* the layout, so the first `fitView` —
+  // and with it `data-fit-view-count`, the viewport transform and the stored
+  // camera — is still one commit away when the flag flips. Reading any of them
+  // synchronously at that moment is a race that goes red exactly when the
+  // machine is busy.
+  await waitFor(
+    () => expect(Number(canvas.getAttribute('data-fit-view-count'))).toBeGreaterThan(0),
+    { timeout: CANVAS_TIMEOUT },
+  )
   return canvas
 }
 
@@ -353,8 +372,9 @@ describe('live change overlays — distinguishable without colour', () => {
   it('gives the four states four distinct non-colour signatures', () => {
     // Label, icon and line style each separate all four states on their own, so
     // no state depends on being seen in colour.
+    const t = translateWith('canvas')
     const signatures = WORK_STATES.map(
-      (state) => `${state.label}|${state.borderStyle}|${state.strokeDasharray}`,
+      (state) => `${t(state.labelKey)}|${state.borderStyle}|${state.strokeDasharray}`,
     )
     expect(new Set(signatures).size).toBe(4)
     expect(new Set(WORK_STATES.map((state) => state.icon)).size).toBe(4)

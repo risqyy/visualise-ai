@@ -1,8 +1,10 @@
 import { Link, getRouteApi } from '@tanstack/react-router'
+import { useTranslation } from 'react-i18next'
 
 import { useProject } from '@/api/queries'
 import { AsyncState, EmptyState } from '@/components/AsyncState'
 import { Button } from '@/components/ui/button'
+import { ReportedText } from '@/i18n'
 
 const route = getRouteApi('/projects/$projectId/')
 
@@ -15,6 +17,7 @@ const route = getRouteApi('/projects/$projectId/')
  * that has not reported a run yet.
  */
 export function ProjectIndexPage() {
+  const { t } = useTranslation('projects')
   const { projectId } = route.useParams()
   const project = useProject(projectId)
 
@@ -24,18 +27,20 @@ export function ProjectIndexPage() {
         isPending={project.isPending}
         isError={project.isError}
         error={project.error}
-        emptyTitle="Projekt nicht verfügbar"
+        emptyTitle={t('detail.emptyTitle')}
         onRetry={() => void project.refetch()}
       >
         {/* A project has no display name in the contract — it is its slug. */}
-        <h1 className="font-mono text-xl font-semibold">{projectId}</h1>
+        <h1 className="font-mono text-xl font-semibold">
+          <ReportedText value={projectId} />
+        </h1>
         <EmptyState
           className="mt-4"
-          title="Noch kein Run gemeldet"
-          description="Für dieses Projekt liegt kein Run vor. Sobald ein Orchestrator ein Ereignis sendet, öffnet dieses Projekt seinen aktuellen Run automatisch."
+          title={t('detail.noRunTitle')}
+          description={t('detail.noRunDescription')}
         />
         <Button asChild variant="outline" className="mt-4">
-          <Link to="/projects">Zurück zur Projektliste</Link>
+          <Link to="/projects">{t('detail.backToList')}</Link>
         </Button>
       </AsyncState>
     </main>

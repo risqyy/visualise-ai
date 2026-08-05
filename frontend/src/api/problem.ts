@@ -109,14 +109,32 @@ export function syntheticProblem(status: number, statusText: string): Problem {
   }
 }
 
-/** Human-readable one-liner for error states in the UI. */
-export function describeError(error: unknown): string {
+/**
+ * What an error state has to say, split by **who is speaking**.
+ *
+ * Most of it is the backend's own wording — its problem title and its stable
+ * code — and that is reported data: it is rendered verbatim, in every language,
+ * through `<ReportedText>`. Only two cases are the cockpit's own sentence, and
+ * those two carry a translation key instead of a string. This module cannot
+ * call `useTranslation`, so it returns the distinction rather than the words
+ * (ADR 0014 named this as #42's piece of unfinished business).
+ */
+export type ErrorDescription =
+  /** The backend's or the runtime's own words. Never translated. */
+  | { kind: 'reported'; text: string }
+  /** No HTTP response at all; `detail` is the runtime's message. */
+  | { kind: 'backendUnreachable'; detail: string }
+  /** Something was thrown that is not even an `Error`. */
+  | { kind: 'unknown' }
+
+/** One-liner for error states in the UI, as `<ErrorDescription>` renders it. */
+export function describeError(error: unknown): ErrorDescription {
   if (isProblemError(error)) {
-    return `${error.problem.title} (${error.code})`
+    return { kind: 'reported', text: `${error.problem.title} (${error.code})` }
   }
   if (isNetworkError(error)) {
-    return `Backend nicht erreichbar: ${error.message}`
+    return { kind: 'backendUnreachable', detail: error.message }
   }
-  if (error instanceof Error) return error.message
-  return 'Unbekannter Fehler'
+  if (error instanceof Error) return { kind: 'reported', text: error.message }
+  return { kind: 'unknown' }
 }

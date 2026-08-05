@@ -1,3 +1,5 @@
+import { useTranslation } from 'react-i18next'
+
 import type { WorkStateCounts } from '@/canvas/changeOverlays'
 import { cn } from '@/lib/utils'
 import { WORK_STATES } from '@/state/workStates'
@@ -24,6 +26,7 @@ export interface ChangeCounterProps {
 }
 
 export function ChangeCounter({ counts, className }: ChangeCounterProps) {
+  const { t } = useTranslation('canvas')
   const total = WORK_STATES.reduce((sum, state) => sum + counts[state.id], 0)
 
   return (
@@ -33,9 +36,9 @@ export function ChangeCounter({ counts, className }: ChangeCounterProps) {
       data-total={total}
       aria-label={
         total === 0
-          ? 'Keine gemeldeten Änderungen'
+          ? t('counter.none')
           : WORK_STATES.filter((state) => counts[state.id] > 0)
-              .map((state) => `${counts[state.id]} ${state.label}`)
+              .map((state) => `${counts[state.id]} ${t(state.labelKey)}`)
               .join(', ')
       }
     >
@@ -52,14 +55,14 @@ export function ChangeCounter({ counts, className }: ChangeCounterProps) {
             )}
             data-testid={`change-counter-${state.id}`}
             data-count={count}
-            title={state.description}
+            title={t(state.descriptionKey)}
           >
             <Icon
               className={cn('size-3.5 shrink-0', count > 0 && state.colorClass)}
               aria-hidden="true"
             />
             <span className="tabular-nums">{count}</span>
-            <span>{state.label}</span>
+            <span>{t(state.labelKey)}</span>
           </span>
         )
       })}

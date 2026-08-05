@@ -1,0 +1,125 @@
+{
+  "change": {
+    "emptyDescription": "For this component no change is announced and still unapplied in this run.",
+    "emptyTitle": "No open proposals",
+    "label": "Open proposals",
+    "plannedAt": "planned",
+    "stateLabel": "State"
+  },
+  "component": {
+    "emptyTitle": "No data on this component"
+  },
+  "context": {
+    "agentLabel": "Agent",
+    "finished": "finished:",
+    "label": "Component context",
+    "noAgent": "No responsible agent is evidenced.",
+    "noTask": "No task reported.",
+    "noWorkStep": "No work step named this component in this run.",
+    "notInModel": "not in the applied model",
+    "notInModelNote": "The component is no longer part of the applied architecture model. Evidence and history are kept.",
+    "roleNotReported": "role not reported",
+    "runNotReported": "not reported",
+    "selfReported": "self-reported",
+    "statusLabel": "Status",
+    "taskLabel": "Task",
+    "workStepCompleted": "completed",
+    "workStepLabel": "Work step",
+    "workStepOpen": "open since"
+  },
+  "deepFocus": {
+    "banner": "Deep focus: {{section}} — the architecture stays visible on the left.",
+    "enter": "Deep focus",
+    "exit": "Exit",
+    "leave": "Exit deep focus"
+  },
+  "diff": {
+    "changeHeading": "Change {{changeId}}",
+    "emptyDescription": "For this component no diff.reported was reported in this run.",
+    "emptyTitle": "No diffs reported",
+    "label": "Unified diffs",
+    "lineAddition": "added",
+    "lineContext": "unchanged",
+    "lineHunk": "Section",
+    "lineMeta": "Header line",
+    "lineRemoval": "removed",
+    "loadMore": "Load more diffs",
+    "singleHeading": "Single diff {{diffId}}",
+    "stat": "{{stat}} in file",
+    "withoutChangeId": "Reported without <field/> — the agent did not assign this diff to any announced change."
+  },
+  "empty": {
+    "description": "Select a component on the architecture surface. The selection is carried as ?component= in the address and is therefore directly linkable.",
+    "title": "No component selected"
+  },
+  "eventType": {
+    "agentFinished": "Agent finished",
+    "agentProgressReported": "Progress reported",
+    "agentStarted": "Agent started",
+    "agentStatusReported": "Status reported",
+    "architectureSnapshotPublished": "Architecture snapshot published",
+    "componentChangeApplied": "Component change applied",
+    "componentChangePlanned": "Component change planned",
+    "correctionIssued": "Correction",
+    "diffReported": "Diff reported",
+    "feedbackPublished": "Feedback published",
+    "planPublished": "Plan published",
+    "planStepUpdated": "Plan step updated",
+    "problemReported": "Problem reported",
+    "relationshipChangeApplied": "Relationship change applied",
+    "relationshipChangePlanned": "Relationship change planned",
+    "retractionIssued": "Retraction",
+    "riskReported": "Risk reported",
+    "runFinished": "Run finished",
+    "workStepCompleted": "Work step completed",
+    "workStepStarted": "Work step started"
+  },
+  "feedback": {
+    "emptyDescription": "For this component no feedback.published was reported in this run.",
+    "emptyTitle": "No feedback reported",
+    "label": "AI feedback",
+    "untitled": "Reported without a title"
+  },
+  "history": {
+    "correctedInto": "— new content as {{type}}",
+    "corrects": "corrects",
+    "currentRunSuffix": "(current run)",
+    "emptyTitle": "No older evidence",
+    "label": "History",
+    "laterCorrected": "corrected later — the entry remains",
+    "laterRetracted": "retracted later — the entry remains",
+    "listEmptyDescription": "No event has been reported for this component yet.",
+    "listEmptyTitle": "No history",
+    "loadOlder": "Load older entries",
+    "note": "All runs, newest first. Corrections and retractions stand beside them as entries of their own — nothing is overwritten.",
+    "reasonLabel": "Reason:",
+    "retracts": "retracts",
+    "title": "History across all runs"
+  },
+  "meta": {
+    "runPrefix": "Run"
+  },
+  "pane": {
+    "subtitleEmpty": "no component selected"
+  },
+  "problem": {
+    "emptyDescription": "For this component no problem.reported was reported in this run.",
+    "emptyTitle": "No problems reported",
+    "label": "Problems"
+  },
+  "risk": {
+    "emptyDescription": "For this component no risk.reported was reported in this run.",
+    "emptyTitle": "No risks reported",
+    "label": "Risks",
+    "severityHigh": "high (assessed by the agent)",
+    "severityLabel": "Severity: {{severity}}",
+    "severityLow": "low (assessed by the agent)",
+    "severityMedium": "medium (assessed by the agent)"
+  },
+  "source": {
+    "allRuns": "all runs",
+    "currentRun": "Current run",
+    "history": "History",
+    "label": "Evidence source"
+  }
+}

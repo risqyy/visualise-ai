@@ -1,0 +1,169 @@
+{
+  "a11y": {
+    "agentsReporting": "{{agents}} melden dazu",
+    "bundleOf": "Sammelkante mit {{relationships}}",
+    "collapsedNote": "eingeklappt, {{components}} verborgen",
+    "componentRole": "Architekturkomponente",
+    "containerRole": "Architekturcontainer",
+    "contains": "Container mit {{components}}",
+    "fitView": "Ansicht einpassen",
+    "fromTo": "Beziehung von {{source}} zu {{target}}",
+    "furtherRelationships": "und {{relationships}} weitere",
+    "ghostNote": "nicht mehr Teil des angewandten Architekturmodells",
+    "handle": "Verbindungspunkt",
+    "identifiedBy": "Komponenten-ID {{componentId}}",
+    "inContainer": "in {{container}}",
+    "noWorkState": "kein Änderungsstatus gemeldet",
+    "proposalNote": "angekündigt, noch nicht Teil des angewandten Architekturmodells",
+    "relationshipRole": "Architekturbeziehung",
+    "rolledUpNote": "gemeldet für eine eingeklappte Komponente darin",
+    "toggleInteractive": "Interaktivität umschalten",
+    "zoomControls": "Zoomsteuerung des Architekturgraphen",
+    "zoomIn": "Hineinzoomen",
+    "zoomOut": "Herauszoomen"
+  },
+  "componentKind": {
+    "datastore": "Datenspeicher",
+    "external": "Extern",
+    "library": "Bibliothek",
+    "module": "Modul",
+    "queue": "Queue",
+    "service": "Service",
+    "system": "System",
+    "topic": "Topic",
+    "ui": "UI"
+  },
+  "counter": {
+    "none": "Keine gemeldeten Änderungen"
+  },
+  "detail": {
+    "fullDescription": "Zusätzlich Tags. Gebündelte Beziehungen sind einzeln aufgefächert.",
+    "fullLabel": "Vollständig",
+    "indicator": "Detailstufe: {{level}}",
+    "overviewDescription": "Nur Name und Art. Parallele Beziehungen sind gebündelt.",
+    "overviewLabel": "Übersicht",
+    "standardDescription": "Zusätzlich die gemeldete Technologie. Parallele Beziehungen sind gebündelt.",
+    "standardLabel": "Standard"
+  },
+  "diagnostics": {
+    "danglingRelationships": "{{count}} Beziehung(en) zeigen auf eine Komponente außerhalb des Snapshots und werden nicht gezeichnet.",
+    "duplicateComponentIds": "{{count}} doppelte Komponenten-ID(s); jeweils die erste Meldung wird gezeigt.",
+    "duplicateRelationshipIds": "{{count}} doppelte Beziehungs-ID(s); jeweils die erste Meldung wird gezeigt.",
+    "hierarchyCycles": "{{count}} Zyklus/Zyklen in der Hierarchie. Der jeweils erste Knoten wurde gelöst, damit die Struktur darstellbar bleibt.",
+    "orphanedParents": "{{count}} Komponente(n) verweisen auf ein Elternteil, das nicht Teil des Snapshots ist. Sie werden als eigenständige Wurzeln gezeigt.",
+    "summary": "{{count}} unstimmige Angaben"
+  },
+  "edge": {
+    "bundleCollapse": "Sammelkante wieder zusammenklappen",
+    "bundleExpand": "Sammelkante aufklappen: {{relationships}}",
+    "channel": "Kanal: {{value}}",
+    "operation": "Operation: {{value}}",
+    "protocol": "Protokoll: {{value}}"
+  },
+  "graph": {
+    "edgeInstructions": "Enter oder Leertaste wählt diese Beziehung aus; bei einer Sammelkante klappt sie die enthaltenen Beziehungen auf und wieder zu. Escape hebt die Auswahl auf.",
+    "instructions": "Architekturgraph des Projekts. Mit der Tabulatortaste zwischen den Komponenten und Beziehungen wechseln. Enter oder Leertaste wählt die fokussierte Komponente aus und zeigt sie im Inspector; eine erneute Aktivierung hebt die Auswahl auf, Escape ebenfalls. Jede Komponente nennt ihren gemeldeten Namen, ihre Art, ob sie weitere Komponenten enthält, in welchem Container sie liegt und welchen Änderungsstatus ein Agent für sie gemeldet hat. Der Graph ist eine Beobachtung: das gemeldete Architekturmodell lässt sich hier nicht bearbeiten.",
+    "label": "Interaktiver Architekturgraph",
+    "layouting": "Layout wird berechnet…",
+    "minimapLabel": "Übersichtskarte der Architektur",
+    "nodeInstructions": "Enter oder Leertaste wählt diese Komponente aus und zeigt sie im Inspector. Escape hebt die Auswahl auf. Die Komponente lässt sich nicht bearbeiten oder entfernen — das Cockpit beobachtet nur."
+  },
+  "legend": {
+    "dialogTitle": "Arbeitszustände der Agents",
+    "disclaimer": "Die Farben zeigen ausschließlich Arbeitsphasen der Agents. Sie sind kein Qualitätsurteil: Das Cockpit bewertet die Arbeit nicht — das tun Sie.",
+    "explain": "Legende erklären",
+    "relationshipTitle": "Beziehungsarten",
+    "workStateTitle": "Arbeitszustände"
+  },
+  "node": {
+    "collapsed": "{{components}} eingeklappt"
+  },
+  "overlay": {
+    "agentsReporting": "Agents melden zu diesem Element",
+    "agentsReportingCount": "{{count}} Agents melden zu diesem Element:",
+    "applied": {
+      "add": "hinzugefügt",
+      "modify": "geändert",
+      "remove": "entfernt"
+    },
+    "changeApplied": "Änderung angewandt: {{operation}}",
+    "changePlanned": "Änderung angekündigt: {{operation}}",
+    "ghostNote": "Nicht mehr Teil des angewandten Architekturmodells.",
+    "operation": {
+      "add": "hinzufügen",
+      "modify": "ändern",
+      "remove": "entfernen"
+    },
+    "proposalNote": "Vorschlag: nicht Teil des angewandten Architekturmodells.",
+    "workStepRunning": "Arbeitsschritt läuft: {{title}}"
+  },
+  "pane": {
+    "components": "{{count}} Komponenten",
+    "emptyDescription": "Das Modell erscheint, sobald ein Agent architecture.snapshot_published sendet.",
+    "emptyTitle": "Noch kein Architekturmodell gemeldet",
+    "label": "Architekturfläche",
+    "relationships": "{{count}} Beziehungen",
+    "title": "Architektur"
+  },
+  "relationshipKind": {
+    "async": {
+      "description": "Asynchroner Nachrichtenfluss ohne unmittelbare Antwort.",
+      "label": "Asynchrone Nachricht"
+    },
+    "data": {
+      "description": "Lesender oder schreibender Zugriff auf einen Datenspeicher.",
+      "label": "Datenzugriff"
+    },
+    "dependency": {
+      "description": "Strukturelle Abhängigkeit ohne konkretes Laufzeitprotokoll.",
+      "label": "Abhängigkeit"
+    },
+    "grpc": {
+      "description": "Synchroner gRPC-Aufruf von der Quelle zum Ziel.",
+      "label": "gRPC-Aufruf"
+    },
+    "http": {
+      "description": "Synchroner HTTP-Aufruf von der Quelle zum Ziel.",
+      "label": "HTTP-Aufruf"
+    },
+    "natsTopic": {
+      "description": "Ein einzelnes NATS-Topic. Jedes Topic bleibt eine eigene Beziehung und wird nie zusammengefasst.",
+      "label": "NATS-Topic"
+    }
+  },
+  "tool": {
+    "backToOverview": "Systemebene",
+    "backToOverviewHint": "Zurück auf System- und Container-Ebene: tiefere Komponenten werden wieder eingeklappt und die Ansicht in lesbarer Größe eingepasst.",
+    "collapse": "Einklappen",
+    "expand": "Aufklappen",
+    "expandHidden": "Aufklappen ({{hidden}})",
+    "fitWholeModel": "Gesamtes Modell einpassen",
+    "fitWholeModelHint": "Klappt alle Container auf und passt das vollständige Modell in die Fläche ein. Bei vielen Komponenten wird die Darstellung dabei bewusst klein — das ist die Übersichtsaktion. Die Kamera bewegt sich sonst nur beim ersten Laden — nie durch eintreffende Ereignisse.",
+    "hideMinimap": "Übersichtskarte ausblenden",
+    "resetPositions": "Positionen zurücksetzen",
+    "resetPositionsHint": "Verschobene Knoten zurück auf das berechnete Layout. Verschiebungen sind ohnehin nur lokal und ändern das Architekturmodell nicht.",
+    "showMinimap": "Übersichtskarte einblenden"
+  },
+  "visibility": {
+    "hint": "Tiefere Komponenten sind hinter ihrem Container eingeklappt, damit die oberen Ebenen lesbar bleiben. Aufklappen über das Dreieck am Container, über einen Deep Link oder über „Gesamtes Modell einpassen\".",
+    "summary": "{{visible}} von {{total}} Komponenten sichtbar"
+  },
+  "workState": {
+    "active": {
+      "description": "Ein Agent hat für diesen Bereich einen Arbeitsschritt begonnen und ihn noch nicht abgeschlossen.",
+      "label": "aktiv"
+    },
+    "planned": {
+      "description": "Ein Agent hat die Änderung angekündigt. Das angewandte Architekturmodell ist unverändert.",
+      "label": "geplant"
+    },
+    "recentlyApplied": {
+      "description": "Die gemeldete Änderung ist im angewandten Architekturmodell enthalten.",
+      "label": "kürzlich angewandt"
+    },
+    "removed": {
+      "description": "Der Agent hat gemeldet, dass dieses Element entfernt wurde. Es wird nur noch als Beleg gezeigt.",
+      "label": "entfernt"
+    }
+  }
+}

@@ -1,0 +1,21 @@
+{
+  "detail": {
+    "backToList": "Back to the project list",
+    "emptyTitle": "Project not available",
+    "noRunDescription": "No run has been reported for this project. As soon as an orchestrator sends an event, this project opens its current run automatically.",
+    "noRunTitle": "No run reported yet"
+  },
+  "empty": {
+    "description": "A project appears as soon as an agent sends its first event to /api/v1/events.",
+    "title": "No projects reported yet"
+  },
+  "item": {
+    "lastReported": "last reported",
+    "noCurrentRun": "no current run",
+    "openLabel": "Open project {{projectId}}"
+  },
+  "list": {
+    "description": "Observed projects. Opening a project goes straight to its current run.",
+    "title": "Projects"
+  }
+}

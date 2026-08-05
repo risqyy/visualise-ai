@@ -1,0 +1,17 @@
+{
+  "generic": {
+    "backendUnreachable": "Backend nicht erreichbar: {{detail}}",
+    "unknown": "Unbekannter Fehler"
+  },
+  "load": {
+    "title": "Daten konnten nicht geladen werden"
+  },
+  "notFound": {
+    "description": "Diese Adresse gehört zu keiner Ansicht des Cockpits.",
+    "title": "Seite nicht gefunden"
+  },
+  "route": {
+    "backToProjects": "Zur Projektliste",
+    "title": "Ansicht konnte nicht geladen werden"
+  }
+}

@@ -1,5 +1,6 @@
 import { Maximize2, Minimize2 } from 'lucide-react'
 import { useMemo, type ReactNode } from 'react'
+import { useTranslation } from 'react-i18next'
 
 import { useComponentHistory, useComponentInspector } from '@/api/queries'
 import type { ComponentId, ProjectId, RunId } from '@/api/types'
@@ -18,8 +19,8 @@ import { useStableScroll } from '@/components/workspace/inspector/scrollStabilit
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Separator } from '@/components/ui/separator'
+import { ReportedText } from '@/i18n'
 import { cn } from '@/lib/utils'
-import { COUNT_LABELS, counted } from '@/lib/plural'
 import type { DeepFocusTarget } from '@/routes/searchParams'
 
 export interface InspectorPaneProps {
@@ -66,6 +67,9 @@ export function InspectorPane({
   onSetFocus,
   onSetHistoryMode,
 }: InspectorPaneProps) {
+  const { t } = useTranslation('inspector')
+  const { t: tWorkspace } = useTranslation('workspace')
+  const { t: tCommon } = useTranslation('common')
   const inspector = useComponentInspector(projectId, componentId, runId)
   const history = useComponentHistory(projectId, componentId, { enabled: historyMode })
 
@@ -95,10 +99,24 @@ export function InspectorPane({
   const showSecondary = focus === undefined
 
   return (
-    <section className="pane-surface" aria-label="Inspector" data-testid="pane-inspector">
+    <section
+      className="pane-surface"
+      aria-label={tWorkspace('pane.rightLabel')}
+      data-testid="pane-inspector"
+    >
       <PaneHeader
-        title="Inspector"
-        subtitle={head?.component?.name ?? componentId ?? 'keine Komponente ausgewählt'}
+        title={tWorkspace('pane.rightLabel')}
+        subtitle={
+          // The component's reported name — or, failing that, its reported id.
+          // Only the "nothing is selected" case is the cockpit's own sentence.
+          head?.component?.name !== undefined ? (
+            <ReportedText value={head.component.name} />
+          ) : componentId !== undefined ? (
+            <ReportedText value={componentId} />
+          ) : (
+            t('pane.subtitleEmpty')
+          )
+        }
       />
 
       {focus && (
@@ -108,8 +126,9 @@ export function InspectorPane({
         >
           <Maximize2 className="size-3.5 shrink-0" aria-hidden="true" />
           <p className="min-w-0 flex-1 truncate text-xs">
-            Deep Focus: {focus === 'feedback' ? 'KI-Feedback' : 'Unified Diffs'} — die
-            Architektur bleibt links sichtbar.
+            {t('deepFocus.banner', {
+              section: focus === 'feedback' ? t('feedback.label') : t('diff.label'),
+            })}
           </p>
           <Button
             variant="outline"
@@ -118,7 +137,7 @@ export function InspectorPane({
             onClick={() => onSetFocus(undefined)}
           >
             <Minimize2 className="size-3" aria-hidden="true" />
-            Beenden
+            {t('deepFocus.exit')}
           </Button>
         </div>
       )}
@@ -126,21 +145,25 @@ export function InspectorPane({
       {componentId && (
         <div
           role="tablist"
-          aria-label="Belegquelle"
+          aria-label={t('source.label')}
           className="border-border flex shrink-0 items-center gap-1 border-b px-3 py-1.5"
         >
           <ViewTab
-            label="Aktueller Run"
+            label={t('source.currentRun')}
             selected={!historyMode}
             onSelect={() => onSetHistoryMode(false)}
           />
           <ViewTab
-            label="Historie"
+            label={t('source.history')}
             selected={historyMode}
             onSelect={() => onSetHistoryMode(true)}
           />
           <span className="text-muted-foreground text-2xs ml-auto truncate font-mono">
-            {historyMode ? 'alle Runs' : (head?.runId ?? runId)}
+            {historyMode ? (
+              t('source.allRuns')
+            ) : (
+              <ReportedText value={head?.runId ?? runId} />
+            )}
           </span>
         </div>
       )}
@@ -152,16 +175,13 @@ export function InspectorPane({
       >
         <div className="space-y-4 p-3">
           {!componentId ? (
-            <EmptyState
-              title="Keine Komponente ausgewählt"
-              description="Wählen Sie eine Komponente auf der Architekturfläche aus. Die Auswahl steht als ?component= in der Adresse und ist damit direkt verlinkbar."
-            />
+            <EmptyState title={t('empty.title')} description={t('empty.description')} />
           ) : (
             <AsyncState
               isPending={inspector.isPending}
               isError={inspector.isError}
               error={inspector.error}
-              emptyTitle="Keine Daten zu dieser Komponente"
+              emptyTitle={t('component.emptyTitle')}
               onRetry={() => void inspector.refetch()}
               skeletonRows={6}
             >
@@ -177,16 +197,16 @@ export function InspectorPane({
 
               {historyMode ? (
                 <section
-                  aria-label="Historie"
+                  aria-label={t('history.label')}
                   data-testid="inspector-history"
                   className="space-y-2"
                 >
-                  <span className="pane-heading">Historie über alle Runs</span>
+                  <span className="pane-heading">{t('history.title')}</span>
                   <AsyncState
                     isPending={history.isPending}
                     isError={history.isError}
                     error={history.error}
-                    emptyTitle="Keine älteren Belege"
+                    emptyTitle={t('history.emptyTitle')}
                     onRetry={() => void history.refetch()}
                   >
                     <ComponentHistoryList
@@ -203,23 +223,23 @@ export function InspectorPane({
                   {showSecondary && head && (
                     <div className="flex flex-wrap gap-1">
                       <Badge variant="outline" className="text-2xs font-normal">
-                        {counted(head.feedback.length, COUNT_LABELS.feedback)}
+                        {tCommon('count.feedback', { count: head.feedback.length })}
                       </Badge>
                       <Badge variant="outline" className="text-2xs font-normal">
-                        {counted(diffs.length, COUNT_LABELS.diff)}
+                        {tCommon('count.diff', { count: diffs.length })}
                       </Badge>
                       <Badge variant="outline" className="text-2xs font-normal">
-                        {counted(head.risks.length, COUNT_LABELS.risk)}
+                        {tCommon('count.risk', { count: head.risks.length })}
                       </Badge>
                       <Badge variant="outline" className="text-2xs font-normal">
-                        {counted(head.problems.length, COUNT_LABELS.problem)}
+                        {tCommon('count.problem', { count: head.problems.length })}
                       </Badge>
                     </div>
                   )}
 
                   {showFeedback && (
                     <InspectorSection
-                      label="KI-Feedback"
+                      label={t('feedback.label')}
                       target="feedback"
                       focus={focus}
                       onSetFocus={onSetFocus}
@@ -232,7 +252,7 @@ export function InspectorPane({
 
                   {showDiffs && (
                     <InspectorSection
-                      label="Unified Diffs"
+                      label={t('diff.label')}
                       target="diffs"
                       focus={focus}
                       onSetFocus={onSetFocus}
@@ -249,25 +269,28 @@ export function InspectorPane({
                   {showSecondary && (
                     <>
                       <Separator />
-                      <section aria-label="Risiken" data-testid="inspector-risks">
-                        <span className="pane-heading">Risiken</span>
+                      <section aria-label={t('risk.label')} data-testid="inspector-risks">
+                        <span className="pane-heading">{t('risk.label')}</span>
                         <div className="pt-2">
                           <RiskList risks={head?.risks ?? []} />
                         </div>
                       </section>
 
-                      <section aria-label="Probleme" data-testid="inspector-problems">
-                        <span className="pane-heading">Probleme</span>
+                      <section
+                        aria-label={t('problem.label')}
+                        data-testid="inspector-problems"
+                      >
+                        <span className="pane-heading">{t('problem.label')}</span>
                         <div className="pt-2">
                           <ProblemList problems={head?.problems ?? []} />
                         </div>
                       </section>
 
                       <section
-                        aria-label="Offene Vorschläge"
+                        aria-label={t('change.label')}
                         data-testid="inspector-active-changes"
                       >
-                        <span className="pane-heading">Offene Vorschläge</span>
+                        <span className="pane-heading">{t('change.label')}</span>
                         <div className="pt-2">
                           <ActiveChangeList changes={head?.activeChanges ?? []} />
                         </div>
@@ -324,6 +347,7 @@ function InspectorSection({
   onSetFocus: (target: DeepFocusTarget | undefined) => void
   children: ReactNode
 }) {
+  const { t } = useTranslation('inspector')
   const isFocused = focus === target
 
   return (
@@ -342,7 +366,7 @@ function InspectorSection({
           ) : (
             <Maximize2 className="size-3" aria-hidden="true" />
           )}
-          {isFocused ? 'Deep Focus beenden' : 'Deep Focus'}
+          {isFocused ? t('deepFocus.leave') : t('deepFocus.enter')}
         </Button>
       </div>
       <div className="pt-2">{children}</div>

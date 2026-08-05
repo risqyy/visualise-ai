@@ -1,5 +1,6 @@
 import { expect, test } from '@playwright/test'
 
+import { showWholeModel } from '../src/canvas.js'
 import { MAIN_PROJECT, MAIN_RUN } from '../src/config.js'
 
 /**
@@ -32,6 +33,10 @@ test('5 · clicking a component shows its agent, task, markdown feedback and gro
   await expect(page.getByTestId('pane-inspector')).toContainText(
     'Keine Komponente ausgewählt',
   )
+
+  // `tax` sits three levels down and is therefore behind its container when the
+  // project opens (#34). The explicit overview action brings it on screen.
+  await showWholeModel(page)
 
   await page.getByTestId(`canvas-node-${TAX}`).click()
 

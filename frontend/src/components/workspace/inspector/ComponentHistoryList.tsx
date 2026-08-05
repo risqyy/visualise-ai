@@ -1,15 +1,16 @@
 import { History, PencilLine, Undo2 } from 'lucide-react'
+import { useTranslation } from 'react-i18next'
 
 import type { ComponentHistoryEntry, RunId } from '@/api/types'
 import { EmptyState } from '@/components/AsyncState'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
+import { ReportedText, ReportedTime } from '@/i18n'
 import { cn } from '@/lib/utils'
 
-import { formatTimestamp } from './formatting'
 import {
   buildHistoryItems,
-  EVENT_TYPE_LABELS,
+  EVENT_TYPE_LABEL_KEY,
   type HistoryItem,
 } from './historyEntries'
 import { SCROLL_ANCHOR_ATTRIBUTE } from './scrollStability'
@@ -44,23 +45,22 @@ export function ComponentHistoryList({
   isFetchingNextPage,
   onFetchNextPage,
 }: ComponentHistoryListProps) {
+  const { t } = useTranslation('inspector')
+  const { t: tCommon } = useTranslation('common')
   const items = buildHistoryItems(entries)
 
   if (items.length === 0) {
     return (
       <EmptyState
-        title="Keine Historie"
-        description="Zu dieser Komponente wurde noch kein Ereignis gemeldet."
+        title={t('history.listEmptyTitle')}
+        description={t('history.listEmptyDescription')}
       />
     )
   }
 
   return (
     <div className="space-y-2" data-testid="history-entries">
-      <p className="text-muted-foreground text-2xs">
-        Alle Runs, neueste zuerst. Korrekturen und Retraktionen stehen als eigene
-        Einträge daneben — nichts wird überschrieben.
-      </p>
+      <p className="text-muted-foreground text-2xs">{t('history.note')}</p>
 
       <ol className="space-y-1.5">
         {items.map((item) => (
@@ -78,7 +78,7 @@ export function ComponentHistoryList({
           disabled={isFetchingNextPage}
           onClick={onFetchNextPage}
         >
-          {isFetchingNextPage ? 'Lädt…' : 'Ältere Einträge laden'}
+          {isFetchingNextPage ? tCommon('state.loadingMore') : t('history.loadOlder')}
         </Button>
       )}
     </div>
@@ -86,6 +86,7 @@ export function ComponentHistoryList({
 }
 
 function HistoryRow({ item, isCurrentRun }: { item: HistoryItem; isCurrentRun: boolean }) {
+  const { t } = useTranslation('inspector')
   const { entry } = item
 
   return (
@@ -107,7 +108,7 @@ function HistoryRow({ item, isCurrentRun }: { item: HistoryItem; isCurrentRun: b
       <div className="flex items-center gap-1.5">
         <HistoryIcon kind={item.kind} />
         <h4 className="min-w-0 flex-1 truncate text-xs font-semibold">
-          {EVENT_TYPE_LABELS[entry.type]}
+          {t(EVENT_TYPE_LABEL_KEY[entry.type])}
         </h4>
         <span className="text-muted-foreground text-2xs shrink-0 tabular-nums">
           #{entry.position}
@@ -115,27 +116,34 @@ function HistoryRow({ item, isCurrentRun }: { item: HistoryItem; isCurrentRun: b
       </div>
 
       <p className="text-muted-foreground text-2xs">
-        <span className="font-mono">{entry.agentId}</span>
+        {/* Agent id, run id and the timestamp are all reported values. */}
+        <ReportedText value={entry.agentId} className="font-mono" />
         <span aria-hidden="true"> · </span>
-        Run <span className="font-mono">{entry.runId}</span>
-        {isCurrentRun && <span> (aktueller Run)</span>}
+        {t('meta.runPrefix')} <ReportedText value={entry.runId} className="font-mono" />
+        {isCurrentRun && <span> {t('history.currentRunSuffix')}</span>}
         <span aria-hidden="true"> · </span>
-        {formatTimestamp(entry.occurredAt)}
+        <ReportedTime value={entry.occurredAt} />
       </p>
 
       {item.reason !== null && (
         <p className="mt-1 text-xs">
-          <span className="text-muted-foreground">Begründung: </span>
-          {item.reason}
+          {/* The reason is the agent's own sentence. */}
+          <span className="text-muted-foreground">{t('history.reasonLabel')} </span>
+          <ReportedText value={item.reason} />
         </p>
       )}
 
       {item.referencesClientEventId !== null && (
         <p className="text-muted-foreground text-2xs mt-0.5">
-          {item.kind === 'correction' ? 'korrigiert' : 'zieht zurück'}{' '}
-          <span className="font-mono">{item.referencesClientEventId}</span>
+          {item.kind === 'correction' ? t('history.corrects') : t('history.retracts')}{' '}
+          <ReportedText value={item.referencesClientEventId} className="font-mono" />
           {item.correctedType !== null && (
-            <> — neuer Inhalt als {EVENT_TYPE_LABELS[item.correctedType]}</>
+            <>
+              {' '}
+              {t('history.correctedInto', {
+                type: t(EVENT_TYPE_LABEL_KEY[item.correctedType]),
+              })}
+            </>
           )}
         </p>
       )}
@@ -144,12 +152,12 @@ function HistoryRow({ item, isCurrentRun }: { item: HistoryItem; isCurrentRun: b
         <div className="mt-1 flex flex-wrap gap-1">
           {item.isCorrected && (
             <Badge variant="outline" className="text-2xs font-normal">
-              später korrigiert — Eintrag bleibt bestehen
+              {t('history.laterCorrected')}
             </Badge>
           )}
           {item.isRetracted && (
             <Badge variant="outline" className="text-2xs font-normal">
-              später zurückgezogen — Eintrag bleibt bestehen
+              {t('history.laterRetracted')}
             </Badge>
           )}
         </div>

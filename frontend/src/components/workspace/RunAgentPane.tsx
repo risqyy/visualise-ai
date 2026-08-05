@@ -1,5 +1,6 @@
 import { ChevronRight } from 'lucide-react'
 import { useState, type ReactNode } from 'react'
+import { useTranslation } from 'react-i18next'
 
 import { useCurrentRun } from '@/api/currentRun'
 import { useAgents, usePlans, useRun, useRuns } from '@/api/queries'
@@ -9,7 +10,7 @@ import { PaneHeader } from '@/components/workspace/PaneHeader'
 import { AgentTree } from '@/components/workspace/runAgents/AgentTree'
 import { PlanRevisions } from '@/components/workspace/runAgents/PlanRevisions'
 import { RunSelector } from '@/components/workspace/runAgents/RunSelector'
-import { OUTCOME_LABEL, formatTimestamp } from '@/components/workspace/runAgents/reporting'
+import { OUTCOME_LABEL_KEY } from '@/components/workspace/runAgents/reporting'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import {
@@ -19,7 +20,7 @@ import {
 } from '@/components/ui/collapsible'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Separator } from '@/components/ui/separator'
-import { COUNT_LABELS, counted } from '@/lib/plural'
+import { ReportedText, ReportedTime } from '@/i18n'
 
 export interface RunAgentPaneProps {
   projectId: ProjectId
@@ -45,8 +46,15 @@ export interface RunAgentPaneProps {
  *    (ADR 0003), so an `agent.progress_reported` refetches this run's agent list
  *    and nothing else. Selection and collapse state live outside the cache, so a
  *    refetch cannot move them.
+ * 5. **Density never removes anything.** Long reported texts are clipped by CSS
+ *    and stay complete in the DOM, and a compact agent row is one keystroke away
+ *    from its full detail. What a row shows first follows the agent's *own*
+ *    reported status — never elapsed time (#39, ADR 0014).
  */
 export function RunAgentPane({ projectId, runId }: RunAgentPaneProps) {
+  const { t } = useTranslation('agents')
+  const { t: tWorkspace } = useTranslation('workspace')
+  const { t: tCommon } = useTranslation('common')
   const runs = useRuns(projectId)
   const currentRun = useCurrentRun(projectId)
   const run = useRun(projectId, runId)
@@ -65,17 +73,19 @@ export function RunAgentPane({ projectId, runId }: RunAgentPaneProps) {
   return (
     <section
       className="pane-surface"
-      aria-label="Run- und Agent-Bereich"
+      aria-label={tWorkspace('pane.leftLabel')}
       data-testid="pane-run-agents"
       data-run-id={runId}
     >
-      <PaneHeader title="Runs und Agents" subtitle={projectId} />
+      <PaneHeader title={t('pane.title')} subtitle={<ReportedText value={projectId} />} />
 
       <ScrollArea className="min-h-0 flex-1">
         <div className="space-y-4 p-3">
           <Section
-            title="Runs"
-            count={runList.length > 0 ? `${runList.length} geladen` : null}
+            title={t('runs.title')}
+            count={
+              runList.length > 0 ? t('runs.loadedCount', { count: runList.length }) : null
+            }
           >
             <RunSelector
               projectId={projectId}
@@ -94,52 +104,54 @@ export function RunAgentPane({ projectId, runId }: RunAgentPaneProps) {
 
           <Separator />
 
-          <section aria-label="Gemeldeter Runzustand" data-testid="run-state">
-            <span className="pane-heading">Runzustand</span>
+          <section aria-label={t('runState.sectionLabel')} data-testid="run-state">
+            <span className="pane-heading">{t('runState.title')}</span>
             <div className="pt-1">
               <AsyncState
                 isPending={run.isPending}
                 isError={run.isError}
                 error={run.error}
-                emptyTitle="Run nicht verfügbar"
+                emptyTitle={t('runState.emptyTitle')}
                 onRetry={() => void run.refetch()}
                 skeletonRows={2}
               >
                 {run.data && (
-                  <dl className="space-y-0.5 text-2xs">
-                    <Row label="Run">
-                      <span className="font-mono">{run.data.run.runId}</span>
+                  <dl className="space-y-0.5 text-xs">
+                    <Row label={t('runState.runLabel')}>
+                      <ReportedText value={run.data.run.runId} className="pane-meta" />
                     </Row>
-                    <Row label="Zustand">
+                    <Row label={t('runState.stateLabel')}>
                       <span
                         data-testid="run-openness"
                         data-open={run.data.run.isOpen ? 'true' : 'false'}
                       >
                         {run.data.run.isOpen
-                          ? 'offen — kein Terminalereignis gemeldet'
-                          : `beendet: ${
-                              run.data.run.outcome
-                                ? OUTCOME_LABEL[run.data.run.outcome]
-                                : 'ohne gemeldetes Ergebnis'
-                            }`}
+                          ? t('runs.openState')
+                          : t('runs.finishedState', {
+                              outcome: run.data.run.outcome
+                                ? t(OUTCOME_LABEL_KEY[run.data.run.outcome])
+                                : t('runs.noOutcome'),
+                            })}
                       </span>
                     </Row>
-                    <Row label="Beginn">
-                      <span className="font-mono">
-                        {formatTimestamp(run.data.run.startedAt)}
-                      </span>
+                    <Row label={t('runState.startLabel')}>
+                      <ReportedTime value={run.data.run.startedAt} className="pane-meta" />
                     </Row>
-                    <Row label="Ende">
-                      <span className="font-mono">
-                        {run.data.run.finishedAt
-                          ? formatTimestamp(run.data.run.finishedAt)
-                          : 'kein Ende gemeldet'}
-                      </span>
+                    <Row label={t('runState.endLabel')}>
+                      {/*
+                        A timestamp is metadata and may be 11 px; "nothing was
+                        reported" is a sentence and is not (#39).
+                      */}
+                      {run.data.run.finishedAt ? (
+                        <ReportedTime value={run.data.run.finishedAt} className="pane-meta" />
+                      ) : (
+                        <span className="text-muted-foreground">{t('runState.noEnd')}</span>
+                      )}
                     </Row>
-                    <Row label="Umfang">
-                      {counted(run.data.run.counts.agents, COUNT_LABELS.agent)} ·{' '}
-                      {counted(run.data.run.counts.plans, COUNT_LABELS.plan)} ·{' '}
-                      {counted(run.data.run.counts.workSteps, COUNT_LABELS.workStep)}
+                    <Row label={t('runState.scopeLabel')}>
+                      {tCommon('count.agent', { count: run.data.run.counts.agents })} ·{' '}
+                      {tCommon('count.plan', { count: run.data.run.counts.plans })} ·{' '}
+                      {tCommon('count.workStep', { count: run.data.run.counts.workSteps })}
                     </Row>
                   </dl>
                 )}
@@ -149,12 +161,12 @@ export function RunAgentPane({ projectId, runId }: RunAgentPaneProps) {
 
           <Separator />
 
-          <section aria-label="Agenthierarchie" data-testid="agent-tree-region">
+          <section aria-label={t('tree.label')} data-testid="agent-tree-region">
             <div className="flex items-center justify-between gap-2">
-              <span className="pane-heading">Agenthierarchie</span>
+              <span className="pane-heading">{t('tree.label')}</span>
               {agents.isSuccess && (
-                <Badge variant="outline" className="text-2xs font-normal">
-                  {agentList.length} gemeldet
+                <Badge variant="outline" className="font-normal">
+                  {t('tree.reportedCount', { count: agentList.length })}
                 </Badge>
               )}
             </div>
@@ -165,8 +177,11 @@ export function RunAgentPane({ projectId, runId }: RunAgentPaneProps) {
                 isError={agents.isError}
                 error={agents.error}
                 isEmpty={agentList.length === 0}
-                emptyTitle="Keine Agents gemeldet"
-                emptyDescription={`Für Run ${runId} liegt noch kein agent.started-Ereignis vor.`}
+                emptyTitle={t('tree.emptyTitle')}
+                // `runId` is reported data. `EmptyState.description` is a
+                // string, so it is interpolated rather than wrapped, which
+                // i18next passes through byte for byte (ADR 0014).
+                emptyDescription={t('tree.emptyDescription', { runId })}
                 onRetry={() => void agents.refetch()}
                 skeletonRows={4}
               >
@@ -181,14 +196,17 @@ export function RunAgentPane({ projectId, runId }: RunAgentPaneProps) {
 
           <Separator />
 
-          <Section title="Pläne" count={planList.length > 0 ? `${planList.length}` : null}>
+          <Section
+            title={t('plans.title')}
+            count={planList.length > 0 ? `${planList.length}` : null}
+          >
             <AsyncState
               isPending={plans.isPending}
               isError={plans.isError}
               error={plans.error}
               isEmpty={planList.length === 0}
-              emptyTitle="Kein Plan veröffentlicht"
-              emptyDescription={`Für Run ${runId} liegt noch kein plan.published-Ereignis vor.`}
+              emptyTitle={t('plans.emptyTitle')}
+              emptyDescription={t('plans.emptyDescription', { runId })}
               onRetry={() => void plans.refetch()}
               skeletonRows={3}
             >
@@ -224,7 +242,7 @@ function Section({
             <span className="pane-heading">{title}</span>
           </Button>
         </CollapsibleTrigger>
-        {count && <span className="text-muted-foreground text-2xs">{count}</span>}
+        {count && <span className="text-muted-foreground text-xs">{count}</span>}
       </div>
       <CollapsibleContent className="pt-1">{children}</CollapsibleContent>
     </Collapsible>

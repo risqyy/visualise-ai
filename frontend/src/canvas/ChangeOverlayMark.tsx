@@ -1,4 +1,5 @@
 import { Users } from 'lucide-react'
+import { useTranslation } from 'react-i18next'
 
 import { cn } from '@/lib/utils'
 import { WORK_STATE_BY_ID } from '@/state/workStates'
@@ -38,9 +39,10 @@ export function ChangeOverlayMark({
   compact = false,
   className,
 }: ChangeOverlayMarkProps) {
+  const { t } = useTranslation('canvas')
   const definition = WORK_STATE_BY_ID[overlay.state]
   const Icon = definition.icon
-  const label = overlayLabel(overlay)
+  const label = overlayLabel(overlay, t)
   const agentCount = overlay.agentIds.length
 
   return (
@@ -55,10 +57,10 @@ export function ChangeOverlayMark({
         borderStyle: definition.borderStyle,
         color: `var(${definition.colorVar})`,
       }}
-      title={overlayTitle(overlay)}
+      title={overlayTitle(overlay, t)}
       data-testid={`overlay-mark-${overlay.targetKind}-${overlay.targetId}`}
       data-work-state={overlay.state}
-      data-work-state-label={definition.label}
+      data-work-state-label={t(definition.labelKey)}
       data-border-style={definition.borderStyle}
       data-dasharray={definition.strokeDasharray}
       data-operation={overlay.operation ?? 'none'}
@@ -75,7 +77,7 @@ export function ChangeOverlayMark({
         <span className="inline-flex shrink-0 items-center gap-0.5 font-medium">
           <Users className="size-3" aria-hidden="true" />
           {agentCount}
-          <span className="sr-only"> Agents melden zu diesem Element</span>
+          <span className="sr-only"> {t('overlay.agentsReporting')}</span>
         </span>
       )}
     </span>

@@ -1,5 +1,7 @@
 import { EdgeLabelRenderer, type EdgeProps } from '@xyflow/react'
+import type { TFunction } from 'i18next'
 import { memo, type ReactNode } from 'react'
+import { useTranslation } from 'react-i18next'
 
 import type { Relationship } from '@/api/types'
 import { cn } from '@/lib/utils'
@@ -214,6 +216,7 @@ export const RelationshipEdge = memo(function RelationshipEdge({
   targetX,
   targetY,
 }: EdgeProps<ArchitectureEdge>) {
+  const { t } = useTranslation('canvas')
   const level = useDetailLevel()
   const expandedEdgeIds = useUiStore((state) => state.expandedEdgeIds)
   const toggleEdgeExpanded = useUiStore((state) => state.toggleEdgeExpanded)
@@ -275,9 +278,11 @@ export const RelationshipEdge = memo(function RelationshipEdge({
             <EdgeBadge
               point={badgePoint}
               onClick={() => toggleEdgeExpanded(id)}
-              title={`Sammelkante aufklappen: ${resolved
-                .map((entry) => entry.displayName)
-                .join(', ')}`}
+              // The display names are built from reported values; they are
+              // interpolated into our sentence, never rewritten.
+              title={t('edge.bundleExpand', {
+                relationships: resolved.map((entry) => entry.displayName).join(', '),
+              })}
               testId={`edge-bundle-${id}`}
             >
               {badgeLabel} ▸
@@ -292,7 +297,7 @@ export const RelationshipEdge = memo(function RelationshipEdge({
                     emphasised ? null : single.relationship.relationshipId,
                   )
                 }
-                title={relationshipTitle(single.relationship)}
+                title={relationshipTitle(single.relationship, t)}
                 testId={`edge-label-${single.relationship.relationshipId}`}
                 {...(emphasised ? { emphasised: true } : {})}
               >
@@ -353,7 +358,7 @@ export const RelationshipEdge = memo(function RelationshipEdge({
                   emphasised ? null : entry.relationship.relationshipId,
                 )
               }
-              title={relationshipTitle(entry.relationship)}
+              title={relationshipTitle(entry.relationship, t)}
               testId={`edge-label-${entry.relationship.relationshipId}`}
               {...(emphasised ? { emphasised: true } : {})}
             >
@@ -365,7 +370,7 @@ export const RelationshipEdge = memo(function RelationshipEdge({
         <EdgeBadge
           point={pointAtRatio(route, 0.12)}
           onClick={() => toggleEdgeExpanded(id)}
-          title="Sammelkante wieder zusammenklappen"
+          title={t('edge.bundleCollapse')}
           testId={`edge-collapse-${id}`}
         >
           ▾ {resolved.length}
@@ -375,14 +380,29 @@ export const RelationshipEdge = memo(function RelationshipEdge({
   )
 })
 
-function relationshipTitle(relationship: Relationship): string {
+/**
+ * The `title` of one relationship: our word for its kind, then the values the
+ * agent reported for it.
+ *
+ * The labels are translated; `protocol`, `operation` and `channel` are reported
+ * project data — a NATS topic in particular — and are interpolated verbatim. A
+ * `title` attribute holds a string, so this is the interpolation half of the
+ * translation contract (ADR 0014).
+ */
+function relationshipTitle(relationship: Relationship, t: TFunction<'canvas'>): string {
   const style = RELATIONSHIP_KIND_STYLE_BY_ID[relationship.kind]
   const parts = [
-    style?.label ?? relationship.kind,
+    style ? t(style.labelKey) : relationship.kind,
     reported(relationship.label),
-    reported(relationship.protocol) ? `Protokoll: ${relationship.protocol}` : null,
-    reported(relationship.operation) ? `Operation: ${relationship.operation}` : null,
-    reported(relationship.channel) ? `Kanal: ${relationship.channel}` : null,
+    reported(relationship.protocol)
+      ? t('edge.protocol', { value: relationship.protocol })
+      : null,
+    reported(relationship.operation)
+      ? t('edge.operation', { value: relationship.operation })
+      : null,
+    reported(relationship.channel)
+      ? t('edge.channel', { value: relationship.channel })
+      : null,
   ].filter((part): part is string => part !== null && part !== undefined)
   return parts.join('\n')
 }

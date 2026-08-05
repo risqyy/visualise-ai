@@ -1,5 +1,6 @@
 import { PanelLeftOpen, PanelRightOpen } from 'lucide-react'
 import { useEffect, useRef, useState, type ReactNode } from 'react'
+import { useTranslation } from 'react-i18next'
 import type {
   GroupImperativeHandle,
   Layout,
@@ -16,6 +17,8 @@ import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip
 import {
   COLLAPSED_PANE_SIZE,
   PANE_IDS,
+  PANE_MAX_WIDTH,
+  PANE_MIN_WIDTH_PX,
   useUiStore,
   type PaneLayout,
 } from '@/state/uiStore'
@@ -37,8 +40,20 @@ export interface WorkspaceLayoutProps {
  *
  * Both side panes are independently collapsible. A collapsed pane keeps a thin
  * rail with its expand control, so the pane never disappears without a way back.
+ *
+ * The **shares** are relative and the **minimums are absolute** (issue #41).
+ * That split is deliberate: the proportions are what keeps the architecture
+ * surface dominant at every width, while a percentage minimum would shrink with
+ * the window and let a pane become unusable at 1280 — the width a 1920 px
+ * window has at 150 % browser zoom. The numbers live in `state/uiStore.ts`
+ * next to the layout they constrain.
+ *
+ * Nothing here scrolls. The group is exactly one viewport tall and each pane
+ * owns its own scroll region, which is what keeps the page itself free of a
+ * scrollbar in either direction.
  */
 export function WorkspaceLayout({ left, center, right }: WorkspaceLayoutProps) {
+  const { t } = useTranslation('workspace')
   const layout = useUiStore((state) => state.layout)
   const leftCollapsed = useUiStore((state) => state.leftCollapsed)
   const rightCollapsed = useUiStore((state) => state.rightCollapsed)
@@ -72,8 +87,8 @@ export function WorkspaceLayout({ left, center, right }: WorkspaceLayoutProps) {
         id={PANE_IDS.left}
         collapsible
         collapsedSize={`${COLLAPSED_PANE_SIZE}%`}
-        minSize="12%"
-        maxSize="32%"
+        minSize={PANE_MIN_WIDTH_PX[PANE_IDS.left]}
+        maxSize={PANE_MAX_WIDTH.left}
         panelRef={leftPanelRef}
         className="min-w-0"
         onResize={() => syncCollapsed(leftPanelRef, leftCollapsed, setLeftCollapsed)}
@@ -81,7 +96,7 @@ export function WorkspaceLayout({ left, center, right }: WorkspaceLayoutProps) {
         {leftCollapsed ? (
           <CollapsedRail
             side="left"
-            label="Run- und Agent-Bereich"
+            label={t('pane.leftLabel')}
             onExpand={() => setLeftCollapsed(false)}
           />
         ) : (
@@ -89,20 +104,24 @@ export function WorkspaceLayout({ left, center, right }: WorkspaceLayoutProps) {
         )}
       </ResizablePanel>
 
-      <ResizableHandle withHandle aria-label="Breite des Run- und Agent-Bereichs" />
+      <ResizableHandle withHandle aria-label={t('pane.leftWidthLabel')} />
 
-      <ResizablePanel id={PANE_IDS.center} minSize="30%" className="min-w-0">
+      <ResizablePanel
+        id={PANE_IDS.center}
+        minSize={PANE_MIN_WIDTH_PX[PANE_IDS.center]}
+        className="min-w-0"
+      >
         {center}
       </ResizablePanel>
 
-      <ResizableHandle withHandle aria-label="Breite des Inspectors" />
+      <ResizableHandle withHandle aria-label={t('pane.rightWidthLabel')} />
 
       <ResizablePanel
         id={PANE_IDS.right}
         collapsible
         collapsedSize={`${COLLAPSED_PANE_SIZE}%`}
-        minSize="16%"
-        maxSize="60%"
+        minSize={PANE_MIN_WIDTH_PX[PANE_IDS.right]}
+        maxSize={PANE_MAX_WIDTH.right}
         panelRef={rightPanelRef}
         className="min-w-0"
         onResize={() => syncCollapsed(rightPanelRef, rightCollapsed, setRightCollapsed)}
@@ -110,7 +129,7 @@ export function WorkspaceLayout({ left, center, right }: WorkspaceLayoutProps) {
         {rightCollapsed ? (
           <CollapsedRail
             side="right"
-            label="Inspector"
+            label={t('pane.rightLabel')}
             onExpand={() => setRightCollapsed(false)}
           />
         ) : (
@@ -131,7 +150,9 @@ function CollapsedRail({
   label: string
   onExpand: () => void
 }) {
+  const { t } = useTranslation('workspace')
   const Icon = side === 'left' ? PanelLeftOpen : PanelRightOpen
+  const expand = t('pane.expand', { pane: label })
 
   return (
     <div
@@ -142,12 +163,10 @@ function CollapsedRail({
         <TooltipTrigger asChild>
           <Button variant="ghost" size="icon" className="size-7" onClick={onExpand}>
             <Icon aria-hidden="true" />
-            <span className="sr-only">{label} ausklappen</span>
+            <span className="sr-only">{expand}</span>
           </Button>
         </TooltipTrigger>
-        <TooltipContent side={side === 'left' ? 'right' : 'left'}>
-          {label} ausklappen
-        </TooltipContent>
+        <TooltipContent side={side === 'left' ? 'right' : 'left'}>{expand}</TooltipContent>
       </Tooltip>
       <span
         className="pane-heading text-muted-foreground whitespace-nowrap"

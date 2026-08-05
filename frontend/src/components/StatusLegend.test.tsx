@@ -3,9 +3,13 @@ import userEvent from '@testing-library/user-event'
 import { describe, expect, it } from 'vitest'
 
 import { TooltipProvider } from '@/components/ui/tooltip'
-import { WORK_STATES, WORK_STATE_DISCLAIMER } from '@/state/workStates'
+import { WORK_STATES, WORK_STATE_DISCLAIMER_KEY } from '@/state/workStates'
+import { translateWith } from '@/test/translate'
 
 import { StatusLegend } from './StatusLegend'
+
+/** German is what `src/test/setup.ts` installs, so this is what is rendered. */
+const t = translateWith('canvas')
 
 function renderLegend() {
   return render(
@@ -31,7 +35,7 @@ describe('StatusLegend', () => {
     // Deliberately queried by text, not by colour: the legend has to be
     // readable without any colour perception at all.
     for (const state of WORK_STATES) {
-      expect(screen.getByText(state.label)).toBeVisible()
+      expect(screen.getByText(t(state.labelKey))).toBeVisible()
     }
   })
 
@@ -53,13 +57,13 @@ describe('StatusLegend', () => {
     await user.click(screen.getByRole('button', { name: /Legende erklären/ }))
 
     const dialog = await screen.findByRole('dialog')
-    expect(dialog).toHaveTextContent(WORK_STATE_DISCLAIMER)
+    expect(dialog).toHaveTextContent(t(WORK_STATE_DISCLAIMER_KEY))
     expect(dialog).toHaveTextContent(/kein Qualitätsurteil/)
 
     // The explanation repeats every label together with its description.
     for (const state of WORK_STATES) {
-      expect(dialog).toHaveTextContent(state.label)
-      expect(dialog).toHaveTextContent(state.description)
+      expect(dialog).toHaveTextContent(t(state.labelKey))
+      expect(dialog).toHaveTextContent(t(state.descriptionKey))
     }
   })
 })

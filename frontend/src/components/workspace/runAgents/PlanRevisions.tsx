@@ -1,12 +1,14 @@
+import { useTranslation } from 'react-i18next'
+
 import type { RunPlan, RunPlanRevision } from '@/api/types'
 import { Badge } from '@/components/ui/badge'
+import { ReportedText, ReportedTime } from '@/i18n'
 import { cn } from '@/lib/utils'
 
 import { CompletedStepsMeter } from './ProgressDisplay'
 import {
   PLAN_STEP_STATE_GLYPH,
-  PLAN_STEP_STATE_LABEL,
-  formatTimestamp,
+  PLAN_STEP_STATE_LABEL_KEY,
   stepCompletion,
 } from './reporting'
 
@@ -29,6 +31,9 @@ export interface PlanRevisionsProps {
  * without an interaction.
  */
 export function PlanRevisions({ plans }: PlanRevisionsProps) {
+  const { t } = useTranslation('agents')
+  const { t: tCommon } = useTranslation('common')
+
   return (
     <div data-testid="plan-revisions" className="space-y-3">
       {plans.map((plan) => (
@@ -39,13 +44,18 @@ export function PlanRevisions({ plans }: PlanRevisionsProps) {
           className="border-border rounded-md border"
         >
           <header className="border-border flex items-baseline gap-1.5 border-b px-2 py-1.5">
-            <h4 className="truncate font-mono text-xs font-medium">{plan.planId}</h4>
-            <span className="text-muted-foreground shrink-0 text-2xs">
-              {plan.revisions.length} Revision{plan.revisions.length === 1 ? '' : 'en'}
+            <h4 className="truncate font-mono text-xs font-medium">
+              <ReportedText value={plan.planId} />
+            </h4>
+            <span className="text-muted-foreground shrink-0 text-xs">
+              {tCommon('count.revision', { count: plan.revisions.length })}
             </span>
           </header>
 
-          <ol aria-label={`Revisionen von ${plan.planId}`} className="divide-border divide-y">
+          <ol
+            aria-label={t('plan.revisionsLabel', { planId: plan.planId })}
+            className="divide-border divide-y"
+          >
             {[...plan.revisions]
               .sort((left, right) => left.revision - right.revision)
               .map((revision) => (
@@ -69,7 +79,9 @@ function PlanRevisionEntry({
   planId: string
   revision: RunPlanRevision
 }) {
+  const { t } = useTranslation('agents')
   const completion = stepCompletion(revision)
+  const revisionTitle = t('plan.revisionTitle', { revision: revision.revision })
 
   return (
     <li
@@ -79,25 +91,33 @@ function PlanRevisionEntry({
       className={cn('space-y-1.5 px-2 py-2', !revision.isCurrent && 'bg-muted/30')}
     >
       <div className="flex items-baseline gap-1.5">
-        <h5 className="text-xs font-medium">Revision {revision.revision}</h5>
+        <h5 className="text-xs font-medium">{revisionTitle}</h5>
         {revision.isCurrent ? (
-          <Badge variant="secondary" className="text-2xs font-normal">
-            aktuell
+          <Badge variant="secondary" className="font-normal">
+            {t('plan.currentBadge')}
           </Badge>
         ) : (
-          <Badge variant="outline" className="text-2xs font-normal">
-            frühere Fassung
+          <Badge variant="outline" className="font-normal">
+            {t('plan.earlierBadge')}
           </Badge>
         )}
       </div>
 
-      <p className="text-muted-foreground font-mono text-2xs">
-        {formatTimestamp(revision.createdAt)} · {revision.createdByAgentId}
+      <p className="pane-meta text-muted-foreground">
+        <ReportedTime value={revision.createdAt} className="pane-meta" /> ·{' '}
+        {/*
+          `pane-meta` is repeated on the value and not only on the paragraph:
+          wrapping a text node in `<ReportedText>` moves which element *owns*
+          the text, and the pane's typography rule — nothing below 12 px unless
+          it is bounded, monospaced `pane-meta` metadata (#39) — is checked on
+          the owning element.
+        */}
+        <ReportedText value={revision.createdByAgentId} className="pane-meta" />
       </p>
 
       <CompletedStepsMeter
         completion={completion}
-        label={`Revision ${revision.revision}`}
+        label={revisionTitle}
         testId={`plan-completion-${planId}-${revision.revision}`}
       />
 
@@ -109,7 +129,7 @@ function PlanRevisionEntry({
               key={step.stepId}
               data-testid={`plan-step-${planId}-${revision.revision}-${step.stepId}`}
               data-step-state={step.state}
-              className="flex items-baseline gap-1.5 text-2xs"
+              className="flex items-baseline gap-1.5 text-xs"
             >
               <span
                 aria-hidden="true"
@@ -120,9 +140,12 @@ function PlanRevisionEntry({
               >
                 {PLAN_STEP_STATE_GLYPH[step.state]}
               </span>
-              <span className="min-w-0 flex-1">{step.title}</span>
+              {/* The step title is the agent's own wording. */}
+              <span className="min-w-0 flex-1">
+                <ReportedText value={step.title} />
+              </span>
               <span className="text-muted-foreground shrink-0">
-                {PLAN_STEP_STATE_LABEL[step.state]}
+                {t(PLAN_STEP_STATE_LABEL_KEY[step.state])}
               </span>
             </li>
           ))}

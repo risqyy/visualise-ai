@@ -1,0 +1,21 @@
+{
+  "detail": {
+    "backToList": "Zurück zur Projektliste",
+    "emptyTitle": "Projekt nicht verfügbar",
+    "noRunDescription": "Für dieses Projekt liegt kein Run vor. Sobald ein Orchestrator ein Ereignis sendet, öffnet dieses Projekt seinen aktuellen Run automatisch.",
+    "noRunTitle": "Noch kein Run gemeldet"
+  },
+  "empty": {
+    "description": "Ein Projekt entsteht, sobald ein Agent das erste Ereignis an /api/v1/events sendet.",
+    "title": "Noch keine Projekte gemeldet"
+  },
+  "item": {
+    "lastReported": "zuletzt gemeldet",
+    "noCurrentRun": "kein aktueller Run",
+    "openLabel": "Projekt {{projectId}} öffnen"
+  },
+  "list": {
+    "description": "Beobachtete Projekte. Ein Projekt öffnet direkt seinen aktuellen Run.",
+    "title": "Projekte"
+  }
+}

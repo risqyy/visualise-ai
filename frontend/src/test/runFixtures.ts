@@ -141,6 +141,75 @@ export const treeAgentsResponse: AgentListResponse = {
   ],
 }
 
+/**
+ * The density stress case of #39, mirroring the simulator's `self` scenario:
+ * a root orchestrator whose `assignedTask` is a whole paragraph, a subagent
+ * whose task is three issue titles chained with `·`, and a long status note.
+ *
+ * The strings are copied verbatim from what the simulator reports, because the
+ * point of the fixture is exactly their length — a paraphrase would test a
+ * different sentence than the one the acceptance looks at.
+ */
+export const PARAGRAPH_TASK =
+  'Build the v0 agent cockpit of epic #1: a versioned event contract, a Compose ' +
+  'deployment behind one entry point, an append-only event store, the ingestion ' +
+  'and read surfaces, the live stream, the three-pane cockpit, a deterministic ' +
+  'simulator and a mandatory end-to-end acceptance run.'
+
+export const CHAINED_TASK =
+  '[v0] Event-Ingestion, Validierung und Lifecycle-Regeln implementieren (#20) · ' +
+  '[v0] Projektbezogene HTTP Read API implementieren (#21) · ' +
+  '[v0] SSE-Livestream mit positionsbasiertem Replay implementieren (#23)'
+
+export const LONG_STATUS_NOTE =
+  'Every subagent finished. The run is left open on purpose: no status is derived from silence.'
+
+export const longTaskAgentsResponse: AgentListResponse = {
+  projectPosition: 62,
+  agents: [
+    agent({
+      agentId: 'orchestrator-root',
+      parentAgentId: null,
+      role: 'orchestrator',
+      displayName: 'Root Orchestrator',
+      assignedTask: PARAGRAPH_TASK,
+      status: 'idle',
+      statusNote: LONG_STATUS_NOTE,
+      progress: { percent: 96, scope: 'overall_estimate', basis: 'reported_estimate' },
+      startedAt: '2026-08-04T09:00:49Z',
+      lastEventAt: '2026-08-04T10:41:59Z',
+      position: 122,
+    }),
+    agent({
+      agentId: 'subagent-backend-api',
+      parentAgentId: 'orchestrator-root',
+      role: 'subagent',
+      displayName: 'Backend HTTP Surface',
+      assignedTask: CHAINED_TASK,
+      status: 'done',
+      statusNote: '',
+      progress: { percent: 100, scope: 'own_task', basis: 'completed_steps' },
+      finishedOutcome: 'completed',
+      startedAt: '2026-08-04T09:08:26Z',
+      lastEventAt: '2026-08-04T09:46:31Z',
+      position: 56,
+    }),
+    agent({
+      agentId: 'subagent-implementer',
+      parentAgentId: 'orchestrator-root',
+      role: 'subagent',
+      displayName: 'Implementer',
+      assignedTask: 'VAT-Behandlung in ein eigenes Modul verschieben.',
+      status: 'working',
+      statusNote: 'Schreibt Total() um.',
+      progress: { percent: 70, scope: 'own_task', basis: 'completed_steps' },
+      startedAt: '2026-08-04T09:00:05Z',
+      lastEventAt: '2026-08-04T09:06:31Z',
+      position: 41,
+    }),
+  ],
+}
+
 export const historicalAgentsResponse: AgentListResponse = {
   projectPosition: 62,
   agents: [

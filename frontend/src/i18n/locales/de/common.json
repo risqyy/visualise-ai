@@ -1,0 +1,53 @@
+{
+  "action": {
+    "close": "Schließen",
+    "retry": "Erneut versuchen"
+  },
+  "count": {
+    "agent_one": "{{count, number}} Agent",
+    "agent_other": "{{count, number}} Agents",
+    "child_one": "{{count, number}} Kind",
+    "child_other": "{{count, number}} Kinder",
+    "component_one": "{{count, number}} Komponente",
+    "component_other": "{{count, number}} Komponenten",
+    "diff_one": "{{count, number}} Diff",
+    "diff_other": "{{count, number}} Diffs",
+    "feedback_one": "{{count, number}} Feedback",
+    "feedback_other": "{{count, number}} Feedback",
+    "file_one": "{{count, number}} Datei",
+    "file_other": "{{count, number}} Dateien",
+    "plan_one": "{{count, number}} Plan",
+    "plan_other": "{{count, number}} Pläne",
+    "problem_one": "{{count, number}} Problem",
+    "problem_other": "{{count, number}} Probleme",
+    "relationship_one": "{{count, number}} Beziehung",
+    "relationship_other": "{{count, number}} Beziehungen",
+    "revision_one": "{{count, number}} Revision",
+    "revision_other": "{{count, number}} Revisionen",
+    "risk_one": "{{count, number}} Risiko",
+    "risk_other": "{{count, number}} Risiken",
+    "workStep_one": "{{count, number}} Arbeitsschritt",
+    "workStep_other": "{{count, number}} Arbeitsschritte"
+  },
+  "language": {
+    "code": {
+      "de": "DE",
+      "en": "EN"
+    },
+    "current": "Aktuelle Sprache: {{language}}",
+    "label": "Sprache",
+    "name": {
+      "de": "Deutsch",
+      "en": "English"
+    },
+    "switchTo": "Auf {{language}} umschalten"
+  },
+  "state": {
+    "loading": "Daten werden geladen…",
+    "loadingMore": "Lädt…"
+  },
+  "time": {
+    "notReported": "nicht gemeldet",
+    "relativeWithExact": "{{relative}}, gemeldet {{absolute}}"
+  }
+}
