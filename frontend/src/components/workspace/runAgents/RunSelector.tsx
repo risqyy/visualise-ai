@@ -176,7 +176,7 @@ function RunLink({
           : `beendet: ${run.outcome ? OUTCOME_LABEL[run.outcome] : 'ohne gemeldetes Ergebnis'}`}
       </span>
       <span className="pane-meta text-muted-foreground block">
-        seit <ReportedTime value={run.startedAt} />
+        seit <ReportedTime value={run.startedAt} className="pane-meta" />
       </span>
       <span className="text-muted-foreground block text-xs">
         {/*

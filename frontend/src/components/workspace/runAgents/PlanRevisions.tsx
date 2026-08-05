@@ -96,7 +96,8 @@ function PlanRevisionEntry({
       </div>
 
       <p className="pane-meta text-muted-foreground">
-        <ReportedTime value={revision.createdAt} /> · {revision.createdByAgentId}
+        <ReportedTime value={revision.createdAt} className="pane-meta" /> ·{' '}
+        {revision.createdByAgentId}
       </p>
 
       <CompletedStepsMeter

@@ -284,7 +284,11 @@ export function AgentTreeItem({
                   data-testid={`agent-last-event-${agent.agentId}`}
                   className="pane-meta text-muted-foreground"
                 >
-                  <ReportedTime value={agent.lastEventAt} display="relative" />
+                  <ReportedTime
+                    value={agent.lastEventAt}
+                    display="relative"
+                    className="pane-meta"
+                  />
                 </span>
               </DetailRow>
               <DetailRow label={AGENT_PANE_TEXT.outcomeLabel}>

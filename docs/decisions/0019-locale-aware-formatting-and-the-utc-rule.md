@@ -157,6 +157,13 @@ data, and left for someone to investigate.
   they replaced. `ProjectsPage.i18n.test.tsx` gained a case proving the reported
   instant survives byte-for-byte in `datetime` in both languages, which is what
   the removed `data-reported` assertion used to cover.
+- **A rendered instant is now its own element, and the density rule of #39
+  applies to it.** The run/agent pane may only use 11 px type for bounded,
+  monospaced metadata, and the acceptance suite walks every element that owns
+  text to check it. Where a timestamp used to be a text node inside a
+  `pane-meta` span it is now a `<time>` of its own, so it carries `pane-meta`
+  itself at those four call sites. The rendering is unchanged; what changed is
+  which element the class has to sit on.
 - **`<time>` elements are now the anchor for timestamp assertions.** A test that
   wants the exact instant reads `title` or the element text; both are one string
   per element and both are asserted to agree across areas.
