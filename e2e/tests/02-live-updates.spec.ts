@@ -7,6 +7,7 @@ import {
   MAIN_PROJECT,
   MAIN_RUN,
 } from '../src/config.js'
+import { showWholeModel } from '../src/canvas.js'
 import { installLiveObserver } from '../src/liveObserver.js'
 import { startSimulator, type SimulatorSummary } from '../src/simulator.js'
 
@@ -73,6 +74,13 @@ test('3 · every live change state is observed while the run is happening', asyn
   // screen long enough to be genuinely observable rather than inferred.
   const simulator = startSimulator({ scenario: 'full', speed: 1 })
 
+  // The architecture snapshot is the first thing the run publishes, and the
+  // canvas opens it on its top levels only (#34). The states below land on
+  // components two and three levels down, so the whole model is opened here —
+  // once, before any of them arrive — and stays open for the rest of the run.
+  await expect(page.getByTestId('architecture-canvas')).toBeVisible({ timeout: 120_000 })
+  await showWholeModel(page)
+
   // The applied removal is the last of the four states to appear; waiting for it
   // means the run reached its "Applied changes" phase with the page open.
   await expect
@@ -93,7 +101,9 @@ test('3 · every live change state is observed while the run is happening', asyn
   expect(summary.endPosition).toBe(summary.eventsSent + 1)
 
   // The last proposal of the run arrives after the applied changes; waiting for
-  // its node means the page processed the whole stream.
+  // its node means the page processed the whole stream. It is two levels down,
+  // so the whole model has to be open for it to be drawn (#34).
+  await showWholeModel(page)
   await expect(
     page.getByTestId('canvas-node-shop-platform.orders.domain.rounding'),
   ).toBeVisible()
@@ -173,6 +183,7 @@ test('3 · after a reload the watched states start empty again — which is why 
   )
   await expect(page.getByTestId('architecture-canvas')).toBeVisible()
   // The pending proposals come back from the read API's `activeChanges`.
+  await showWholeModel(page)
   await expect(
     page.getByTestId('canvas-node-shop-platform.orders.domain.rounding'),
   ).toBeVisible()

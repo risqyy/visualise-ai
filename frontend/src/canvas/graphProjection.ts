@@ -105,6 +105,20 @@ export interface ComponentNodeData extends Record<string, unknown> {
   isCompound: boolean
   /** Reported work state of this component, or `null` when none was reported. */
   overlay: ChangeOverlay | null
+  /**
+   * `true` when this container is collapsed: its children are not drawn and it
+   * is rendered as a leaf-sized box. Set by `collapse.ts`, never by the
+   * projection — what is *reported* does not depend on what is *open*.
+   */
+  collapsed?: boolean
+  /** Components hidden inside this collapsed container, at any depth below it. */
+  hiddenDescendantCount?: number
+  /**
+   * `true` when `overlay` describes something *inside* this collapsed container
+   * rather than the container itself. Hiding a component must not hide what an
+   * agent is doing to it.
+   */
+  overlayRolledUp?: boolean
 }
 
 export type ArchitectureNode = Node<ComponentNodeData, ArchitectureNodeType>
@@ -615,7 +629,9 @@ export function countRelationships(edges: readonly ArchitectureEdge[]): number {
  * signature therefore have the same layout, which is what lets the canvas skip
  * a re-layout after a refetch that changed nothing structural.
  */
-export function projectionSignature(projection: ArchitectureProjection): string {
+export function projectionSignature(
+  projection: Pick<ArchitectureProjection, 'nodes' | 'edges'>,
+): string {
   const nodes = projection.nodes
     .map((node) => `${node.id}<${node.parentId ?? ''}>${node.width}x${node.height}`)
     .join('|')

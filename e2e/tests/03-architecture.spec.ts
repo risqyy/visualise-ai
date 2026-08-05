@@ -1,6 +1,7 @@
 import { expect, test, type Page } from '@playwright/test'
 
 import { getJson } from '../src/api.js'
+import { showWholeModel } from '../src/canvas.js'
 import { MAIN_PROJECT, MAIN_RUN } from '../src/config.js'
 
 /**
@@ -78,7 +79,10 @@ test('2 · the canvas draws the reported hierarchy across four nesting levels', 
   page,
 }) => {
   await openWorkspace(page)
-  await page.getByTestId('canvas-fit-view').click()
+  // The canvas opens on its top levels (#34); the hierarchy and the individual
+  // topic edges below them are what this check is about, so it opens the whole
+  // model first — through the button a user would press.
+  await showWholeModel(page)
 
   const canvas = page.getByTestId('architecture-canvas')
   await expect(canvas).toHaveAttribute('data-node-count', '17')
@@ -160,7 +164,10 @@ test('2 · every relationship kind is drawn, and every reported NATS topic stays
 
   // ---- what the canvas draws ----------------------------------------------
   await openWorkspace(page)
-  await page.getByTestId('canvas-fit-view').click()
+  // The canvas opens on its top levels (#34); the hierarchy and the individual
+  // topic edges below them are what this check is about, so it opens the whole
+  // model first — through the button a user would press.
+  await showWholeModel(page)
 
   // All six typed kinds are on screen, each with its own stroke pattern.
   for (const kind of RELATIONSHIP_KINDS) {

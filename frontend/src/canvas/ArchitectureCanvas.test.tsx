@@ -44,9 +44,22 @@ function architectureFetch(initial: ArchitectureResponse) {
   }
 }
 
+/**
+ * Renders the canvas with every container open.
+ *
+ * A project opens on its top levels with deeper containers collapsed (#34 /
+ * ADR 0017), which is what `ArchitectureZoom.test.tsx` covers. The assertions
+ * in this file are about bundling, selection and the camera on components that
+ * sit three and four levels down, so they start from the state the user reaches
+ * with "Gesamtes Modell einpassen" — a real, reachable state, and the one these
+ * tests have always described.
+ */
 function renderCanvas(url = WORKSPACE_URL, initial = nestedArchitectureResponse) {
   const architecture = architectureFetch(initial)
-  const app = renderApp(url, { fetchImpl: architecture.fetchImpl })
+  const app = renderApp(url, {
+    fetchImpl: architecture.fetchImpl,
+    expandAllComponents: true,
+  })
   return { ...app, ...architecture }
 }
 
