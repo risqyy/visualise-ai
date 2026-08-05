@@ -5,7 +5,14 @@
 <html lang="de" class="dark">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=1920" />
+    <!-- The cockpit is desktop-only, but it must lay out against the window the
+         user actually has. A fixed `width=1920` told every viewport-honouring
+         browser mode to pretend the window were 1920 px wide, which broke
+         smaller desktop windows, split screens and browser zoom (issue #41).
+         `device-width` + `initial-scale=1` hands the layout the real CSS
+         viewport, so the pane minimums in `state/uiStore.ts` are what decides
+         how narrow a pane may get. -->
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Visualise AI — Agent Cockpit</title>
   </head>
   <body>
