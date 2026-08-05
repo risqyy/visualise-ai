@@ -110,6 +110,14 @@ async function waitForCanvas(): Promise<HTMLElement> {
     () => expect(document.querySelectorAll('.react-flow__node').length).toBeGreaterThan(0),
     { timeout: CANVAS_TIMEOUT },
   )
+  // And the automatic camera placement runs in an effect after that again, so
+  // `data-fit-view-count`, the viewport transform and the stored camera are
+  // still one commit away. Reading them synchronously here is a race that goes
+  // red exactly when the machine is busy.
+  await waitFor(
+    () => expect(Number(canvas.getAttribute('data-fit-view-count'))).toBeGreaterThan(0),
+    { timeout: CANVAS_TIMEOUT },
+  )
   return canvas
 }
 

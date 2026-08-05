@@ -11,6 +11,7 @@ import {
   resolveFormattingLanguage,
 } from './formatting'
 import type { Language } from './languages'
+import { resources } from './resources'
 
 /**
  * The formatting service, in both languages.
@@ -81,6 +82,78 @@ describe('counted nouns', () => {
       '1,234 components',
     )
   })
+
+  /**
+   * The cases above name the nouns they check, which is what makes them
+   * readable and what makes them incomplete: a counted noun added next week is
+   * covered by none of them.
+   *
+   * This one reads the nouns out of the catalogue instead, so the day
+   * `count.proposal` is added it is checked in both languages without anybody
+   * remembering to come back here.
+   */
+  describe('every counted noun in the catalogue', () => {
+    /** `agent`, `child`, … — the base names behind the `_one`/`_other` keys. */
+    const nouns = [
+      ...new Set(
+        Object.keys(resources.de.common.count).map((key) => key.replace(/_(one|other)$/, '')),
+      ),
+    ].sort()
+
+    it('exists in both languages with both plural categories', () => {
+      expect(nouns.length).toBeGreaterThan(10)
+      for (const language of ['de', 'en'] as const) {
+        for (const noun of nouns) {
+          for (const category of ['one', 'other'] as const) {
+            const entry = resources[language].common.count as Record<string, string>
+            expect(entry[`${noun}_${category}`], `${language} ${noun}_${category}`).toMatch(
+              /\S/,
+            )
+          }
+        }
+      }
+    })
+
+    it('renders zero, one and many as a formatted number plus a word', () => {
+      for (const language of ['de', 'en'] as const) {
+        const t = translatorFor(language)
+        for (const noun of nouns) {
+          const key = `common:count.${noun}` as 'common:count.plan'
+          for (const count of [0, 1, 2, 11, 1234]) {
+            const rendered = t(key, { count })
+            const where = `${language} ${noun} ${count}`
+
+            // The number is there, formatted for the language…
+            expect(rendered, where).toContain(formatNumber(count, language))
+            // …a word follows it…
+            expect(rendered, where).toMatch(/\d\s*\S*\s+\p{L}{2,}/u)
+            // …and nothing fell through to the key or to the raw plural suffix.
+            expect(rendered, where).not.toContain('count.')
+            expect(rendered, where).not.toContain('_other')
+          }
+          // Singular and plural are actually chosen, not the same string twice —
+          // except where the language genuinely does not distinguish them.
+          const singular = t(key, { count: 1 })
+          const plural = t(key, { count: 2 })
+          if (language === 'en') expect(singular, noun).not.toBe(plural)
+        }
+      }
+    })
+
+    it('picks the plural form the language asks for, not the one German asks for', () => {
+      // The point of `Intl.PluralRules` over the hand-written table: zero takes
+      // the *plural* in both languages, which the old two-branch helper only got
+      // right because it was written for German.
+      for (const language of ['de', 'en'] as const) {
+        const t = translatorFor(language)
+        const entry = resources[language].common.count as Record<string, string>
+        for (const noun of nouns) {
+          const expected = (entry[`${noun}_other`] ?? '').replace('{{count, number}}', '0')
+          expect(t(`common:count.${noun}` as 'common:count.plan', { count: 0 })).toBe(expected)
+        }
+      }
+    })
+  })
 })
 
 // ---------------------------------------------------------------------------
@@ -146,6 +219,11 @@ describe('relative instants', () => {
     { name: 'days', at: '2026-08-01T09:15:00Z', de: 'vor 3 Tagen', en: '3 days ago' },
     { name: 'a future report', at: '2026-08-04T09:25:00Z', de: 'in 10 Minuten', en: 'in 10 minutes' },
     { name: 'a very long time ago', at: '2020-01-01T00:00:00Z', de: 'vor 6 Jahren', en: '6 years ago' },
+    // The two units between "days" and "years". Both exist in
+    // `Intl.RelativeTimeFormat` and both were unchecked, which is how a unit
+    // that is never selected — or selected one threshold too early — survives.
+    { name: 'weeks', at: '2026-07-21T09:15:00Z', de: 'vor 2 Wochen', en: '2 weeks ago' },
+    { name: 'months', at: '2026-05-04T09:15:00Z', de: 'vor 3 Monaten', en: '3 months ago' },
   ]
 
   for (const testCase of cases) {
@@ -191,6 +269,16 @@ describe('percentages', () => {
   it('does not turn a non-number into a plausible percentage', () => {
     expect(formatPercent(Number.NaN, 'de')).not.toContain('0')
     expect(formatPercent(Number.NaN, 'en')).not.toContain('0')
+    expect(formatPercent(Number.POSITIVE_INFINITY, 'de')).not.toMatch(/\d/)
+    expect(formatPercent(Number.POSITIVE_INFINITY, 'en')).not.toMatch(/\d/)
+  })
+
+  it('reports a value outside 0–100 as it was reported rather than clamping it', () => {
+    // A percentage above 100 or below 0 is an agent's claim about its own
+    // progress. Correcting it would hide a defect in the thing the cockpit
+    // exists to observe (ADR 0019).
+    expect(formatPercent(140, 'de')).toBe('140\u00a0%')
+    expect(formatPercent(-5, 'en')).toBe('-5%')
   })
 })
 

@@ -72,7 +72,24 @@ async function waitForCanvas(): Promise<HTMLElement> {
     () => expect(canvas.getAttribute('data-layouting')).toBe('false'),
     { timeout: CANVAS_TIMEOUT },
   )
+  await waitForInitialFit(canvas)
   return canvas
+}
+
+/**
+ * `data-layouting: false` only says that ELK is done.
+ *
+ * The automatic camera placement runs in an effect *after* the layout, so the
+ * first `fitView` — and with it `data-fit-view-count`, the viewport transform
+ * and the stored camera — is still one commit away when the flag flips.
+ * Reading any of the three synchronously at that moment is a race that goes red
+ * exactly when the machine is busy and green on every quiet developer laptop.
+ */
+async function waitForInitialFit(canvas: HTMLElement): Promise<void> {
+  await waitFor(
+    () => expect(Number(canvas.getAttribute('data-fit-view-count'))).toBeGreaterThan(0),
+    { timeout: CANVAS_TIMEOUT },
+  )
 }
 
 /** The rendered zoom and pan — the ground truth of where the camera is. */

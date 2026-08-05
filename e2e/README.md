@@ -76,9 +76,11 @@ created`, gegen eine gefüllte Datenbank bricht der Lauf also laut ab.
 | `src/sse.ts` | Roher SSE-Leser — er besitzt den Socket, damit der Abbruch erzwungen werden kann |
 | `src/liveObserver.ts` | Wird vor dem App-Start injiziert und zeichnet die Live-Zustände auf |
 | `src/controls.ts` | Sichtbarkeit und Überdeckung über `elementFromPoint` |
-| `tests/` | Die acht verbindlichen Prüfungen, in Ausführungsreihenfolge nummeriert |
+| `src/layout.ts` | Seitenüberlauf und abgeschnittener Text — als Funktion der Fensterbreite |
+| `src/pseudoLocale.ts` | Verlängert im Browser jeden Text, der dem Cockpit gehört, um 35 % |
+| `tests/` | Die neun Prüfdateien, in Ausführungsreihenfolge nummeriert |
 
-## Die acht verbindlichen Prüfungen
+## Die neun Prüfdateien
 
 | Datei | Prüfung |
 | --- | --- |
@@ -90,6 +92,28 @@ created`, gegen eine gefüllte Datenbank bricht der Lauf also laut ab.
 | `06-run-history-focus.spec.ts` | Trennung von aktuellem Run und Historie, Deep-Focus-Grundverhalten |
 | `07-sse-replay.spec.ts` | Erzwungener SSE-Abbruch und lückenloser, geordneter Replay |
 | `08-viewport.spec.ts` | Keine horizontale Seitenscrollbar, keine verdeckte Primärsteuerung |
+| `09-i18n-layout.spec.ts` | Layout in Deutsch, Englisch und Pseudo-Locale bei 1920, 1440 und 1280 |
+
+`01`–`08` sind die verbindlichen Prüfungen des v0-Epics (#14) und bleiben
+unverändert: dieselben Assertions, dieselben 1920 × 1080, dieselbe Sprache.
+`09` kommt aus dem i18n-Epic (#37), läuft danach und fügt drei Achsen hinzu —
+zwei weitere Breiten, die zweite Sprache und eine künstlich um 35 % verlängerte
+dritte. Alle Selektoren in `09` sind sprachunabhängig; eine Prüfliste mit
+deutschen `aria-label`s findet im englischen Lauf nichts und meldet dann
+„nichts abgeschnitten" über einen Bildschirm, den sie nie angesehen hat.
+
+### Screenshots sind Belege, keine Baseline
+
+`09` hängt neun Screenshots an den Report (drei Breiten × Deutsch, Englisch,
+Pseudo-Locale). Verglichen wird **nichts** gegen ein eingechecktes Bild.
+`toHaveScreenshot()` vergleicht gerenderte Pixel, und die hängen an
+Schriftrendering und Subpixel-Positionierung: eine im Linux-Container
+aufgenommene Baseline widerspricht demselben Build auf einem Windows-Rechner
+über Text, der völlig korrekt ist. Was das Issue tatsächlich verlangt — keine
+abgeschnittenen Pane-Titel, Buttons, Legenden oder Statuswerte — wird stattdessen
+gemessen: `scrollWidth` gegen `clientWidth` bei einem `overflow`, das den Rest
+verbirgt. Die Begründung steht in
+[ADR 0022](../docs/decisions/0022-translation-test-suite-pseudo-locale-and-a-suite-that-can-be-believed.md).
 
 `02-live-updates.spec.ts` sendet die repräsentative Sequenz und ist die einzige
 Datei, die das darf: das Szenario `full` erwartet ein leeres Projekt. Die
