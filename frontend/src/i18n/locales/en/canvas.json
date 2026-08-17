@@ -39,10 +39,12 @@
   "detail": {
     "fullDescription": "Tags in addition. Bundled relationships are fanned out one by one.",
     "fullLabel": "Full",
-    "indicator": "Detail level: {{level}}",
-    "overviewDescription": "Name and kind only. Parallel relationships are bundled.",
-    "overviewLabel": "Overview",
-    "standardDescription": "The reported technology in addition. Parallel relationships are bundled.",
+    "indicator": "Display level: {{level}}",
+    "minimalDescription": "Shape and icon only. Text stays available through selection and the inspector.",
+    "minimalLabel": "Map",
+    "overviewDescription": "Readable overview with primary names. Secondary text appears only once the zoom is high enough.",
+    "overviewLabel": "Readable overview",
+    "standardDescription": "Kind and reported technology in addition. Secondary text stays at least 10 px effective size.",
     "standardLabel": "Standard"
   },
   "diagnostics": {
@@ -56,6 +58,7 @@
   "edge": {
     "bundleCollapse": "Fold the bundled edge back together",
     "bundleExpand": "Unfold the bundled edge: {{relationships}}",
+    "bundleSelect": "Inspect a relationship in this bundle: {{relationships}}",
     "channel": "Channel: {{value}}",
     "operation": "Operation: {{value}}",
     "protocol": "Protocol: {{value}}"
@@ -153,13 +156,13 @@
     }
   },
   "tool": {
-    "backToOverview": "System level",
-    "backToOverviewHint": "Back to system and container level: deeper components are collapsed again and the view is fitted at a readable size.",
+    "backToOverview": "Readable system overview",
+    "backToOverviewHint": "Back to a readable system overview: deeper components are collapsed again and the view is fitted with at least 12 px effective primary text.",
     "collapse": "Collapse",
     "expand": "Expand",
     "expandHidden": "Expand ({{hidden}})",
-    "fitWholeModel": "Fit the whole model",
-    "fitWholeModelHint": "Expands every container and fits the complete model into the surface. With many components the picture deliberately becomes small — this is the overview action. Otherwise the camera only moves on the first load — never because events arrive.",
+    "fitWholeModel": "Whole-model map",
+    "fitWholeModelHint": "Expands every container and shows the complete model as a spatial map. With many components the picture deliberately becomes small; it is for orientation, not reading. Search, selection and the inspector remain available. Otherwise the camera only moves on the first load — never because events arrive.",
     "hideMinimap": "Hide the overview map",
     "layoutLeftRight": "Left to right",
     "layoutOrientation": "Graph orientation",
@@ -169,7 +172,7 @@
     "showMinimap": "Show the overview map"
   },
   "visibility": {
-    "hint": "Deeper components are collapsed behind their container so the upper levels stay readable. Connections to collapsed components are lifted to the visible container. Relationships whose two ends are inside the same collapsed container are intentionally not drawn. Parallel reported relationships may be bundled into one connection. Expand them through the triangle on the container, through a deep link or through “Fit the whole model”.",
+    "hint": "Deeper components are collapsed behind their container so the upper levels stay readable. Connections to collapsed components are lifted to the visible container. Relationships whose two ends are inside the same collapsed container are intentionally not drawn. Parallel reported relationships may be bundled into one connection. Expand them through the triangle on the container, through a deep link or through the spatial whole-model map.",
     "summary_one": "{{visible, number}} of {{total, number}} element visible",
     "summary_other": "{{visible, number}} of {{total, number}} elements visible"
   },

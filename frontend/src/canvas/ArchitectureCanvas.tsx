@@ -106,8 +106,8 @@ import { useCanvasVoice } from './useCanvasVoice'
  *    project and on an explicit click, never because data arrived.
  * 4. **The first picture is readable.** The automatic camera never goes below
  *    `MIN_READABLE_ZOOM`, and a project opens on its top levels with deeper
- *    containers collapsed (`collapse.ts`). Both are undone by an explicit
- *    "Gesamtes Modell einpassen", never by anything the data does.
+ *    containers collapsed (`collapse.ts`). Both are undone by the explicit
+ *    spatial "Gesamtkarte", never by anything the data does.
  *
  * The accessible surface — names, roles and states of the nodes and edges —
  * lives in `./canvasAccessibility`; this component only wires it up, owns the
@@ -489,7 +489,7 @@ function ArchitectureCanvasInner({
   const requestFit = useCallback(
     (mode: FitMode, afterRelayout: boolean) => {
       invalidatePendingSearchFocus()
-      // "Systemebene" reproduces the entry picture, and the entry picture keeps
+      // "Lesbare Systemübersicht" reproduces the entry picture, and the entry picture keeps
       // the selected component on screen. The whole-model overview does not: it
       // is about the model, not about one component of it.
       const focusComponentId =
@@ -732,14 +732,26 @@ function ArchitectureCanvasInner({
   )
 
   /**
-   * The path is the hit target in overview, where an individual relationship
-   * deliberately has no label. Bundles remain a disclosure action: the path
-   * opens them, while their expanded labels select one member at a time.
+   * The path is the hit target when labels are hidden. At readable levels a
+   * bundle remains a disclosure action: the path opens it, while its expanded
+   * labels select one member at a time. At map level the path selects the first
+   * member in the inspector, because expanding labels would violate the text
+   * floor.
    */
   const onEdgeClick = useCallback<EdgeMouseHandler<ArchitectureEdge>>(
     (_event, edge) => {
       const relationships = edge.data?.relationships ?? []
       if (relationships.length > 1) {
+        if (detailLevel === 'minimal') {
+          const first = relationships[0]
+          if (!first) return
+          ;(onSelectRelationship ?? setStoredSelectedRelationshipId)(
+            first.relationshipId === visualSelectedRelationshipId
+              ? null
+              : first.relationshipId,
+          )
+          return
+        }
         toggleEdgeExpanded(edge.id)
         return
       }
@@ -753,6 +765,7 @@ function ArchitectureCanvasInner({
       onSelectRelationship,
       setStoredSelectedRelationshipId,
       toggleEdgeExpanded,
+      detailLevel,
       visualSelectedRelationshipId,
     ],
   )
@@ -807,7 +820,9 @@ function ArchitectureCanvasInner({
    * writes the `component` search parameter, which is the same path a click
    * takes, so the URL, the selection and the inspector cannot drift apart.
    * Activating an edge unfolds a bundle or selects the single relationship —
-   * the same two actions its badges offer to the mouse.
+   * the same two actions its badges offer to the mouse. At map level the
+   * bundle control is icon-only, so activation selects its first relationship
+   * for the inspector instead of exposing text below the readability floor.
    *
    * A real control *inside* a node — the disclosure toggle of a container — is
    * left alone: it is its own tab stop with its own action, and a container
@@ -874,6 +889,16 @@ function ArchitectureCanvasInner({
       const edge = edges.find((candidate) => candidate.id === edgeId)
       const relationships = edge?.data?.relationships ?? []
       if (relationships.length > 1) {
+        if (detailLevel === 'minimal') {
+          const first = relationships[0]
+          if (!first) return
+          ;(onSelectRelationship ?? setStoredSelectedRelationshipId)(
+            first.relationshipId === activeSelectedRelationshipId
+              ? null
+              : first.relationshipId,
+          )
+          return
+        }
         toggleEdgeExpanded(edgeId)
         return
       }
@@ -890,6 +915,7 @@ function ArchitectureCanvasInner({
       activeSelectedRelationshipId,
       onSelectRelationship,
       setStoredSelectedRelationshipId,
+      detailLevel,
       openSearch,
       toggleEdgeExpanded,
     ],
@@ -924,7 +950,7 @@ function ArchitectureCanvasInner({
     [onToggleCollapsed],
   )
 
-  /** "Gesamtes Modell einpassen": everything open, everything on screen. */
+  /** "Gesamtkarte": everything open, everything on screen for orientation. */
   const onShowWholeModel = useCallback(() => {
     const willRelayout = graph.collapsedIds.length > 0
     if (willRelayout) setCollapsedComponentIds([])

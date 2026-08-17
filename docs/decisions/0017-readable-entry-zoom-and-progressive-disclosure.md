@@ -1,5 +1,10 @@
 # 17. A readable entry picture: a floor under the automatic zoom and a hierarchy that opens on demand
 
+> **Threshold note:** Issue #56 / [ADR 0024](./0024-readable-semantic-zoom-levels.md)
+> supersedes this record's former 10 px-derived `0.77` floor with separate
+> effective floors for primary (12 px) and secondary (10 px) text. The hierarchy
+> disclosure and camera ownership decisions below remain in force.
+
 - **Status:** accepted
 - **Date:** 2026-08-04
 - **Context issue:** #34 (part of the v0 epic #1)

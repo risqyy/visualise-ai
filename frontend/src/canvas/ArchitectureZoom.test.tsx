@@ -17,7 +17,7 @@ import { PROJECT_ID, RUN_ID, createFakeFetch, streamedEvent } from '@/test/fixtu
 import { renderApp } from '@/test/renderApp'
 
 import {
-  MIN_LEGIBLE_FONT_SIZE_PX,
+  MIN_PRIMARY_TEXT_SIZE_PX,
   MIN_READABLE_ZOOM,
   NODE_LABEL_FONT_SIZE_PX,
 } from './detailLevel'
@@ -156,15 +156,14 @@ describe('architecture canvas — a large model opens readable', () => {
 
       const { zoom } = useUiStore.getState().camera
 
-      // The acceptance criterion, as a measurement: the name of a visible
-      // component is at least as large as the smallest type the product
-      // renders anywhere else.
+      // The acceptance criterion, as a measurement: primary text is at least
+      // 12 effective px in the automatic picture.
       expect(zoom).toBeGreaterThanOrEqual(MIN_READABLE_ZOOM)
       expect(NODE_LABEL_FONT_SIZE_PX * zoom).toBeGreaterThanOrEqual(
-        MIN_LEGIBLE_FONT_SIZE_PX,
+        MIN_PRIMARY_TEXT_SIZE_PX,
       )
-      expect(LEAF_NODE_SIZE.width * zoom).toBeGreaterThanOrEqual(175)
-      expect(LEAF_NODE_SIZE.height * zoom).toBeGreaterThanOrEqual(73)
+      expect(LEAF_NODE_SIZE.width * zoom).toBeGreaterThanOrEqual(210)
+      expect(LEAF_NODE_SIZE.height * zoom).toBeGreaterThanOrEqual(89)
 
       // Still exactly one automatic camera movement.
       expect(canvas.getAttribute('data-fit-view-count')).toBe('1')

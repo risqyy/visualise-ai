@@ -247,6 +247,35 @@ describe('accessible architecture graph — every node arrives named', () => {
 
 describe('accessible architecture graph — selection by keyboard alone', () => {
   it(
+    'selects the first relationship of a bundled edge with Enter at map level',
+    async () => {
+      const user = userEvent.setup()
+      const { router } = renderGraph()
+      const canvas = await waitForCanvas()
+
+      await user.click(screen.getByTestId('canvas-fit-view'))
+      await waitFor(() => expect(canvas).toHaveAttribute('data-detail-level', 'minimal'))
+
+      const edge = document.querySelector<HTMLElement>(
+        '.react-flow__edge[data-id="rel:platform.core.orders~>platform.bus"]',
+      )
+      expect(edge).not.toBeNull()
+      edge?.focus()
+      await user.keyboard('{Enter}')
+
+      await waitFor(() =>
+        expect(router.state.location.search).toEqual({ relationship: 'r-05' }),
+      )
+      expect(await screen.findByTestId('inspector-relationship-context')).toHaveAttribute(
+        'data-relationship-id',
+        'r-05',
+      )
+      expect(document.activeElement).toBe(edge)
+    },
+    CANVAS_TIMEOUT,
+  )
+
+  it(
     'selects a single relationship with Enter and preserves edge focus',
     async () => {
       const user = userEvent.setup()
@@ -548,7 +577,7 @@ describe('accessible architecture graph — the state a screen reader hears is t
  *
  * A **pan** is a different matter. React Flow's `autoPanOnNodeFocus` brings a
  * node that lies outside the viewport into view at the same zoom, and it is
- * deliberately left on (ADR 0018): since ADR 0017 the entry zoom is 0.77 rather
+ * deliberately left on (ADR 0018): since ADR 0024 the entry zoom is 0.93 rather
  * than 0.20, so a large model no longer fits on screen and a focus ring on an
  * off-screen node would be a ring nobody can see. That pan is requested by the
  * user's own Tab press — never by arriving data.

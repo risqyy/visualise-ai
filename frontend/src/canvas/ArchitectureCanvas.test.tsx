@@ -51,7 +51,7 @@ function architectureFetch(initial: ArchitectureResponse) {
  * ADR 0017), which is what `ArchitectureZoom.test.tsx` covers. The assertions
  * in this file are about bundling, selection and the camera on components that
  * sit three and four levels down, so they start from the state the user reaches
- * with "Gesamtes Modell einpassen" — a real, reachable state, and the one these
+ * with "Gesamtkarte" — a real, reachable state, and the one these
  * tests have always described.
  */
 function renderCanvas(
@@ -262,7 +262,7 @@ describe('architecture canvas — edge bundling stays resolvable', () => {
       // The initial fit intentionally stays readable. Explicitly fitting the
       // whole model gives this test the actual overview interaction state.
       await user.click(screen.getByTestId('canvas-fit-view'))
-      await waitFor(() => expect(canvas).toHaveAttribute('data-detail-level', 'overview'))
+      await waitFor(() => expect(canvas).toHaveAttribute('data-detail-level', 'minimal'))
 
       // Individual labels stay hidden at overview so the graph does not become
       // a wall of long reported values. The line itself remains the hit target.
@@ -327,6 +327,63 @@ describe('architecture canvas — edge bundling stays resolvable', () => {
       await user.click(screen.getByTestId(`edge-collapse-${BUNDLE_EDGE_ID}`))
       expect(screen.getByTestId(`edge-bundle-${BUNDLE_EDGE_ID}`)).toBeInTheDocument()
       expect(screen.queryByTestId('edge-label-r-05')).not.toBeInTheDocument()
+    },
+    CANVAS_TIMEOUT,
+  )
+
+  it(
+    'keeps a bundled relationship inspectable from the icon-only map control',
+    async () => {
+      const user = userEvent.setup()
+      const { router } = renderCanvas()
+      const canvas = await waitForCanvas()
+
+      await user.click(screen.getByTestId('canvas-fit-view'))
+      await waitFor(() => expect(canvas).toHaveAttribute('data-detail-level', 'minimal'))
+
+      const bundle = await screen.findByTestId(`edge-bundle-${BUNDLE_EDGE_ID}`)
+      expect(bundle).toHaveAttribute('title', expect.stringContaining('Inspector'))
+      expect(bundle).toHaveAttribute('aria-label', expect.stringContaining('Inspector'))
+      expect(bundle.querySelector('svg')).toBeInTheDocument()
+      expect(bundle.textContent).not.toContain('NATS')
+
+      // Map-level activation selects a real member, so the inspector can show
+      // the selected relationship and the complete bundle without tiny labels.
+      await user.click(bundle)
+      await waitFor(() =>
+        expect(router.state.location.search).toEqual({ relationship: 'r-05' }),
+      )
+      expect(await screen.findByTestId('inspector-relationship-context')).toHaveAttribute(
+        'data-relationship-id',
+        'r-05',
+      )
+      expect(screen.getByTestId('inspector-relationship-bundle')).toHaveTextContent(
+        'NATS · orders.created',
+      )
+      expect(screen.queryByTestId('edge-label-r-05')).not.toBeInTheDocument()
+    },
+    CANVAS_TIMEOUT,
+  )
+
+  it(
+    'selects the first bundle member from the map control when another member is selected',
+    async () => {
+      const user = userEvent.setup()
+      const { router } = renderCanvas(`${WORKSPACE_URL}?relationship=r-06`)
+      const canvas = await waitForCanvas()
+
+      await user.click(screen.getByTestId('canvas-fit-view'))
+      await waitFor(() => expect(canvas).toHaveAttribute('data-detail-level', 'minimal'))
+
+      await user.click(await screen.findByTestId(`edge-bundle-${BUNDLE_EDGE_ID}`))
+
+      await waitFor(() =>
+        expect(router.state.location.search).toEqual({ relationship: 'r-05' }),
+      )
+      expect(await screen.findByTestId('inspector-relationship-context')).toHaveAttribute(
+        'data-relationship-id',
+        'r-05',
+      )
     },
     CANVAS_TIMEOUT,
   )

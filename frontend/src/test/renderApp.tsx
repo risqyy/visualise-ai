@@ -20,7 +20,7 @@ export interface RenderAppOptions {
   i18n?: I18n
   /**
    * Starts with every architecture container open, i.e. in the state the user
-   * reaches with "Gesamtes Modell einpassen".
+   * reaches with the "Gesamtkarte" action.
    *
    * A project otherwise opens on its top levels with deeper containers
    * collapsed (ADR 0017), which is the right default but the wrong starting

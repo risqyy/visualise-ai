@@ -186,6 +186,21 @@
   border-radius: calc(var(--radius) - 2px);
 }
 
+/* Semantic detail changes are content changes, not motion. Respect the
+   platform preference when a node state or relationship highlight transitions
+   between them, and when React Flow animates a camera operation. */
+@media (prefers-reduced-motion: reduce) {
+  .react-flow,
+  .react-flow *,
+  .react-flow *::before,
+  .react-flow *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    scroll-behavior: auto !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
 @layer components {
   /* Shared surface for the three panes. */
   .pane-surface {

@@ -12,7 +12,7 @@ import {
   viewportForFocus,
   type CameraPolicyInput,
 } from './cameraPolicy'
-import { MIN_LEGIBLE_FONT_SIZE_PX, MIN_READABLE_ZOOM } from './detailLevel'
+import { MIN_PRIMARY_TEXT_SIZE_PX, MIN_READABLE_ZOOM } from './detailLevel'
 import { LEAF_NODE_SIZE } from './graphProjection'
 
 /** A settled 1920 × 1080 workspace: the centre pane is ~1036 × 933. */
@@ -153,7 +153,7 @@ describe('where the camera goes', () => {
     // Fitting all of it would need 0.48; the floor wins.
     expect(automatic.zoom).toBe(MIN_READABLE_ZOOM)
     expect(LEAF_NODE_SIZE.width * automatic.zoom).toBeGreaterThan(170)
-    expect(13 * automatic.zoom).toBeGreaterThanOrEqual(MIN_LEGIBLE_FONT_SIZE_PX)
+    expect(13 * automatic.zoom).toBeGreaterThanOrEqual(MIN_PRIMARY_TEXT_SIZE_PX)
   })
 
   it('holds the floor however many components there are', () => {

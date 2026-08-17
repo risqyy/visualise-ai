@@ -18,7 +18,13 @@ import {
   componentTags,
   technologyParts,
 } from './componentKinds'
-import { DISCLOSURE_LABEL_KEYS, showsTags, showsTechnology } from './detailLevel'
+import {
+  DISCLOSURE_LABEL_KEYS,
+  showsKind,
+  showsPrimaryText,
+  showsTags,
+  showsTechnology,
+} from './detailLevel'
 import { HANDLE_IDS, type ArchitectureNode } from './graphProjection'
 import type { GraphOrientation } from './graphOrientation'
 import { CanvasNodeActionsContext } from './nodeActions'
@@ -247,18 +253,26 @@ export const ComponentNode = memo(function ComponentNode({
     >
       <div className="flex items-start gap-1.5">
         <Icon className="text-muted-foreground mt-px size-3.5 shrink-0" aria-hidden="true" />
-        <span
-          className="text-foreground min-w-0 flex-1 truncate text-[13px] leading-tight font-medium"
-          title={component.name}
-          data-testid="node-name"
-        >
-          {/* The component's reported name. Not ours, so never translated. */}
-          <ReportedText value={component.name} />
-        </span>
-        <KindBadge label={componentKindLabel(component.kind, t)} />
+        {showsPrimaryText(level) && (
+          <span
+            className="text-foreground min-w-0 flex-1 truncate text-[13px] leading-tight font-medium"
+            title={component.name}
+            data-testid="node-name"
+          >
+            {/* The component's reported name. Not ours, so never translated. */}
+            <ReportedText value={component.name} />
+          </span>
+        )}
+        {showsKind(level) && <KindBadge label={componentKindLabel(component.kind, t)} />}
       </div>
 
-      {overlay && <ChangeOverlayMark overlay={overlay} className="self-start" />}
+      {overlay && (
+        <ChangeOverlayMark
+          overlay={overlay}
+          compact={!showsPrimaryText(level)}
+          className="self-start"
+        />
+      )}
       {showsTechnology(level) && <TechnologyRow parts={technology} />}
       {showsTags(level) && <TagRow tags={tags} />}
 
@@ -334,13 +348,15 @@ export const CompoundNode = memo(function CompoundNode({
           hiddenCount={collapsed ? hiddenCount : childCount}
         />
         <Icon className="text-muted-foreground size-3.5 shrink-0" aria-hidden="true" />
-        <span
-          className="text-foreground min-w-0 flex-1 truncate text-[13px] leading-tight font-medium"
-          title={component.name}
-          data-testid="node-name"
-        >
-          <ReportedText value={component.name} />
-        </span>
+        {showsPrimaryText(level) && (
+          <span
+            className="text-foreground min-w-0 flex-1 truncate text-[13px] leading-tight font-medium"
+            title={component.name}
+            data-testid="node-name"
+          >
+            <ReportedText value={component.name} />
+          </span>
+        )}
         {/* A closed container is only as wide as a leaf, so the metadata moves
             out of the header — squeezed between a technology string and two
             badges, the name is the first thing to lose its space, and the name
@@ -353,25 +369,27 @@ export const CompoundNode = memo(function CompoundNode({
             <ReportedText value={technology.join(' · ')} />
           </span>
         )}
-        {overlay && <ChangeOverlayMark overlay={overlay} />}
-        {!collapsed && (
-          <span className="text-muted-foreground shrink-0 text-[10px]">
+        {overlay && <ChangeOverlayMark overlay={overlay} compact={!showsPrimaryText(level)} />}
+        {!collapsed && showsPrimaryText(level) && (
+          <span className="text-muted-foreground shrink-0 text-[11px]">
             {tCommon('count.child', { count: childCount })}
           </span>
         )}
-        <KindBadge label={componentKindLabel(component.kind, t)} />
+        {showsKind(level) && <KindBadge label={componentKindLabel(component.kind, t)} />}
       </div>
 
       {collapsed && (
         <div className="flex flex-col gap-1 px-2.5 pt-1.5">
-          <p
-            className="text-muted-foreground text-[10px] leading-tight"
-            data-testid="node-hidden-count"
-          >
-            {t('node.collapsed', {
-              components: tCommon('count.component', { count: hiddenCount }),
-            })}
-          </p>
+          {showsPrimaryText(level) && (
+            <p
+              className="text-muted-foreground text-[11px] leading-tight"
+              data-testid="node-hidden-count"
+            >
+              {t('node.collapsed', {
+                components: tCommon('count.component', { count: hiddenCount }),
+              })}
+            </p>
+          )}
           {showsTechnology(level) && <TechnologyRow parts={technology} />}
         </div>
       )}
