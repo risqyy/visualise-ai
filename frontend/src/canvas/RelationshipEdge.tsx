@@ -418,7 +418,9 @@ export const RelationshipEdge = memo(function RelationshipEdge({
                   const first = resolved[0]
                   if (!first) return
                   selectRelationship(
-                    emphasised ? null : first.relationship.relationshipId,
+                    first.relationship.relationshipId === selectedRelationshipId
+                      ? null
+                      : first.relationship.relationshipId,
                   )
                   return
                 }

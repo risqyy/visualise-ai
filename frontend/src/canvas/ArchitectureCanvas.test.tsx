@@ -366,6 +366,29 @@ describe('architecture canvas — edge bundling stays resolvable', () => {
   )
 
   it(
+    'selects the first bundle member from the map control when another member is selected',
+    async () => {
+      const user = userEvent.setup()
+      const { router } = renderCanvas(`${WORKSPACE_URL}?relationship=r-06`)
+      const canvas = await waitForCanvas()
+
+      await user.click(screen.getByTestId('canvas-fit-view'))
+      await waitFor(() => expect(canvas).toHaveAttribute('data-detail-level', 'minimal'))
+
+      await user.click(await screen.findByTestId(`edge-bundle-${BUNDLE_EDGE_ID}`))
+
+      await waitFor(() =>
+        expect(router.state.location.search).toEqual({ relationship: 'r-05' }),
+      )
+      expect(await screen.findByTestId('inspector-relationship-context')).toHaveAttribute(
+        'data-relationship-id',
+        'r-05',
+      )
+    },
+    CANVAS_TIMEOUT,
+  )
+
+  it(
     'selecting one topic of an unfolded bundle marks exactly that relationship',
     async () => {
       const user = userEvent.setup()
