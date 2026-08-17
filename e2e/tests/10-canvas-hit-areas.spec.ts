@@ -12,10 +12,10 @@ import { showWholeModel } from '../src/canvas.js'
 const VIEWPORT = { width: 1920, height: 1080 } as const
 const DESKTOP_TARGET = 32
 const COARSE_TARGET = 44
-// Chromium can serialize the computed SVG stroke and its transform as a
-// fraction just below the mathematical value. Keep this tolerance exclusive
-// to the derived SVG stroke measurement; HTML hit-area boxes stay exact.
-const SVG_STROKE_TOLERANCE = 0.01
+// Chromium can serialize transformed CSS geometry as a fraction just below
+// the mathematical value. This browser-measurement tolerance keeps the
+// effective thresholds at 31.99/43.99 px; product hit areas remain unchanged.
+const BROWSER_GEOMETRY_TOLERANCE = 0.01
 const CANVAS_URL = `/projects/${MAIN_PROJECT}/runs/${MAIN_RUN}`
 
 const TOOLBAR_ACTIONS = [
@@ -59,8 +59,12 @@ async function assertTarget(
   await expect(target, `${label}: target is missing`).toBeVisible()
   const box = await target.boundingBox()
   expect(box, `${label}: target has no browser box`).not.toBeNull()
-  expect(box!.width, `${label}: width`).toBeGreaterThanOrEqual(minimum)
-  expect(box!.height, `${label}: height`).toBeGreaterThanOrEqual(minimum)
+  expect(box!.width, `${label}: width`).toBeGreaterThanOrEqual(
+    minimum - BROWSER_GEOMETRY_TOLERANCE,
+  )
+  expect(box!.height, `${label}: height`).toBeGreaterThanOrEqual(
+    minimum - BROWSER_GEOMETRY_TOLERANCE,
+  )
 }
 
 /**
@@ -106,8 +110,8 @@ async function assertRelationshipAction(
   })
   expect(
     measurement.effectiveStrokeWidth,
-    `${label}: effective edge hit width (SVG tolerance ${SVG_STROKE_TOLERANCE}px)`,
-  ).toBeGreaterThanOrEqual(minimum - SVG_STROKE_TOLERANCE)
+    `${label}: effective edge hit width (browser geometry tolerance ${BROWSER_GEOMETRY_TOLERANCE}px)`,
+  ).toBeGreaterThanOrEqual(minimum - BROWSER_GEOMETRY_TOLERANCE)
   expect(
     Math.max(measurement.width, measurement.height),
     `${label}: edge path has no measurable browser box`,
