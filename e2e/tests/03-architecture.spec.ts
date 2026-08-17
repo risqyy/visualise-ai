@@ -678,85 +678,86 @@ test('2 · the self run supports a complete spatial keyboard walk and safe focus
     await page.locator('.react-flow__edge').count(),
   )
 
-  const geometry = await page.locator('.react-flow__node').evaluateAll((elements) =>
-    elements.map((element, order) => {
-      const rect = element.getBoundingClientRect()
-      return {
-        id: element.getAttribute('data-id') ?? '',
-        x: rect.x,
-        y: rect.y,
-        width: rect.width,
-        height: rect.height,
-        order,
-      }
-    }),
+  const entryId = await enterGraphWithKeyboard(page)
+  await expect(page.locator('.react-flow__node[tabindex="0"]')).toHaveAttribute(
+    'data-id',
+    entryId,
   )
-  const entryId = await page
-    .locator('.react-flow__node[tabindex="0"]')
-    .getAttribute('data-id')
-  expect(entryId).not.toBeNull()
-  await page.locator(`.react-flow__node[data-id="${entryId}"]`).focus()
-
-  // Use the browser's actual laid-out rectangles to derive a route that visits
-  // every visible node. Every step is still executed through the real arrow
-  // key handler, so this catches a mismatch between layout and navigation.
   const orientation = (await canvas.getAttribute('data-layout-orientation')) as
     | 'top-down'
     | 'left-right'
   const visited = new Set<string>([entryId!])
-  let current = entryId!
+  const keyboardReachable = new Set<string>([entryId!])
+
+  // A directed spatial-neighbour graph need not have one Hamiltonian walk: a
+  // local minimum can make a branch unreachable from the current node. Probe
+  // every reachable target from the canonical entry instead. Each re-entry is
+  // keyboard-only (Tab reaches the one roving node); every target transition
+  // below is therefore an actual Arrow-key result, never a synthetic focus.
   for (const target of nodeIds) {
-    if (visited.has(target)) continue
-    const path = spatialPath(geometry, current, target, orientation)
-    if (path === null) {
-      // Spatial navigation is directional rather than a linear list: a
-      // legitimate layout can contain a local minimum that no shortest-arrow
-      // choice reaches from the current node. Re-enter the composite's roving
-      // item for that branch, then continue exercising arrows from there.
-      const targetNode = page.locator(`.react-flow__node[data-id="${target}"]`)
-      await targetNode.focus()
-      await expect(targetNode).toHaveAttribute('tabindex', '0')
-      current = target
-      visited.add(target)
-      continue
-    }
+    if (target === entryId) continue
+    await page.reload()
+    await expect(page.getByTestId('live-connection-state')).toHaveAttribute(
+      'data-state',
+      'live',
+    )
+    await expect(canvas).toBeVisible()
+    await expect(canvas).toHaveAttribute('data-layouting', 'false')
+    await showWholeModel(page)
+
+    const reenteredId = await enterGraphWithKeyboard(page)
+    expect(reenteredId).toBe(entryId)
+    const routeGeometry = await page.locator('.react-flow__node').evaluateAll((elements) =>
+      elements.map((element, order) => {
+        const rect = element.getBoundingClientRect()
+        return {
+          id: element.getAttribute('data-id') ?? '',
+          x: rect.x,
+          y: rect.y,
+          width: rect.width,
+          height: rect.height,
+          order,
+        }
+      }),
+    )
+    const routePaths = spatialPaths(routeGeometry, entryId!, orientation)
+    for (const reachableId of routePaths.keys()) keyboardReachable.add(reachableId)
+    const path = routePaths.get(target)
+    if (path === undefined) continue
+    let current = reenteredId
     for (const direction of path) {
       await page.keyboard.press(direction)
       const next = await page.evaluate(() =>
         document.activeElement?.closest('.react-flow__node')?.getAttribute('data-id') ?? null,
       )
       expect(next).not.toBeNull()
+      const expected = spatialNext(routeGeometry, current, direction, orientation)
+      expect(
+        next,
+        `target=${target} source=${current} direction=${direction} expected=${expected ?? current}`,
+      ).toBe(expected ?? current)
       current = next!
     }
-    if (current !== target) {
-      // The browser rectangles include the current React Flow viewport
-      // projection. If a live layout update changes that projection between
-      // route calculation and a key press, re-enter the intended roving item
-      // before continuing; the arrow assertions above still cover the actual
-      // transitions that occurred.
-      const targetNode = page.locator(`.react-flow__node[data-id="${target}"]`)
-      await targetNode.focus()
-      await expect(targetNode).toHaveAttribute('tabindex', '0')
-      current = target
-    }
-    visited.add(current)
+    expect(current).toBe(target)
+    visited.add(target)
+    await expect(page.locator('.react-flow__node[tabindex="0"]')).toHaveCount(1)
   }
-  expect(
-    [...visited],
-    `keyboard walk missed: ${nodeIds.filter((id) => !visited.has(id)).join(', ')}`,
-  ).toHaveLength(nodeIds.length)
-  await expect(page.locator('.react-flow__node[tabindex="0"]')).toHaveCount(1)
+  expect([...visited].sort()).toEqual([...keyboardReachable].sort())
+  expect(visited.size).toBeGreaterThan(10)
 
   // At a larger zoom the model extends beyond the pane. An arrow transition
   // into an off-screen neighbour must pan while preserving the scale.
+  await page.reload()
+  await expect(page.getByTestId('live-connection-state')).toHaveAttribute('data-state', 'live')
+  await expect(canvas).toBeVisible()
+  await expect(canvas).toHaveAttribute('data-layouting', 'false')
+  await showWholeModel(page)
   const zoomIn = page.locator('.react-flow__controls-zoomin')
   for (let index = 0; index < 8; index += 1) await zoomIn.click()
-  // Re-enter a stable model item without asking React Flow to reveal it. The
-  // following arrow must therefore prove the explicit focus-camera path,
-  // rather than inheriting a viewport already centred on the item.
-  await page.locator(`.react-flow__node[data-id="${nodeIds[0]}"]`).evaluate((element) => {
-    ;(element as HTMLElement).focus({ preventScroll: true })
-  })
+  // Re-enter through the composite's real Tab entry. The following arrow must
+  // prove the explicit focus-camera path, rather than inheriting a viewport
+  // already centred on a programmatically focused node.
+  expect(await enterGraphWithKeyboard(page)).toBe(entryId)
   const zoomBefore = await canvas.getAttribute('data-canvas-zoom')
   const viewportBefore = await page.locator('.react-flow__viewport').getAttribute('style')
   let panned = false
@@ -784,17 +785,48 @@ test('2 · the self run supports a complete spatial keyboard walk and safe focus
   // leaves one valid roving entry and never leaves focus on a vanished node.
   const focusedChild = 'visualise-ai.frontend.canvas'
   const parent = 'visualise-ai.frontend'
-  await page.locator(`.react-flow__node[data-id="${focusedChild}"]`).focus()
-  await page.getByTestId(`node-disclosure-${parent}`).click()
+  const focusedChildNode = page.locator(`.react-flow__node[data-id="${focusedChild}"]`)
+  await focusedChildNode.focus()
+  expect(
+    await page.evaluate(
+      () => document.activeElement?.closest('.react-flow__node')?.getAttribute('data-id') ?? null,
+    ),
+  ).toBe(focusedChild)
+  // HTMLElement.click() dispatches React's action without moving focus to the
+  // disclosure button, so the focused child is still the node removed by the
+  // following relayout.
+  await page.getByTestId(`node-disclosure-${parent}`).evaluate((element) => {
+    ;(element as HTMLButtonElement).click()
+  })
   await expect(canvas).toHaveAttribute('data-layouting', 'false')
-  await expect(page.locator(`.react-flow__node[data-id="${focusedChild}"]`)).toHaveCount(0)
+  await expect(focusedChildNode).toHaveCount(0)
+  const parentNode = page.locator(`.react-flow__node[data-id="${parent}"]`)
+  await expect(parentNode).toHaveAttribute('tabindex', '0')
   await expect(page.locator('.react-flow__node[tabindex="0"]')).toHaveCount(1)
   expect(
     await page.evaluate(
       () => document.activeElement?.closest('.react-flow__node')?.getAttribute('data-id') ?? null,
     ),
-  ).not.toBe(focusedChild)
+  ).toBe(parent)
 })
+
+async function enterGraphWithKeyboard(page: Page): Promise<string> {
+  // Start from the canvas fit control, which is outside the composite. Shift+
+  // Tab then re-enters the current roving node through the browser's real tab
+  // order; no graph target is focused by the test harness.
+  await page.getByTestId('canvas-fit-view').focus()
+  for (let attempt = 0; attempt < 80; attempt += 1) {
+    await page.keyboard.press('Shift+Tab')
+    const nodeId = await page.evaluate(() => {
+      const active = document.activeElement
+      return active?.matches('.react-flow__node')
+        ? active.getAttribute('data-id')
+        : null
+    })
+    if (nodeId !== null) return nodeId
+  }
+  throw new Error('Keyboard Tab sequence did not enter the architecture graph')
+}
 
 interface SpatialBox {
   id: string
@@ -807,27 +839,27 @@ interface SpatialBox {
 
 type SpatialKey = 'ArrowUp' | 'ArrowDown' | 'ArrowLeft' | 'ArrowRight'
 
-function spatialPath(
+function spatialPaths(
   boxes: readonly SpatialBox[],
   source: string,
-  target: string,
   orientation: 'top-down' | 'left-right',
-): SpatialKey[] | null {
+): Map<string, SpatialKey[]> {
   const directions: SpatialKey[] = ['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight']
-  const queue: { id: string; path: SpatialKey[] }[] = [{ id: source, path: [] }]
-  const seen = new Set([source])
+  const paths = new Map<string, SpatialKey[]>([[source, []]])
+  const queue = [source]
   while (queue.length > 0) {
     const current = queue.shift()
     if (!current) break
-    if (current.id === target) return current.path
+    const currentPath = paths.get(current)
+    if (currentPath === undefined) continue
     for (const direction of directions) {
-      const next = spatialNext(boxes, current.id, direction, orientation)
-      if (next === null || seen.has(next)) continue
-      seen.add(next)
-      queue.push({ id: next, path: [...current.path, direction] })
+      const next = spatialNext(boxes, current, direction, orientation)
+      if (next === null || paths.has(next)) continue
+      paths.set(next, [...currentPath, direction])
+      queue.push(next)
     }
   }
-  return null
+  return paths
 }
 
 function spatialNext(

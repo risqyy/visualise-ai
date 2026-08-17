@@ -478,6 +478,31 @@ describe('accessible architecture graph — selection by keyboard alone', () => 
     },
     CANVAS_TIMEOUT,
   )
+
+  it(
+    'moves focus to the nearest visible ancestor when a focused child is collapsed',
+    async () => {
+      renderGraph()
+      await waitForCanvas()
+
+      const focusedChild = nodeElement('platform.core.orders')
+      const nearestAncestor = nodeElement('platform.core')
+      const outerAncestor = nodeElement('platform')
+      focusedChild.focus()
+      expect(document.activeElement).toBe(focusedChild)
+
+      const disclosure = within(nearestAncestor).getByRole('button')
+      disclosure.click()
+
+      await waitFor(() =>
+        expect(document.querySelector('.react-flow__node[data-id="platform.core.orders"]')).toBeNull(),
+      )
+      await waitFor(() => expect(document.activeElement).toBe(nearestAncestor))
+      expect(nearestAncestor).toHaveAttribute('tabindex', '0')
+      expect(outerAncestor).toHaveAttribute('tabindex', '-1')
+    },
+    CANVAS_TIMEOUT,
+  )
 })
 
 /**

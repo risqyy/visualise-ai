@@ -844,7 +844,7 @@ function ArchitectureCanvasInner({
       current !== null && visibleNodeIds.has(current)
         ? current
         : current !== null
-          ? graphAncestorsOf(current).find((id) => visibleNodeIds.has(id)) ??
+          ? [...graphAncestorsOf(current)].reverse().find((id) => visibleNodeIds.has(id)) ??
             graphNodes[0]?.id ??
             null
           : graphNodes[0]?.id ?? null
@@ -1090,7 +1090,32 @@ function ArchitectureCanvasInner({
 
   const focusSpatialNode = useCallback(
     (componentId: ComponentId, direction: SpatialDirection) => {
-      const nextId = spatialNeighbor(spatialNodes, componentId, direction, orientation)
+      // The viewport can apply nested transforms that are not represented by
+      // the relative React Flow model positions alone. In the browser use the
+      // rendered rectangles as the source of truth; jsdom has no layout, so
+      // the model projection remains the deterministic test fallback.
+      const renderedNodes = [...document.querySelectorAll<HTMLElement>('.react-flow__node')].map(
+        (element, order) => {
+          const rect = element.getBoundingClientRect()
+          return {
+            id: element.getAttribute('data-id') ?? '',
+            x: rect.x,
+            y: rect.y,
+            width: rect.width,
+            height: rect.height,
+            order,
+          }
+        },
+      )
+      const hasLayout = renderedNodes.some(
+        (node) => node.width > 0 || node.height > 0 || node.x !== 0 || node.y !== 0,
+      )
+      const nextId = spatialNeighbor(
+        hasLayout ? renderedNodes : spatialNodes,
+        componentId,
+        direction,
+        orientation,
+      )
       if (nextId === null) return
 
       setFocusedNodeId(nextId)
