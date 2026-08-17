@@ -123,11 +123,6 @@ export function staggeredLabelRatios(
   // a route keep their endpoint lane and are handled again when a layout
   // becomes available.
   const placed: { left: number; right: number; top: number; bottom: number }[] = []
-  const candidates = [
-    EDGE_LABEL_STAGGER_START,
-    0.5,
-    EDGE_LABEL_STAGGER_END,
-  ]
   const ordered = [...edges].sort((first, second) =>
     first.id < second.id ? -1 : first.id > second.id ? 1 : 0,
   )
@@ -136,6 +131,12 @@ export function staggeredLabelRatios(
     if (!route) continue
     const preferred = ratios.get(edge.id) ?? 0.5
     const hadPreferred = ratios.has(edge.id)
+    const candidates = [
+      preferred,
+      EDGE_LABEL_STAGGER_START,
+      0.5,
+      EDGE_LABEL_STAGGER_END,
+    ].filter((candidate, index, all) => all.indexOf(candidate) === index)
     let bestRatio = preferred
     let bestCollisions = Number.POSITIVE_INFINITY
     let bestDistance = Number.POSITIVE_INFINITY

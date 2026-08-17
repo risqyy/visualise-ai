@@ -102,6 +102,33 @@ describe('edge geometry', () => {
     }
   })
 
+  it('keeps intermediate lanes for four long shared-endpoint routes', () => {
+    const route = [
+      { x: 0, y: 0 },
+      { x: 3000, y: 0 },
+    ] as const
+    const edges = ['a', 'b', 'c', 'd'].map((id) => ({
+      id: `edge-${id}`,
+      source: `source-${id}`,
+      target: 'shared-target',
+      route,
+    }))
+    const ratios = staggeredLabelRatios(edges)
+    const expectedRatios = [0.35, 0.45, 0.55, 0.65]
+    edges.forEach((edge, index) => {
+      expect(ratios.get(edge.id)).toBeCloseTo(expectedRatios[index] ?? 0.5, 10)
+    })
+
+    const anchors = edges.map((edge) =>
+      pointAtRatio(route, ratios.get(edge.id) ?? 0.5),
+    )
+    for (let index = 1; index < anchors.length; index += 1) {
+      const previous = anchors[index - 1] as { x: number; y: number }
+      const current = anchors[index] as { x: number; y: number }
+      expect((current.x - previous.x) * 0.93).toBeGreaterThan(220 + 8)
+    }
+  })
+
   it('finds the midpoint of a polyline for the label', () => {
     const midpoint = pointAtRatio([
       { x: 0, y: 0 },
