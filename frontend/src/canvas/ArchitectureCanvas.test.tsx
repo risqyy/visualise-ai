@@ -323,6 +323,34 @@ describe('architecture canvas — selection', () => {
     },
     CANVAS_TIMEOUT,
   )
+
+  it(
+    'uses the URL orientation and switches handles and camera explicitly',
+    async () => {
+      const user = userEvent.setup()
+      const { router } = renderCanvas(`${WORKSPACE_URL}?layout=left-right`)
+      const canvas = await waitForCanvas()
+
+      expect(canvas).toHaveAttribute('data-layout-orientation', 'left-right')
+      expect(
+        document.querySelector('.react-flow__node[data-id="platform"] .react-flow__handle-right'),
+      ).not.toBeNull()
+      expect(canvas).toHaveAttribute('data-fit-view-count', '1')
+
+      await user.click(screen.getByTestId('canvas-layout-top-down'))
+      await waitFor(() =>
+        expect(canvas).toHaveAttribute('data-layout-orientation', 'top-down'),
+      )
+      await waitFor(() => expect(canvas).toHaveAttribute('data-layouting', 'false'))
+      await waitFor(() => expect(canvas).toHaveAttribute('data-fit-view-count', '2'))
+
+      expect(router.state.location.search).toMatchObject({ layout: 'top-down' })
+      expect(
+        document.querySelector('.react-flow__node[data-id="platform"] .react-flow__handle-bottom'),
+      ).not.toBeNull()
+    },
+    CANVAS_TIMEOUT,
+  )
 })
 
 describe('architecture canvas — live updates never move the camera', () => {

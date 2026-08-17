@@ -15,6 +15,7 @@ import { PaneHeader } from '@/components/workspace/PaneHeader'
 import { RelationshipLegend } from '@/components/workspace/RelationshipLegend'
 import { Badge } from '@/components/ui/badge'
 import { ReportedText } from '@/i18n'
+import type { GraphOrientation } from '@/canvas/graphOrientation'
 
 export interface ArchitecturePaneProps {
   projectId: ProjectId
@@ -22,6 +23,8 @@ export interface ArchitecturePaneProps {
   selectedComponentId?: ComponentId | undefined
   /** Writes the selection back into the `component` search param. */
   onSelectComponent: (componentId: ComponentId | null) => void
+  orientation: GraphOrientation
+  onOrientationChange: (orientation: GraphOrientation) => void
 }
 
 /**
@@ -37,6 +40,8 @@ export function ArchitecturePane({
   projectId,
   selectedComponentId,
   onSelectComponent,
+  orientation,
+  onOrientationChange,
 }: ArchitecturePaneProps) {
   const { t } = useTranslation('canvas')
   const architecture = useArchitecture(projectId)
@@ -182,6 +187,8 @@ export function ArchitecturePane({
             model={model}
             selectedComponentId={selectedComponentId}
             onSelectComponent={onSelectComponent}
+            orientation={orientation}
+            onOrientationChange={onOrientationChange}
             onMetricsChange={onCanvasMetricsChange}
           />
         )}

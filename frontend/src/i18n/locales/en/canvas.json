@@ -149,6 +149,9 @@
     "fitWholeModel": "Fit the whole model",
     "fitWholeModelHint": "Expands every container and fits the complete model into the surface. With many components the picture deliberately becomes small — this is the overview action. Otherwise the camera only moves on the first load — never because events arrive.",
     "hideMinimap": "Hide the overview map",
+    "layoutLeftRight": "Left to right",
+    "layoutOrientation": "Graph orientation",
+    "layoutTopDown": "Top-down",
     "resetPositions": "Reset positions",
     "resetPositionsHint": "Moves dragged nodes back onto the computed layout. Drags are local only and do not change the architecture model anyway.",
     "showMinimap": "Show the overview map"

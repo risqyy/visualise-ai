@@ -20,6 +20,7 @@ import {
 } from './componentKinds'
 import { DISCLOSURE_LABEL_KEYS, showsTags, showsTechnology } from './detailLevel'
 import { HANDLE_IDS, type ArchitectureNode } from './graphProjection'
+import type { GraphOrientation } from './graphOrientation'
 import { CanvasNodeActionsContext } from './nodeActions'
 import { useCanvasVoice } from './useCanvasVoice'
 import { useDetailLevel } from './useDetailLevel'
@@ -139,20 +140,21 @@ function DisclosureToggle({
 }
 
 /** Invisible, non-interactive connection points. v0 is read-only. */
-function NodeHandles() {
+function NodeHandles({ orientation }: { orientation: GraphOrientation }) {
+  const topDown = orientation === 'top-down'
   return (
     <>
       <Handle
         type="target"
         id={HANDLE_IDS.target}
-        position={Position.Left}
+        position={topDown ? Position.Top : Position.Left}
         isConnectable={false}
         className="!size-1.5 !border-0 !bg-transparent"
       />
       <Handle
         type="source"
         id={HANDLE_IDS.source}
-        position={Position.Right}
+        position={topDown ? Position.Bottom : Position.Right}
         isConnectable={false}
         className="!size-1.5 !border-0 !bg-transparent"
       />
@@ -258,7 +260,7 @@ export const ComponentNode = memo(function ComponentNode({
       {showsTechnology(level) && <TechnologyRow parts={technology} />}
       {showsTags(level) && <TagRow tags={tags} />}
 
-      <NodeHandles />
+      <NodeHandles orientation={data.orientation} />
     </div>
   )
 })
@@ -363,8 +365,7 @@ export const CompoundNode = memo(function CompoundNode({
         </div>
       )}
 
-      <NodeHandles />
+      <NodeHandles orientation={data.orientation} />
     </div>
   )
 })
-

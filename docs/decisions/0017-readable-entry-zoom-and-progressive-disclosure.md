@@ -83,9 +83,11 @@ small to read; the cockpit may never choose it for them.
 
 `viewportForBounds` also owns the second half of the camera: a model that does
 not fit at the readable zoom is anchored at its **top-left** corner instead of
-being centred. The ELK layout runs left to right with the callers first
-(ADR 0008), so its beginning is where an architecture is read from; centring an
-oversized model drops the reader in the middle of a sentence. The inset is
+being centred. The default ELK layout now runs top-down with callers first
+(ADR 0023); its explicit left-to-right alternative retains the caller-first
+ordering described in ADR 0008. In either orientation, the beginning is where
+an architecture is read from; centring an oversized model drops the reader in
+the middle of a sentence. The inset is
 derived from the existing `FIT_VIEW_PADDING`, so an anchored model sits exactly
 as far from the edge as a centred one.
 

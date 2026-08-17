@@ -20,8 +20,12 @@ describe('ELK layered layout', () => {
     async () => {
       const projection = projectArchitecture(model)
 
-      const first = await layoutArchitecture(projection.nodes, projection.edges)
-      const second = await layoutArchitecture(projection.nodes, projection.edges)
+      const first = await layoutArchitecture(projection.nodes, projection.edges, {
+        direction: 'RIGHT',
+      })
+      const second = await layoutArchitecture(projection.nodes, projection.edges, {
+        direction: 'RIGHT',
+      })
 
       expect(describeLayout(second)).toBe(describeLayout(first))
       expect(second.nodes.map((node) => node.position)).toEqual(
@@ -42,8 +46,12 @@ describe('ELK layered layout', () => {
         relationships: reorder(NESTED_RELATIONSHIPS),
       })
 
-      const fromStraight = await layoutArchitecture(straight.nodes, straight.edges)
-      const fromShuffled = await layoutArchitecture(shuffled.nodes, shuffled.edges)
+      const fromStraight = await layoutArchitecture(straight.nodes, straight.edges, {
+        direction: 'RIGHT',
+      })
+      const fromShuffled = await layoutArchitecture(shuffled.nodes, shuffled.edges, {
+        direction: 'RIGHT',
+      })
 
       expect(describeLayout(fromShuffled)).toBe(describeLayout(fromStraight))
       expect(fromShuffled.routes).toEqual(fromStraight.routes)
@@ -56,13 +64,16 @@ describe('ELK layered layout', () => {
     async () => {
       const projection = projectArchitecture(model)
 
-      const straight = await layoutArchitecture(projection.nodes, projection.edges)
+      const straight = await layoutArchitecture(projection.nodes, projection.edges, {
+        direction: 'RIGHT',
+      })
       const reversed = await layoutArchitecture(
         // Reversing the node array would break React Flow's parent-before-child
         // rule, so the layout has to re-derive the hierarchy itself — which it
         // does, from `parentId` rather than from the array order.
         [...projection.nodes].reverse(),
         [...projection.edges].reverse(),
+        { direction: 'RIGHT' },
       )
 
       const straightById = new Map(straight.nodes.map((node) => [node.id, node.position]))
@@ -77,7 +88,9 @@ describe('ELK layered layout', () => {
     'places children inside their container and gives containers a real size',
     async () => {
       const projection = projectArchitecture(model)
-      const { nodes } = await layoutArchitecture(projection.nodes, projection.edges)
+      const { nodes } = await layoutArchitecture(projection.nodes, projection.edges, {
+        direction: 'RIGHT',
+      })
       const byId = new Map(nodes.map((node) => [node.id, node]))
 
       const container = byId.get('platform.api.http')
@@ -107,7 +120,9 @@ describe('ELK layered layout', () => {
     'routes every edge from the source handle to the target handle',
     async () => {
       const projection = projectArchitecture(model)
-      const layout = await layoutArchitecture(projection.nodes, projection.edges)
+      const layout = await layoutArchitecture(projection.nodes, projection.edges, {
+        direction: 'RIGHT',
+      })
 
       expect(layout.nodes.map((node) => node.id)).toEqual(
         projection.nodes.map((node) => node.id),
@@ -168,7 +183,11 @@ describe('ELK layered layout', () => {
 
   it('sorts the graph it hands to ELK and drops self references', () => {
     const projection = projectArchitecture(model)
-    const graph = buildElkGraph([...projection.nodes].reverse(), [...projection.edges].reverse())
+    const graph = buildElkGraph(
+      [...projection.nodes].reverse(),
+      [...projection.edges].reverse(),
+      { direction: 'RIGHT' },
+    )
 
     expect(graph.children?.map((child) => child.id)).toEqual(['external.payments', 'platform'])
     expect(graph.edges?.map((edge) => edge.id)).toEqual(
@@ -188,4 +207,73 @@ describe('ELK layered layout', () => {
     const layout = await layoutArchitecture([], [])
     expect(layout).toEqual({ nodes: [], routes: {}, bounds: { width: 0, height: 0 } })
   })
+
+  it(
+    'uses top-down ports and routes when no direction override is supplied',
+    async () => {
+      const projection = projectArchitecture(model, 'top-down')
+      const graph = buildElkGraph(projection.nodes, projection.edges)
+      const platform = graph.children?.find((child) => child.id === 'platform')
+
+      expect(graph.layoutOptions?.['elk.direction']).toBe('DOWN')
+      expect(platform?.ports?.map((port) => port.layoutOptions?.['elk.port.side'])).toEqual([
+        'NORTH',
+        'SOUTH',
+      ])
+
+      const layout = await layoutArchitecture(projection.nodes, projection.edges)
+      const byId = new Map(layout.nodes.map((node) => [node.id, node]))
+      const absolute = (id: string): { x: number; y: number } => {
+        let x = 0
+        let y = 0
+        let current = byId.get(id)
+        const guard = new Set<string>()
+        while (current && !guard.has(current.id)) {
+          guard.add(current.id)
+          x += current.position.x
+          y += current.position.y
+          current = current.parentId ? byId.get(current.parentId) : undefined
+        }
+        return { x, y }
+      }
+      for (const edge of projection.edges) {
+        const route = layout.routes[edge.id]
+        expect(route, `route for ${edge.id}`).toBeDefined()
+        const source = byId.get(edge.source)
+        const target = byId.get(edge.target)
+        const sourceOrigin = absolute(edge.source)
+        const targetOrigin = absolute(edge.target)
+        const start = route?.[0]
+        const end = route?.[route.length - 1]
+        expect(Math.abs((start?.x ?? 0) - (sourceOrigin.x + (source?.width ?? 0) / 2))).toBeLessThanOrEqual(1)
+        expect(Math.abs((start?.y ?? 0) - (sourceOrigin.y + (source?.height ?? 0)))).toBeLessThanOrEqual(1)
+        expect(Math.abs((end?.x ?? 0) - (targetOrigin.x + (target?.width ?? 0) / 2))).toBeLessThanOrEqual(1)
+        expect(Math.abs((end?.y ?? 0) - targetOrigin.y)).toBeLessThanOrEqual(1)
+      }
+    },
+    LAYOUT_TIMEOUT,
+  )
+
+  it(
+    'keeps top-down layouts stable across repeated and permuted solves',
+    async () => {
+      const projection = projectArchitecture(model, 'top-down')
+
+      const first = await layoutArchitecture(projection.nodes, projection.edges)
+      const second = await layoutArchitecture(projection.nodes, projection.edges)
+      const fromPermuted = await layoutArchitecture(
+        reorder(projection.nodes),
+        reorder(projection.edges),
+      )
+
+      expect(describeLayout(second)).toBe(describeLayout(first))
+      expect(second.routes).toEqual(first.routes)
+      const firstById = new Map(first.nodes.map((node) => [node.id, node.position]))
+      for (const node of fromPermuted.nodes) {
+        expect(node.position).toEqual(firstById.get(node.id))
+      }
+      expect(fromPermuted.routes).toEqual(first.routes)
+    },
+    LAYOUT_TIMEOUT,
+  )
 })

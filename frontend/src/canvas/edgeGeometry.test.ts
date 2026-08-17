@@ -37,15 +37,15 @@ describe('edge geometry', () => {
       { x: 0, y: 50 },
       { x: 200, y: 50 },
     ]
-    const fanned = fanRoute(route, 13)
+    const fanned = fanRoute(route, 13, 'left-right')
 
     // The endpoints stay exactly on the handles…
     expect(fanned[0]).toEqual({ x: 0, y: 50 })
     expect(fanned[fanned.length - 1]).toEqual({ x: 200, y: 50 })
     // …while the middle of the line moves aside.
-    expect(fanned).toHaveLength(4)
-    expect(fanned[1]?.y).toBe(63)
+    expect(fanned).toHaveLength(6)
     expect(fanned[2]?.y).toBe(63)
+    expect(fanned[3]?.y).toBe(63)
   })
 
   it('centres the fan around the original route', () => {
@@ -70,15 +70,60 @@ describe('edge geometry', () => {
   })
 
   it('falls back to an orthogonal connection when no route was computed', () => {
-    expect(fallbackRoute({ x: 0, y: 10 }, { x: 100, y: 10 })).toEqual([
+    expect(fallbackRoute({ x: 0, y: 10 }, { x: 100, y: 10 }, 'left-right')).toEqual([
       { x: 0, y: 10 },
       { x: 100, y: 10 },
     ])
-    expect(fallbackRoute({ x: 0, y: 0 }, { x: 100, y: 60 })).toEqual([
+    expect(fallbackRoute({ x: 0, y: 0 }, { x: 100, y: 60 }, 'left-right')).toEqual([
       { x: 0, y: 0 },
       { x: 50, y: 0 },
       { x: 50, y: 60 },
       { x: 100, y: 60 },
     ])
+  })
+
+  it('uses a vertical midpoint for a top-down fallback route', () => {
+    expect(fallbackRoute({ x: 20, y: 0 }, { x: 120, y: 200 }, 'top-down')).toEqual([
+      { x: 20, y: 0 },
+      { x: 20, y: 100 },
+      { x: 120, y: 100 },
+      { x: 120, y: 200 },
+    ])
+  })
+
+  it('fans top-down bundles horizontally while keeping both handles attached', () => {
+    const route = [
+      { x: 50, y: 0 },
+      { x: 50, y: 200 },
+    ]
+    const fanned = fanRoute(route, 13, 'top-down')
+    expect(fanned[0]).toEqual(route[0])
+    expect(fanned[fanned.length - 1]).toEqual(route[1])
+    expect(fanned.some((point) => point.x === 63)).toBe(true)
+    for (let index = 1; index < fanned.length; index += 1) {
+      const previous = fanned[index - 1] as { x: number; y: number }
+      const current = fanned[index] as { x: number; y: number }
+      expect(previous.x === current.x || previous.y === current.y).toBe(true)
+    }
+  })
+
+  it('keeps every left-to-right fanout segment axis-aligned', () => {
+    const fanned = fanRoute(
+      [
+        { x: 0, y: 50 },
+        { x: 200, y: 50 },
+      ],
+      13,
+      'left-right',
+    )
+
+    expect(fanned[0]).toEqual({ x: 0, y: 50 })
+    expect(fanned[fanned.length - 1]).toEqual({ x: 200, y: 50 })
+    expect(fanned.some((point) => point.y === 63)).toBe(true)
+    for (let index = 1; index < fanned.length; index += 1) {
+      const previous = fanned[index - 1] as { x: number; y: number }
+      const current = fanned[index] as { x: number; y: number }
+      expect(previous.x === current.x || previous.y === current.y).toBe(true)
+    }
   })
 })

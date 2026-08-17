@@ -149,6 +149,9 @@
     "fitWholeModel": "Gesamtes Modell einpassen",
     "fitWholeModelHint": "Klappt alle Container auf und passt das vollständige Modell in die Fläche ein. Bei vielen Komponenten wird die Darstellung dabei bewusst klein — das ist die Übersichtsaktion. Die Kamera bewegt sich sonst nur beim ersten Laden — nie durch eintreffende Ereignisse.",
     "hideMinimap": "Übersichtskarte ausblenden",
+    "layoutLeftRight": "Links nach rechts",
+    "layoutOrientation": "Graphausrichtung",
+    "layoutTopDown": "Top-down",
     "resetPositions": "Positionen zurücksetzen",
     "resetPositionsHint": "Verschobene Knoten zurück auf das berechnete Layout. Verschiebungen sind ohnehin nur lokal und ändern das Architekturmodell nicht.",
     "showMinimap": "Übersichtskarte einblenden"

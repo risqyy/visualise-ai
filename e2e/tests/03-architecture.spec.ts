@@ -69,6 +69,92 @@ async function openWorkspace(page: Page): Promise<void> {
   )
 }
 
+test('2 · top-down is the default and both orientations are shareable at accepted widths', async ({
+  page,
+}) => {
+  const selectedComponent = 'shop-platform.orders'
+  const viewports = [
+    { width: 1280, height: 720 },
+    { width: 1920, height: 1080 },
+  ] as const
+
+  for (const viewport of viewports) {
+    await page.setViewportSize(viewport)
+    await openWorkspace(page)
+
+    const canvas = page.getByTestId('architecture-canvas')
+    const node = page.locator(`.react-flow__node[data-id="shop-platform"]`)
+    await expect(canvas).toHaveAttribute('data-layout-orientation', 'top-down')
+    await expect(node.locator('.react-flow__handle-top')).toHaveCount(1)
+    await expect(node.locator('.react-flow__handle-bottom')).toHaveCount(1)
+
+    // A selected, collapsed component is deliberately kept in place while the
+    // user changes orientation. Check the URL, canvas and inspector together.
+    if (viewport.width === 1920) {
+      await page.getByTestId(`canvas-node-${selectedComponent}`).click()
+      await expect(page).toHaveURL(
+        new RegExp(`component=${encodeURIComponent(selectedComponent)}`),
+      )
+      await expect(page.getByTestId('inspector-context')).toHaveAttribute(
+        'data-component-id',
+        selectedComponent,
+      )
+
+      const disclosure = page.getByTestId(`node-disclosure-${selectedComponent}`)
+      await expect(disclosure).toHaveAttribute('aria-expanded', 'false')
+      await disclosure.click()
+      await expect(disclosure).toHaveAttribute('aria-expanded', 'true')
+    }
+
+    await page.getByTestId('canvas-layout-left-right').click()
+    await expect(canvas).toHaveAttribute('data-layout-orientation', 'left-right')
+    await expect(canvas).toHaveAttribute('data-layouting', 'false')
+    await expect(page).toHaveURL(/layout=left-right/)
+    await expect(node.locator('.react-flow__handle-left')).toHaveCount(1)
+    await expect(node.locator('.react-flow__handle-right')).toHaveCount(1)
+
+    if (viewport.width === 1920) {
+      await expect(page).toHaveURL(
+        new RegExp(`component=${encodeURIComponent(selectedComponent)}`),
+      )
+      await expect(page.getByTestId(`canvas-node-${selectedComponent}`)).toHaveAttribute(
+        'data-selected',
+        'true',
+      )
+      await expect(page.getByTestId(`node-disclosure-${selectedComponent}`)).toHaveAttribute(
+        'aria-expanded',
+        'true',
+      )
+      await expect(page.getByTestId('inspector-context')).toHaveAttribute(
+        'data-component-id',
+        selectedComponent,
+      )
+    }
+
+    await page.getByTestId('canvas-layout-top-down').click()
+    await expect(canvas).toHaveAttribute('data-layout-orientation', 'top-down')
+    await expect(canvas).toHaveAttribute('data-layouting', 'false')
+    await expect(page).toHaveURL(/layout=top-down/)
+    await expect(node.locator('.react-flow__handle-top')).toHaveCount(1)
+    await expect(node.locator('.react-flow__handle-bottom')).toHaveCount(1)
+
+    if (viewport.width === 1920) {
+      await expect(page.getByTestId(`canvas-node-${selectedComponent}`)).toHaveAttribute(
+        'data-selected',
+        'true',
+      )
+      await expect(page.getByTestId(`node-disclosure-${selectedComponent}`)).toHaveAttribute(
+        'aria-expanded',
+        'true',
+      )
+      await expect(page.getByTestId('inspector-context')).toHaveAttribute(
+        'data-component-id',
+        selectedComponent,
+      )
+    }
+  }
+})
+
 /** Zooms in until the canvas reports the `full` detail level. */
 async function zoomToFullDetail(page: Page): Promise<void> {
   const canvas = page.getByTestId('architecture-canvas')

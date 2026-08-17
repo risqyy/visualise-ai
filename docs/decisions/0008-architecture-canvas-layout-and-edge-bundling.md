@@ -6,6 +6,11 @@
 - **Builds on:** [0003 — Frontend state split and live updates](./0003-frontend-state-split-and-live-updates.md),
   [0005 — Read API shape and run scoping](./0005-read-api-shape-and-run-scoping.md)
 
+The orientation choice recorded here was superseded by [0023 — Top-down graph
+orientation](./0023-graph-orientation-and-directional-handles.md): top-down is
+now the default and the original left-to-right layout remains an explicit
+alternative. The bundling, routing and camera invariants below still apply.
+
 ## Context
 
 The architecture canvas is the product. It is the dominant surface at
@@ -53,9 +58,10 @@ the order the rows arrived in.
 
 ### ELK `layered`, and determinism as a tested property
 
-An architecture model is a directed, mostly acyclic graph: callers left,
-callees right, one layer per hop. That is exactly what a Sugiyama-style
-algorithm draws, so `elk.algorithm: layered` with `elk.direction: RIGHT`.
+An architecture model is a directed, mostly acyclic graph: callers precede
+callees, one layer per hop. That is exactly what a Sugiyama-style algorithm
+draws, so `elk.algorithm: layered` with `elk.direction: DOWN` by default;
+`RIGHT` remains the explicit left-to-right alternative (ADR 0023).
 Force-directed layouts were rejected because they produce a different picture
 every run, and tree layouts because they cannot express the cross-links an
 architecture is full of.
@@ -88,11 +94,12 @@ ELK is loaded through a dynamic `import()`. Its bundled build is ~1.4 MB and has
 no business in the entry chunk of a cockpit that may never open a project; it
 now forms its own chunk, which is the code splitting ADR 0003 anticipated.
 
-**Handles are declared, not measured.** Every node carries its two handles
-(incoming left-centre, outgoing right-centre) on the node object, and ELK gets
-fixed ports at exactly those coordinates (`elk.portConstraints: FIXED_POS`). The
-polyline ELK returns therefore starts and ends *on* the handle. Edge geometry
-becomes a pure function of the layout instead of a function of a rendered DOM.
+**Handles are declared, not measured.** Every node carries directional handles
+(incoming north/outgoing south by default, west/east in the left-to-right
+alternative) on the node object, and ELK gets fixed ports at exactly those
+coordinates (`elk.portConstraints: FIXED_POS`). The polyline ELK returns
+therefore starts and ends *on* the handle. Edge geometry becomes a pure
+function of the layout instead of a function of a rendered DOM.
 
 ### Relationship kinds are encoded without colour at all
 

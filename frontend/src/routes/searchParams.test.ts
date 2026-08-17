@@ -8,6 +8,7 @@ const validSearch: WorkspaceSearch = {
   component: 'shop-platform.orders.domain',
   focus: 'feedback',
   history: true,
+  layout: 'left-right',
 }
 // @ts-expect-error 'runs' is not one of the two deep-focus targets
 const invalidSearch: WorkspaceSearch = { focus: 'runs' }
@@ -15,6 +16,19 @@ const invalidSearch: WorkspaceSearch = { focus: 'runs' }
 describe('validateWorkspaceSearch', () => {
   it('accepts the documented parameters', () => {
     expect(validateWorkspaceSearch({ ...validSearch })).toEqual(validSearch)
+  })
+
+  it('accepts both shareable graph orientations', () => {
+    expect(validateWorkspaceSearch({ layout: 'top-down' })).toEqual({
+      layout: 'top-down',
+    })
+    expect(validateWorkspaceSearch({ layout: 'left-right' })).toEqual({
+      layout: 'left-right',
+    })
+  })
+
+  it('drops an unknown graph orientation', () => {
+    expect(validateWorkspaceSearch({ layout: 'diagonal' })).toEqual({})
   })
 
   it('rejects an unknown focus target and falls back cleanly', () => {

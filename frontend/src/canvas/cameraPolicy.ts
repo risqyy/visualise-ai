@@ -158,10 +158,10 @@ export interface ViewportOptions {
    * How to place a model that does not fit at `minZoom`. `center` keeps the
    * middle of the model on screen, `start` puts its top-left corner there.
    *
-   * The initial camera uses `start`: the layout runs left to right with the
-   * callers first (ADR 0008), so its top-left corner is where an architecture
-   * is read from. Landing in the geometric middle of a model that does not fit
-   * drops the reader somewhere in the middle of a sentence.
+   * The initial camera uses `start`: the active layout direction puts callers
+   * first (ADR 0023), so its top-left corner is where an architecture is read
+   * from. Landing in the geometric middle of a model that does not fit drops
+   * the reader somewhere in the middle of a sentence.
    */
   overflow?: 'center' | 'start'
   /**
