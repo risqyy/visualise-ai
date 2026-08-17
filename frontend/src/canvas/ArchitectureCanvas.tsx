@@ -16,6 +16,7 @@ import {
   type Viewport,
 } from '@xyflow/react'
 import {
+  Focus,
   Layers2,
   Map,
   MapPinOff,
@@ -255,6 +256,8 @@ function ArchitectureCanvasInner({
   const clearNodePositions = useUiStore((state) => state.clearNodePositions)
   const minimapVisible = useUiStore((state) => state.minimapVisible)
   const setMinimapVisible = useUiStore((state) => state.setMinimapVisible)
+  const architectureFocus = useUiStore((state) => state.architectureFocus)
+  const toggleArchitectureFocus = useUiStore((state) => state.toggleArchitectureFocus)
   const clearExpandedEdges = useUiStore((state) => state.clearExpandedEdges)
   const toggleEdgeExpanded = useUiStore((state) => state.toggleEdgeExpanded)
   const storedSelectedRelationshipId = useUiStore((state) => state.selectedRelationshipId)
@@ -419,6 +422,55 @@ function ArchitectureCanvasInner({
     },
     [flow, storeApi, setCamera, publishZoom],
   )
+
+  /**
+   * Folding both side panes changes the drawing surface asynchronously. The
+   * focus action therefore parks one explicit fit on entry and on return until
+   * the browser has applied the new surface size, then clears the request
+   * permanently. The effect intentionally depends only on focus and surface
+   * size: a later live model update must never be mistaken for another camera
+   * command.
+  */
+  const architectureFocusFitTimerRef = useRef<number | null>(null)
+  const architectureFocusFitPendingRef = useRef<'enter' | 'exit' | null>(null)
+  const previousArchitectureFocusRef = useRef(false)
+  useEffect(() => {
+    const entering = architectureFocus && !previousArchitectureFocusRef.current
+    const leaving = !architectureFocus && previousArchitectureFocusRef.current
+    previousArchitectureFocusRef.current = architectureFocus
+
+    if (entering || leaving) {
+      architectureFocusFitPendingRef.current = entering ? 'enter' : 'exit'
+    }
+    if (architectureFocusFitPendingRef.current === null) return
+
+    if (architectureFocusFitTimerRef.current !== null) {
+      window.clearTimeout(architectureFocusFitTimerRef.current)
+    }
+    architectureFocusFitTimerRef.current = window.setTimeout(() => {
+      architectureFocusFitTimerRef.current = null
+      if (
+        useUiStore.getState().architectureFocus !== architectureFocus ||
+        architectureFocusFitPendingRef.current === null
+      ) {
+        return
+      }
+      architectureFocusFitPendingRef.current = null
+      // The fit is an explicit camera hand-off. Mark it as such before the
+      // collapsed panes report their new surface size, otherwise the settling
+      // policy could interpret that same resize as a second automatic fit.
+      userMovedCameraRef.current = true
+      policyRef.current = onUserFitRequest(policyRef.current).state
+      fitView('user')
+    }, 0)
+
+    return () => {
+      if (architectureFocusFitTimerRef.current !== null) {
+        window.clearTimeout(architectureFocusFitTimerRef.current)
+        architectureFocusFitTimerRef.current = null
+      }
+    }
+  }, [architectureFocus, fitView, surfaceHeight, surfaceWidth])
 
   /** Explicitly reveals one laid-out component without changing the zoom. */
   const focusComponentInView = useCallback(
@@ -1102,7 +1154,15 @@ function ArchitectureCanvasInner({
             {/* Wraps rather than overflows: the centre pane can be resized down
                 to a few hundred pixels, and a toolbar that runs past its edge
                 takes its own controls out of reach. */}
-            <div className="border-border bg-card/90 flex max-w-[min(100%,44rem)] flex-wrap items-center gap-1 rounded-md border px-1 py-1 backdrop-blur-sm">
+            <div
+              className={`architecture-toolbar ${minimapVisible ? '' : 'architecture-toolbar-full'} border-border bg-card/90 flex min-w-0 flex-wrap items-center gap-1 rounded-md border px-1 py-1 backdrop-blur-sm`}
+            >
+              <div
+                className="flex min-w-0 flex-wrap items-center gap-1"
+                role="group"
+                aria-label={t('tool.primaryActions')}
+                data-testid="canvas-primary-actions"
+              >
               <Button
                 ref={searchTriggerRef}
                 variant="ghost"
@@ -1194,14 +1254,44 @@ function ArchitectureCanvasInner({
                 </Tooltip>
               )}
 
-              <span className="bg-border mx-0.5 h-4 w-px" aria-hidden="true" />
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant={architectureFocus ? 'secondary' : 'ghost'}
+                    size="sm"
+                    className="h-7 gap-1.5 px-2 text-xs"
+                    onClick={toggleArchitectureFocus}
+                    aria-pressed={architectureFocus}
+                    data-testid="canvas-toggle-architecture-focus"
+                  >
+                    <Focus aria-hidden="true" />
+                    {t(architectureFocus ? 'tool.exitArchitectureFocus' : 'tool.focusArchitecture')}
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent className="max-w-80">
+                  {t(
+                    architectureFocus
+                      ? 'tool.exitArchitectureFocusHint'
+                      : 'tool.focusArchitectureHint',
+                  )}
+                </TooltipContent>
+              </Tooltip>
+              </div>
 
               <div
-                className="border-border/70 flex items-center rounded-sm border"
+                className="flex min-w-0 flex-wrap items-center gap-1"
                 role="group"
-                aria-label={t('tool.layoutOrientation')}
-                data-testid="canvas-layout-orientation"
+                aria-label={t('tool.secondaryInfo')}
+                data-testid="canvas-secondary-info"
               >
+                <span className="bg-border mx-0.5 h-4 w-px" aria-hidden="true" />
+
+                <div
+                  className="border-border/70 flex min-w-0 flex-wrap items-center rounded-sm border"
+                  role="group"
+                  aria-label={t('tool.layoutOrientation')}
+                  data-testid="canvas-layout-orientation"
+                >
                 <Button
                   variant="ghost"
                   size="sm"
@@ -1224,7 +1314,7 @@ function ArchitectureCanvasInner({
                   <span aria-hidden="true">→ </span>
                   {t('tool.layoutLeftRight')}
                 </Button>
-              </div>
+                </div>
 
               <Tooltip>
                 <TooltipTrigger asChild>
@@ -1305,6 +1395,7 @@ function ArchitectureCanvasInner({
                   </TooltipContent>
                 </Tooltip>
               )}
+              </div>
             </div>
             {searchOpen && (
               <div

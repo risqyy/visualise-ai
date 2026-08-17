@@ -202,6 +202,17 @@
 }
 
 @layer components {
+  /* Keep the top-left action cluster out of the minimap's fixed top-right
+     footprint. The toolbar wraps inside this gutter at the supported desktop
+     widths, so every button remains reachable without covering the map. */
+  .architecture-toolbar {
+    max-width: calc(100% - 12rem);
+  }
+
+  .architecture-toolbar-full {
+    max-width: 100%;
+  }
+
   /* Shared surface for the three panes. */
   .pane-surface {
     @apply bg-card text-card-foreground flex h-full min-h-0 min-w-0 flex-col;

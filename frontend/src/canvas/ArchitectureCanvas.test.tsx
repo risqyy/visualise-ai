@@ -885,6 +885,65 @@ describe('architecture canvas — live updates never move the camera', () => {
     },
     CANVAS_TIMEOUT,
   )
+
+  it(
+    'folds both panes, keeps the URL context and does not refit on a later live event',
+    async () => {
+      const user = userEvent.setup()
+      const { queryClient, publish } = renderCanvas(
+        `${WORKSPACE_URL}?component=platform.db`,
+      )
+      const canvas = await waitForCanvas()
+      const previousLayout = {
+        'workspace-left': 23,
+        'workspace-center': 47,
+        'workspace-right': 30,
+      }
+      useUiStore.setState({
+        layout: previousLayout,
+        leftCollapsed: true,
+        rightCollapsed: false,
+      })
+
+      await user.click(screen.getByTestId('canvas-toggle-architecture-focus'))
+      await waitFor(() => expect(useUiStore.getState().architectureFocus).toBe(true))
+      expect(useUiStore.getState()).toMatchObject({
+        leftCollapsed: true,
+        rightCollapsed: true,
+        layout: previousLayout,
+        selectedComponentId: 'platform.db',
+      })
+      await waitFor(() => expect(canvas).toHaveAttribute('data-fit-view-count', '2'))
+
+      const cameraAfterFocus = useUiStore.getState().camera
+      const fitCountAfterFocus = canvas.getAttribute('data-fit-view-count')
+      publish(grownArchitectureResponse)
+      await act(async () => {
+        applyLiveEvent(
+          queryClient,
+          streamedEvent('architecture.snapshot_published', {
+            snapshotId: 'snapshot-after-architecture-focus',
+            components: grownArchitectureResponse.components,
+            relationships: grownArchitectureResponse.relationships,
+          }),
+        )
+      })
+      await waitFor(() => expect(canvas).toHaveAttribute('data-layouting', 'false'))
+      expect(useUiStore.getState().camera).toEqual(cameraAfterFocus)
+      expect(canvas.getAttribute('data-fit-view-count')).toBe(fitCountAfterFocus)
+      expect(useUiStore.getState().selectedComponentId).toBe('platform.db')
+
+      await user.click(screen.getByTestId('canvas-toggle-architecture-focus'))
+      await waitFor(() => expect(useUiStore.getState().architectureFocus).toBe(false))
+      await waitFor(() => expect(canvas).toHaveAttribute('data-fit-view-count', '3'))
+      expect(useUiStore.getState()).toMatchObject({
+        layout: previousLayout,
+        leftCollapsed: true,
+        rightCollapsed: false,
+      })
+    },
+    CANVAS_TIMEOUT,
+  )
 })
 
 describe('architecture canvas — temporary node positions', () => {

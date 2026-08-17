@@ -78,9 +78,9 @@ created`, gegen eine gefüllte Datenbank bricht der Lauf also laut ab.
 | `src/controls.ts` | Sichtbarkeit und Überdeckung über `elementFromPoint` |
 | `src/layout.ts` | Seitenüberlauf und abgeschnittener Text — als Funktion der Fensterbreite |
 | `src/pseudoLocale.ts` | Verlängert im Browser jeden Text, der dem Cockpit gehört, um 35 % |
-| `tests/` | Die neun Prüfdateien, in Ausführungsreihenfolge nummeriert |
+| `tests/` | Die zehn Prüfdateien, in Ausführungsreihenfolge nummeriert |
 
-## Die neun Prüfdateien
+## Die zehn Prüfdateien
 
 | Datei | Prüfung |
 | --- | --- |
@@ -93,6 +93,7 @@ created`, gegen eine gefüllte Datenbank bricht der Lauf also laut ab.
 | `07-sse-replay.spec.ts` | Erzwungener SSE-Abbruch und lückenloser, geordneter Replay |
 | `08-viewport.spec.ts` | Keine horizontale Seitenscrollbar, keine verdeckte Primärsteuerung |
 | `09-i18n-layout.spec.ts` | Layout in Deutsch, Englisch und Pseudo-Locale bei 1920, 1440 und 1280 |
+| `10-architecture-focus.spec.ts` | Architektur-Fokus, exakte Pane-Wiederherstellung und Overlay-Geometrie in Deutsch und Englisch |
 
 `01`–`08` sind die verbindlichen Prüfungen des v0-Epics (#14) und bleiben
 unverändert: dieselben Assertions, dieselben 1920 × 1080, dieselbe Sprache.
