@@ -89,7 +89,9 @@ async function assertRelationshipAction(
   await expect(interactionPath, `${label}: no interactive edge path`).toBeAttached()
   const measurement = await interactionPath.evaluate((element) => {
     const canvas = document.querySelector('[data-testid="architecture-canvas"]')
-    const zoom = Number(canvas?.getAttribute('data-canvas-zoom') ?? '1')
+    const zoom = Number.parseFloat(
+      canvas ? window.getComputedStyle(canvas).getPropertyValue('--vai-canvas-zoom') : '1',
+    )
     const strokeWidth = Number.parseFloat(window.getComputedStyle(element).strokeWidth)
     const rect = element.getBoundingClientRect()
     return {
