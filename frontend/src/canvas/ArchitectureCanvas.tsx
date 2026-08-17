@@ -442,76 +442,197 @@ function ArchitectureCanvasInner({
    * size: a later live model update must never be mistaken for another camera
    * command.
   */
-  const architectureFocusFitTimerRef = useRef<number | null>(null)
-  const architectureFocusFitPendingRef = useRef<'enter' | 'exit' | null>(null)
+  type SurfaceSize = { width: number; height: number }
+  type ArchitectureFocusFitPending = {
+    mode: 'enter' | 'exit'
+    before: SurfaceSize
+    last: SurfaceSize | null
+    stableFrames: number
+    observedSize: SurfaceSize | null
+  }
+  const architectureFocusFitRafRef = useRef<number | null>(null)
+  const architectureFocusFitUsesRafRef = useRef(false)
+  const architectureFocusFitPendingRef = useRef<ArchitectureFocusFitPending | null>(null)
   const previousArchitectureFocusRef = useRef(false)
+  const architectureFocusFitContextRef = useRef({
+    architectureFocus,
+    graphIsRelayouting: graph.isRelayouting,
+    nodeCount: graph.nodes.length,
+    projectId,
+  })
+  const fitViewRef = useRef(fitView)
+  const scheduleArchitectureFocusFitCheckRef = useRef<(() => void) | null>(null)
+
   useEffect(() => {
-    const entering = architectureFocus && !previousArchitectureFocusRef.current
-    const leaving = !architectureFocus && previousArchitectureFocusRef.current
-    previousArchitectureFocusRef.current = architectureFocus
-
-    if (entering || leaving) {
-      architectureFocusFitPendingRef.current = entering ? 'enter' : 'exit'
-      // The pane resize that follows this state change is not a camera
-      // command. Claim the camera before React Flow reports the new size so
-      // the settling policy cannot win a race with this explicit fit.
-      userMovedCameraRef.current = true
+    architectureFocusFitContextRef.current = {
+      architectureFocus,
+      graphIsRelayouting: graph.isRelayouting,
+      nodeCount: graph.nodes.length,
+      projectId,
     }
-    if (architectureFocusFitPendingRef.current === null) return
+    fitViewRef.current = fitView
+  }, [architectureFocus, fitView, graph.isRelayouting, graph.nodes.length, projectId])
 
-    if (architectureFocusFitTimerRef.current !== null) {
-      window.clearTimeout(architectureFocusFitTimerRef.current)
+  const scheduleArchitectureFocusFitCheck = useCallback(() => {
+    if (
+      architectureFocusFitPendingRef.current === null ||
+      architectureFocusFitRafRef.current !== null
+    ) {
+      return
     }
-    architectureFocusFitTimerRef.current = window.setTimeout(() => {
-      architectureFocusFitTimerRef.current = null
-      if (
-        useUiStore.getState().architectureFocus !== architectureFocus ||
-        architectureFocusFitPendingRef.current === null
-      ) {
+
+    const check = () => {
+      architectureFocusFitRafRef.current = null
+      const pending = architectureFocusFitPendingRef.current
+      if (pending === null) return
+
+      const context = architectureFocusFitContextRef.current
+      const expectedFocus = pending.mode === 'enter'
+      if (context.architectureFocus !== expectedFocus) {
+        architectureFocusFitPendingRef.current = null
         return
       }
 
       const { width, height, nodeLookup } = storeApi.getState()
+      const size = { width, height }
+      const sizeChanged = width !== pending.before.width || height !== pending.before.height
+      const measuredByReactFlow =
+        width >= MIN_FIT_VIEWPORT && height >= MIN_FIT_VIEWPORT
+      const domRect = surfaceRef.current?.getBoundingClientRect()
+      const hasBrowserLayout = Boolean(domRect && domRect.width > 0 && domRect.height > 0)
+      const canWaitForBrowserResize =
+        typeof window.requestAnimationFrame === 'function' && hasBrowserLayout
+
       if (
-        graph.isRelayouting ||
+        context.graphIsRelayouting ||
+        context.nodeCount === 0 ||
         nodeLookup.size === 0 ||
-        width < MIN_FIT_VIEWPORT ||
-        height < MIN_FIT_VIEWPORT
+        !measuredByReactFlow ||
+        (!sizeChanged && canWaitForBrowserResize) ||
+        (pending.observedSize !== null &&
+          (Math.round(pending.observedSize.width) !== width ||
+            Math.round(pending.observedSize.height) !== height))
       ) {
-        // Keep the request parked. React Flow publishes its next dimensions
-        // through the dependencies below, which schedules another attempt.
+        pending.last = null
+        pending.stableFrames = 0
+        scheduleArchitectureFocusFitCheckRef.current?.()
         return
       }
 
-      if (!fitView('user')) return
+      // In a real browser, React Flow's ResizeObserver and the two animation
+      // frames below make this wait for the *new* pane size, not the valid old
+      // size that is still in the store during the collapse. jsdom has no
+      // animation frames or layout engine; its fixed React Flow fallback size
+      // is the only measurable surface there, so allow it after one retry.
+      if (
+        pending.last === null ||
+        pending.last.width !== width ||
+        pending.last.height !== height
+      ) {
+        pending.last = size
+        pending.stableFrames = 1
+        scheduleArchitectureFocusFitCheckRef.current?.()
+        return
+      }
+      pending.stableFrames += 1
+      if (canWaitForBrowserResize && pending.stableFrames < 2) {
+        scheduleArchitectureFocusFitCheckRef.current?.()
+        return
+      }
+
+      if (!fitViewRef.current('user')) {
+        pending.last = null
+        pending.stableFrames = 0
+        scheduleArchitectureFocusFitCheckRef.current?.()
+        return
+      }
 
       architectureFocusFitPendingRef.current = null
       // A focus fit can be the first usable picture of a project. Record that
       // fact so the policy does not replay an automatic initial fit after this
       // explicit request completes.
       policyRef.current = {
-        fittedProjectId: projectId,
-        fittedSize: { width, height },
-      }
-    }, 0)
-
-    return () => {
-      if (architectureFocusFitTimerRef.current !== null) {
-        window.clearTimeout(architectureFocusFitTimerRef.current)
-        architectureFocusFitTimerRef.current = null
+        fittedProjectId: context.projectId,
+        fittedSize: size,
       }
     }
+
+    if (typeof window.requestAnimationFrame === 'function') {
+      architectureFocusFitUsesRafRef.current = true
+      architectureFocusFitRafRef.current = window.requestAnimationFrame(check)
+    } else {
+      architectureFocusFitUsesRafRef.current = false
+      architectureFocusFitRafRef.current = window.setTimeout(check, 16)
+    }
+  }, [storeApi])
+
+  useEffect(() => {
+    scheduleArchitectureFocusFitCheckRef.current = scheduleArchitectureFocusFitCheck
+  }, [scheduleArchitectureFocusFitCheck])
+
+  // Observe the same surface React Flow measures. The observer wakes the
+  // settling loop as soon as either panel collapse has produced a new box;
+  // the loop still compares/equalises the store dimensions before fitting.
+  useEffect(() => {
+    const target = surfaceRef.current?.querySelector('.react-flow') ?? surfaceRef.current
+    if (!target || typeof ResizeObserver === 'undefined') return
+
+    const observer = new ResizeObserver((entries) => {
+      const pending = architectureFocusFitPendingRef.current
+      if (pending === null) return
+      const rect = entries[0]?.contentRect
+      if (rect && rect.width > 0 && rect.height > 0) {
+        pending.observedSize = { width: rect.width, height: rect.height }
+      }
+      scheduleArchitectureFocusFitCheck()
+    })
+    observer.observe(target)
+    return () => observer.disconnect()
+  }, [scheduleArchitectureFocusFitCheck])
+
+  // A transition creates exactly one parked request. It is redeemed by the
+  // observer/rAF loop above once the new dimensions are visible, and cannot be
+  // replayed by later graph or live-data updates.
+  useEffect(() => {
+    const entering = architectureFocus && !previousArchitectureFocusRef.current
+    const leaving = !architectureFocus && previousArchitectureFocusRef.current
+    previousArchitectureFocusRef.current = architectureFocus
+
+    if (!entering && !leaving) return
+
+    architectureFocusFitPendingRef.current = {
+      mode: entering ? 'enter' : 'exit',
+      before: { width: surfaceWidth, height: surfaceHeight },
+      last: null,
+      stableFrames: 0,
+      observedSize: null,
+    }
+    // Claim the camera before React Flow reports the new size so the settling
+    // policy cannot win a race with this explicit fit.
+    userMovedCameraRef.current = true
+    scheduleArchitectureFocusFitCheck()
   }, [
     architectureFocus,
-    fitView,
-    graph.isRelayouting,
-    graph.nodes.length,
-    graph.signature,
-    projectId,
-    storeApi,
+    scheduleArchitectureFocusFitCheck,
     surfaceHeight,
     surfaceWidth,
   ])
+
+  useEffect(
+    () => () => {
+      const pendingFrame = architectureFocusFitRafRef.current
+      if (pendingFrame !== null) {
+        if (architectureFocusFitUsesRafRef.current) {
+          window.cancelAnimationFrame(pendingFrame)
+        } else {
+          window.clearTimeout(pendingFrame)
+        }
+      }
+      architectureFocusFitRafRef.current = null
+      architectureFocusFitPendingRef.current = null
+    },
+    [],
+  )
 
   /** Explicitly reveals one laid-out component without changing the zoom. */
   const focusComponentInView = useCallback(

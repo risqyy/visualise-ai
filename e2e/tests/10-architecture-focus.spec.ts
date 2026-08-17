@@ -149,6 +149,9 @@ for (const language of ['de', 'en'] as const) {
       await expect(page.getByTestId('pane-rail-right')).toBeVisible()
       const before = await paneSnapshot(page)
       const urlBefore = page.url()
+      const surfaceBefore = Number(
+        await page.getByTestId('architecture-canvas').getAttribute('data-surface-width'),
+      )
       const fitBefore = Number(
         await page.getByTestId('architecture-canvas').getAttribute('data-fit-view-count'),
       )
@@ -165,6 +168,46 @@ for (const language of ['de', 'en'] as const) {
           ),
         )
         .toBe(fitBefore + 1)
+      await expect
+        .poll(async () =>
+          Number(
+            await page.getByTestId('architecture-canvas').getAttribute('data-surface-width'),
+          ),
+        )
+        .not.toBe(surfaceBefore)
+
+      const focusedGeometry = await page.evaluate(() => {
+        const canvas = document.querySelector<HTMLElement>('[data-testid="architecture-canvas"]')
+        if (canvas === null) return null
+        const canvasRect = canvas.getBoundingClientRect()
+        const nodes = Array.from(document.querySelectorAll<HTMLElement>('.react-flow__node'))
+          .map((node) => node.getBoundingClientRect())
+          .map((rect) => ({
+            left: rect.left,
+            top: rect.top,
+            right: rect.right,
+            bottom: rect.bottom,
+          }))
+        return {
+          canvas: {
+            left: canvasRect.left,
+            top: canvasRect.top,
+            right: canvasRect.right,
+            bottom: canvasRect.bottom,
+          },
+          nodes,
+        }
+      })
+      expect(focusedGeometry).not.toBeNull()
+      expect(
+        focusedGeometry?.nodes.every(
+          (node) =>
+            node.left >= focusedGeometry.canvas.left - 1 &&
+            node.top >= focusedGeometry.canvas.top - 1 &&
+            node.right <= focusedGeometry.canvas.right + 1 &&
+            node.bottom <= focusedGeometry.canvas.bottom + 1,
+        ),
+      ).toBe(true)
       expect(page.url()).toBe(urlBefore)
       const fitAfterFocus = Number(
         await page.getByTestId('architecture-canvas').getAttribute('data-fit-view-count'),

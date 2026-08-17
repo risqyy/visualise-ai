@@ -398,7 +398,10 @@ export const useUiStore = create<UiState>()(
             paneStateBeforeFocusModes:
               remainingMode === undefined ? null : s.paneStateBeforeFocusModes,
             focusModeStack: nextStack,
-            layout: previous?.layout ?? s.layout,
+            // Architecture focus only folds the side panes. If deep focus
+            // remains active, keep its current (possibly user-resized)
+            // arrangement instead of restoring the snapshot from before it.
+            layout: remainingMode === 'deep' ? s.layout : (previous?.layout ?? s.layout),
             leftCollapsed:
               remainingMode === 'deep' ? true : (previous?.leftCollapsed ?? false),
             rightCollapsed:

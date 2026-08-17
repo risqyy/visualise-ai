@@ -112,6 +112,38 @@ describe('architecture focus pane arrangement', () => {
     expect(useUiStore.getState()).toMatchObject(original)
   })
 
+  it('keeps the active deep-focus arrangement when its outer architecture mode ends', () => {
+    const original = {
+      layout: {
+        'workspace-left': 21,
+        'workspace-center': 55,
+        'workspace-right': 24,
+      },
+      leftCollapsed: false,
+      rightCollapsed: true,
+    }
+    useUiStore.setState(original)
+
+    useUiStore.getState().enterArchitectureFocus()
+    useUiStore.getState().enterDeepFocus('feedback')
+    const deepFocusLayout = {
+      'workspace-left': 10,
+      'workspace-center': 58,
+      'workspace-right': 32,
+    }
+    useUiStore.getState().setLayout(deepFocusLayout)
+
+    useUiStore.getState().exitArchitectureFocus()
+
+    expect(useUiStore.getState()).toMatchObject({
+      architectureFocus: false,
+      deepFocus: 'feedback',
+      layout: deepFocusLayout,
+      leftCollapsed: true,
+      rightCollapsed: false,
+    })
+  })
+
   it('resets focus state between tests and workspaces', () => {
     useUiStore.getState().enterArchitectureFocus()
     resetUiStore()
