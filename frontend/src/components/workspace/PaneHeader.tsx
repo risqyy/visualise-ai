@@ -7,11 +7,18 @@ export interface PaneHeaderProps {
   /** Short, neutral subtitle — usually the id the pane is bound to. */
   subtitle?: ReactNode
   actions?: ReactNode
+  actionsClassName?: string
   className?: string
 }
 
 /** Shared header row of the three panes. Keeps the panes visually identical. */
-export function PaneHeader({ title, subtitle, actions, className }: PaneHeaderProps) {
+export function PaneHeader({
+  title,
+  subtitle,
+  actions,
+  actionsClassName,
+  className,
+}: PaneHeaderProps) {
   return (
     <div
       className={cn(
@@ -25,7 +32,11 @@ export function PaneHeader({ title, subtitle, actions, className }: PaneHeaderPr
           <span className="text-muted-foreground truncate text-xs">{subtitle}</span>
         )}
       </div>
-      {actions && <div className="ml-auto flex shrink-0 items-center gap-1">{actions}</div>}
+      {actions && (
+        <div className={cn('ml-auto flex shrink-0 items-center gap-1', actionsClassName)}>
+          {actions}
+        </div>
+      )}
     </div>
   )
 }

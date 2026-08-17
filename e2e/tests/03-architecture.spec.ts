@@ -300,27 +300,39 @@ test('2 · the self run keeps 28 model components apart from its open proposal a
 
   const canvas = page.getByTestId('architecture-canvas')
   await expect(canvas).toHaveAttribute('data-node-count', '28')
-  await expect(canvas).toHaveAttribute('data-overlay-node-count', '1')
-  await expect(canvas).toHaveAttribute('data-total-element-count', '29')
-  await expect(canvas).toHaveAttribute('data-reported-relationship-count', '35')
+  // The overlay count is deliberately not used as the proposal count: the
+  // self run also keeps one removed component as evidence (a ghost).
+  await expect(canvas).toHaveAttribute('data-overlay-node-count', '2')
+  await expect(canvas).toHaveAttribute('data-total-element-count', '30')
+  await expect(canvas).toHaveAttribute('data-reported-relationship-count', '37')
   await expect(page.getByTestId('architecture-model-count')).toContainText(
     '28 Modellkomponenten',
   )
   await expect(page.getByTestId('architecture-proposal-count')).toContainText(
     '+ 1 Vorschlag',
   )
+  await expect(page.getByTestId('architecture-evidence-count')).toContainText(
+    '+ 1 Komponente nur als Beleg',
+  )
+  await expect(
+    page.locator('[data-testid^="canvas-node-"][data-presence="proposal"]'),
+  ).toHaveCount(1)
+  await expect(
+    page.locator('[data-testid^="canvas-node-"][data-presence="ghost"]'),
+  ).toHaveCount(1)
   await expect(page.getByTestId('canvas-node-visualise-ai.repository-provider')).toHaveAttribute(
     'data-presence',
     'proposal',
   )
 
-  // The initial depth shows ten of the 29 total elements. The open proposal is
-  // included in that visible-element count but remains outside the 28-model
-  // component count above; nine connections are visible at this depth.
+  // The initial depth shows ten of the 30 total elements. The proposal and the
+  // evidence ghost remain outside the 28-model component count above; ten
+  // connections are visible at this depth.
+  await expect(canvas).toHaveAttribute('data-collapsed-count', '2')
   await expect(canvas).toHaveAttribute('data-visible-node-count', '10')
-  await expect(canvas).toHaveAttribute('data-visible-connection-count', '9')
+  await expect(canvas).toHaveAttribute('data-visible-connection-count', '10')
   await expect(page.getByTestId('architecture-relationship-count')).toContainText(
-    '35 gemeldete Beziehungen · 9 Verbindungen dargestellt',
+    '37 gemeldete Beziehungen · 10 Verbindungen dargestellt',
   )
 })
 

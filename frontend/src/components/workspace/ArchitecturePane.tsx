@@ -96,10 +96,15 @@ export function ArchitecturePane({
       <PaneHeader
         title={t('pane.title')}
         subtitle={<ReportedText value={projectId} />}
+        // The architecture counters are intentionally allowed to wrap inside
+        // the pane. Keeping them in one unbreakable row makes the title lose
+        // all available width as soon as a locale has longer count labels.
+        className="h-auto min-h-10 items-start py-1 [&>div:first-child]:shrink-0"
+        actionsClassName="min-w-0 flex-1 shrink"
         actions={
           architecture.isSuccess && (
-            <div className="flex items-center gap-2">
-              <ChangeCounter counts={overlay.counts} />
+            <div className="flex w-full min-w-0 flex-wrap items-center justify-end gap-2">
+              <ChangeCounter counts={overlay.counts} className="shrink-0" />
               <span className="bg-border h-4 w-px" aria-hidden="true" />
               {/*
                 The grammatical plural of these two counts is #40's, not this
