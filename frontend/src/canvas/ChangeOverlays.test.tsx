@@ -1,8 +1,9 @@
-import { act, screen, waitFor, within } from '@testing-library/react'
+import { act, render, screen, waitFor, within } from '@testing-library/react'
 import { describe, expect, it } from 'vitest'
 
 import type { ArchitectureResponse, Component, Relationship } from '@/api/types'
 import { applyLiveEvent } from '@/api/useLiveStream'
+import { EMPTY_LEDGER } from '@/state/changeLedger'
 import { DEFAULT_CAMERA, useUiStore } from '@/state/uiStore'
 import { WORK_STATES } from '@/state/workStates'
 import { translateWith } from '@/test/translate'
@@ -19,6 +20,8 @@ import {
 import { PROJECT_ID, RUN_ID, createFakeFetch, streamedEvent } from '@/test/fixtures'
 import { renderApp } from '@/test/renderApp'
 
+import { ChangeOverlayMark } from './ChangeOverlayMark'
+import { buildChangeOverlays } from './changeOverlays'
 /**
  * The live change overlays end to end: a committed event goes through the real
  * SSE apply path, the read model refetches, and the canvas shows the reported
@@ -476,6 +479,38 @@ describe('live change overlays — concurrent agents', () => {
     },
     CANVAS_TIMEOUT,
   )
+
+  it('keeps the compact mark icon-only while its title retains agent context', () => {
+    const overlay = buildChangeOverlays({
+      components: NESTED_COMPONENTS,
+      relationships: NESTED_RELATIONSHIPS,
+      activeChanges: [
+        activeChange({
+          changeId: 'change-a',
+          targetId: 'platform.core.orders',
+          operation: 'modify',
+          agentId: 'subagent-implementer',
+          position: 50,
+        }),
+        activeChange({
+          changeId: 'change-b',
+          targetId: 'platform.core.orders',
+          operation: 'modify',
+          agentId: 'subagent-reviewer',
+          position: 51,
+        }),
+      ],
+      ledger: { ...EMPTY_LEDGER },
+    }).components.get('platform.core.orders')
+
+    expect(overlay).toBeDefined()
+    render(<ChangeOverlayMark overlay={overlay!} compact />)
+
+    const mark = screen.getByTestId('overlay-mark-component-platform.core.orders')
+    expect(mark).not.toHaveTextContent('2')
+    expect(mark).toHaveAttribute('title', expect.stringContaining('2 Agents'))
+    expect(mark.querySelector('.lucide-users')).toBeNull()
+  })
 })
 
 describe('live change overlays — retraction', () => {

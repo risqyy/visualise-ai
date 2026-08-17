@@ -10,7 +10,7 @@ import type { CanvasKey } from '@/i18n'
  *
  * | level      | nodes                        | edges                                  |
  * | ---------- | ---------------------------- | -------------------------------------- |
- * | `minimal`  | shape and icon only         | line only                              |
+ * | `minimal`  | shape and icon only         | line and icon-only inspector action    |
  * | `overview` | primary name                | bundled, count badge only              |
  * | `standard` | + kind and technology       | bundled, kind badge + count            |
  * | `full`     | + tags                       | bundles fanned out, one label per edge |

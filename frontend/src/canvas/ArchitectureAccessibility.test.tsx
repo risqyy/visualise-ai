@@ -247,6 +247,35 @@ describe('accessible architecture graph — every node arrives named', () => {
 
 describe('accessible architecture graph — selection by keyboard alone', () => {
   it(
+    'selects the first relationship of a bundled edge with Enter at map level',
+    async () => {
+      const user = userEvent.setup()
+      const { router } = renderGraph()
+      const canvas = await waitForCanvas()
+
+      await user.click(screen.getByTestId('canvas-fit-view'))
+      await waitFor(() => expect(canvas).toHaveAttribute('data-detail-level', 'minimal'))
+
+      const edge = document.querySelector<HTMLElement>(
+        '.react-flow__edge[data-id="rel:platform.core.orders~>platform.bus"]',
+      )
+      expect(edge).not.toBeNull()
+      edge?.focus()
+      await user.keyboard('{Enter}')
+
+      await waitFor(() =>
+        expect(router.state.location.search).toEqual({ relationship: 'r-05' }),
+      )
+      expect(await screen.findByTestId('inspector-relationship-context')).toHaveAttribute(
+        'data-relationship-id',
+        'r-05',
+      )
+      expect(document.activeElement).toBe(edge)
+    },
+    CANVAS_TIMEOUT,
+  )
+
+  it(
     'selects a single relationship with Enter and preserves edge focus',
     async () => {
       const user = userEvent.setup()

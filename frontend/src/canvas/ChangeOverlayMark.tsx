@@ -13,9 +13,11 @@ import { overlayLabel, overlayTitle, type ChangeOverlay } from './changeOverlays
  * always renders
  *
  * 1. the state's **icon** (a distinct glyph per state),
- * 2. the state's **label as text** — `geplant`, `aktiv`, `kürzlich angewandt`,
- *    `entfernt` — extended by the operation, so `geplant · entfernen` and
- *    `geplant · hinzufügen` are told apart by words rather than by hue, and
+ * 2. the state's **label as text** at readable levels — `geplant`, `aktiv`,
+ *    `kürzlich angewandt`, `entfernt` — extended by the operation, so
+ *    `geplant · entfernen` and `geplant · hinzufügen` are told apart by words
+ *    rather than by hue; the compact map form keeps that label screen-reader
+ *    only, and
  * 3. a border in the state's **line style** (dashed, double, solid, dotted),
  *
  * with the colour on top of all three. A greyscale screenshot of the canvas
@@ -23,9 +25,9 @@ import { overlayLabel, overlayTitle, type ChangeOverlay } from './changeOverlays
  * `data-operation` make that testable without looking at a single colour.
  *
  * When more than one agent reported for the same element, the count is shown
- * next to the label and every single contribution is listed in the `title`.
- * Nothing is merged away: two agents working on one component must be visible
- * as two.
+ * next to the label at readable zoom and every single contribution is listed
+ * in the `title`. The compact map mark keeps only the state icon; its title
+ * still exposes the complete context without rendering text below 10 px.
  */
 export interface ChangeOverlayMarkProps {
   overlay: ChangeOverlay
@@ -49,8 +51,8 @@ export function ChangeOverlayMark({
     <span
       className={cn(
         // Overlay labels are secondary text. At zoom 0.93 they therefore use
-        // 11 px (10.2 effective px); the compact form keeps only the icon when
-        // even primary text is below its floor.
+        // The compact form keeps only the icon when the map is below the
+        // secondary-text floor; the title remains the detailed fallback.
         'inline-flex max-w-full shrink-0 items-center gap-1 rounded-sm border px-1 py-px text-[11px] leading-tight',
         'bg-card/90',
         className,
@@ -76,7 +78,7 @@ export function ChangeOverlayMark({
       ) : (
         <span className="truncate">{label}</span>
       )}
-      {agentCount > 1 && (
+      {!compact && agentCount > 1 && (
         <span className="inline-flex shrink-0 items-center gap-0.5 font-medium">
           <Users className="size-3" aria-hidden="true" />
           {agentCount}

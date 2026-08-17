@@ -58,6 +58,7 @@
   "edge": {
     "bundleCollapse": "Fold the bundled edge back together",
     "bundleExpand": "Unfold the bundled edge: {{relationships}}",
+    "bundleSelect": "Inspect a relationship in this bundle: {{relationships}}",
     "channel": "Channel: {{value}}",
     "operation": "Operation: {{value}}",
     "protocol": "Protocol: {{value}}"

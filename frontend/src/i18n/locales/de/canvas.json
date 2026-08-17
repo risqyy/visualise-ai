@@ -58,6 +58,7 @@
   "edge": {
     "bundleCollapse": "Sammelkante wieder zusammenklappen",
     "bundleExpand": "Sammelkante aufklappen: {{relationships}}",
+    "bundleSelect": "Eine Beziehung dieser Sammelkante im Inspector anzeigen: {{relationships}}",
     "channel": "Kanal: {{value}}",
     "operation": "Operation: {{value}}",
     "protocol": "Protokoll: {{value}}"

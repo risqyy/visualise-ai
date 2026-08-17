@@ -1,5 +1,6 @@
 import { EdgeLabelRenderer, useStore, type EdgeProps } from '@xyflow/react'
 import type { TFunction } from 'i18next'
+import { Layers2 } from 'lucide-react'
 import { memo, useState, type ReactNode } from 'react'
 import { useTranslation } from 'react-i18next'
 
@@ -38,8 +39,10 @@ import { useDetailLevel } from './useDetailLevel'
  * rendering decision that depends on the zoom level and on what the user asked
  * for — it is never a change to the model:
  *
- * * folded (low zoom, default): one line plus a badge with the count, and the
+ * * folded (readable overview): one line plus a badge with the count, and the
  *   kinds it contains,
+ * * map level: one line plus an icon-only control that selects a member in the
+ *   inspector without putting secondary text below its effective-size floor,
  * * unfolded (high zoom, or after a click on the badge): one line per
  *   relationship, each labelled with a bounded identifier — the topic name for
  *   a NATS topic, the operation for a call. Full reported text stays on the
@@ -148,8 +151,10 @@ function EdgeBadge({
   zIndex,
   onClick,
   title,
+  ariaLabel,
   testId,
   emphasised,
+  iconOnly = false,
   detail,
   shortDetail,
   dimmed = false,
@@ -161,8 +166,11 @@ function EdgeBadge({
   zIndex: number
   onClick?: () => void
   title?: string
+  ariaLabel?: string | undefined
   testId?: string
   emphasised?: boolean
+  /** Render an icon-only action when the camera is below the text floor. */
+  iconOnly?: boolean
   /** Full reported discriminator, shown on focus and selection. */
   detail?: string | null
   /** Bounded discriminator shown in the normal canvas state. */
@@ -177,6 +185,7 @@ function EdgeBadge({
     // Relationship badges are secondary text. An 11 px base keeps their
     // effective size above 10 px in the readable overview (zoom 0.93).
     'pointer-events-auto rounded-sm border px-1 py-px font-mono text-[11px] leading-tight whitespace-nowrap',
+    iconOnly && 'size-7 justify-center p-1',
     emphasised
       ? 'border-ring/70 bg-popover text-foreground'
       : 'border-border bg-popover/95 text-muted-foreground',
@@ -211,11 +220,12 @@ function EdgeBadge({
         title={title}
         aria-current={emphasised ? 'true' : undefined}
         aria-label={
-          detail
+          ariaLabel ??
+          (detail
             ? `${children} · ${detail}`
             : typeof children === 'string'
               ? children
-              : undefined
+              : undefined)
         }
         data-testid={testId}
       >
@@ -399,21 +409,46 @@ export const RelationshipEdge = memo(function RelationshipEdge({
               compact={level === 'minimal'}
             />
           )}
-          {bundled && level !== 'minimal' ? (
+          {bundled ? (
             <EdgeBadge
               point={badgePoint}
               zIndex={edgeLabelZIndex}
-              onClick={() => toggleEdgeExpanded(id)}
+              onClick={() => {
+                if (level === 'minimal') {
+                  const first = resolved[0]
+                  if (!first) return
+                  selectRelationship(
+                    emphasised ? null : first.relationship.relationshipId,
+                  )
+                  return
+                }
+                toggleEdgeExpanded(id)
+              }}
               // The display names are built from reported values; they are
               // interpolated into our sentence, never rewritten.
-              title={t('edge.bundleExpand', {
-                relationships: resolved.map((entry) => entry.displayName).join(', '),
-              })}
+              title={t(
+                level === 'minimal' ? 'edge.bundleSelect' : 'edge.bundleExpand',
+                { relationships: resolved.map((entry) => entry.displayName).join(', ') },
+              )}
+              ariaLabel={
+                level === 'minimal'
+                  ? t('edge.bundleSelect', {
+                      relationships: resolved
+                        .map((entry) => entry.displayName)
+                        .join(', '),
+                    })
+                  : undefined
+              }
               testId={`edge-bundle-${id}`}
+              iconOnly={level === 'minimal'}
               dimmed={dimmed}
               {...(hasSelection ? { onEscape: () => selectRelationship(null) } : {})}
             >
-              {badgeLabel} ▸
+              {level === 'minimal' ? (
+                <Layers2 className="size-4" aria-hidden="true" />
+              ) : (
+                `${badgeLabel} ▸`
+              )}
             </EdgeBadge>
           ) : (
             (level === 'standard' || level === 'full') &&

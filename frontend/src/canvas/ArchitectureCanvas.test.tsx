@@ -332,6 +332,40 @@ describe('architecture canvas — edge bundling stays resolvable', () => {
   )
 
   it(
+    'keeps a bundled relationship inspectable from the icon-only map control',
+    async () => {
+      const user = userEvent.setup()
+      const { router } = renderCanvas()
+      const canvas = await waitForCanvas()
+
+      await user.click(screen.getByTestId('canvas-fit-view'))
+      await waitFor(() => expect(canvas).toHaveAttribute('data-detail-level', 'minimal'))
+
+      const bundle = await screen.findByTestId(`edge-bundle-${BUNDLE_EDGE_ID}`)
+      expect(bundle).toHaveAttribute('title', expect.stringContaining('Inspector'))
+      expect(bundle).toHaveAttribute('aria-label', expect.stringContaining('Inspector'))
+      expect(bundle.querySelector('svg')).toBeInTheDocument()
+      expect(bundle.textContent).not.toContain('NATS')
+
+      // Map-level activation selects a real member, so the inspector can show
+      // the selected relationship and the complete bundle without tiny labels.
+      await user.click(bundle)
+      await waitFor(() =>
+        expect(router.state.location.search).toEqual({ relationship: 'r-05' }),
+      )
+      expect(await screen.findByTestId('inspector-relationship-context')).toHaveAttribute(
+        'data-relationship-id',
+        'r-05',
+      )
+      expect(screen.getByTestId('inspector-relationship-bundle')).toHaveTextContent(
+        'NATS · orders.created',
+      )
+      expect(screen.queryByTestId('edge-label-r-05')).not.toBeInTheDocument()
+    },
+    CANVAS_TIMEOUT,
+  )
+
+  it(
     'selecting one topic of an unfolded bundle marks exactly that relationship',
     async () => {
       const user = userEvent.setup()
