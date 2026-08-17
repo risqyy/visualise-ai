@@ -140,6 +140,58 @@ export function spatialNeighbor(
   return candidates[0]?.node.id ?? null
 }
 
+/**
+ * Chooses the canonical Tab entry for a rendered graph.
+ *
+ * A strict directional neighbour graph can have local minima: the first
+ * projected node is not necessarily a source that can reach every visible
+ * node. Prefer the source with the largest deterministic reachable set, while
+ * preserving the canonical projection order for ties. This keeps one stable
+ * composite entry without weakening the spatial meaning of Arrow keys.
+ */
+export function spatialNavigationEntry(
+  nodes: readonly SpatialNode[],
+  orientation: GraphOrientation,
+  preferredId?: string,
+): string | null {
+  if (nodes.length === 0) return null
+
+  const directions: SpatialDirection[] = ['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight']
+  const orderById = new Map(nodes.map((node, order) => [node.id, order]))
+  const neighborsById = new Map(
+    nodes.map((node) => [
+      node.id,
+      directions
+        .map((direction) => spatialNeighbor(nodes, node.id, direction, orientation))
+        .filter((id): id is string => id !== null),
+    ]),
+  )
+  const reachableCount = (source: string): number => {
+    const reached = new Set([source])
+    const queue = [source]
+    while (queue.length > 0) {
+      const current = queue.shift()
+      if (current === undefined) continue
+      for (const next of neighborsById.get(current) ?? []) {
+        if (!reached.has(next)) {
+          reached.add(next)
+          queue.push(next)
+        }
+      }
+    }
+    return reached.size
+  }
+
+  return [...nodes]
+    .map((node) => ({ id: node.id, reachable: reachableCount(node.id) }))
+    .sort((left, right) => {
+      if (left.reachable !== right.reachable) return right.reachable - left.reachable
+      if (left.id === preferredId) return -1
+      if (right.id === preferredId) return 1
+      return (orderById.get(left.id) ?? 0) - (orderById.get(right.id) ?? 0)
+    })[0]?.id ?? null
+}
+
 function centerOf(node: SpatialNode): { x: number; y: number } {
   return { x: node.x + node.width / 2, y: node.y + node.height / 2 }
 }

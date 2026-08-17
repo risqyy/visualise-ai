@@ -1,6 +1,11 @@
 import { describe, expect, it } from 'vitest'
 
-import { spatialNeighbor, toSpatialNodes, type SpatialNode } from './spatialNavigation'
+import {
+  spatialNavigationEntry,
+  spatialNeighbor,
+  toSpatialNodes,
+  type SpatialNode,
+} from './spatialNavigation'
 
 const nodes: SpatialNode[] = [
   { id: 'source', x: 100, y: 100, width: 40, height: 40, order: 0 },
@@ -37,6 +42,37 @@ describe('spatialNeighbor', () => {
       { id: 'source', x: 0, y: 0, width: 20, height: 20, order: 2 },
     ]
     expect(spatialNeighbor(tied, 'source', 'ArrowDown', 'top-down')).toBe('alpha')
+  })
+
+  it('chooses an entry that reaches a formerly stranded spatial subgraph', () => {
+    const formerlyStranded: SpatialNode[] = [
+      { id: 'source', x: 19, y: 18, width: 20, height: 20, order: 0 },
+      { id: 'north-west', x: 1, y: 15, width: 20, height: 20, order: 1 },
+      { id: 'north-east', x: 18, y: 14, width: 20, height: 20, order: 2 },
+      { id: 'west', x: 8, y: 13, width: 20, height: 20, order: 3 },
+      { id: 'centre', x: 10, y: 11, width: 20, height: 20, order: 4 },
+      { id: 'lower-west', x: 4, y: 3, width: 20, height: 20, order: 5 },
+      { id: 'east', x: 17, y: 8, width: 20, height: 20, order: 6 },
+      { id: 'lower-east', x: 18, y: 2, width: 20, height: 20, order: 7 },
+    ]
+
+    expect(spatialNavigationEntry(formerlyStranded, 'top-down', 'source')).toBe('lower-west')
+
+    const reached = new Set(['lower-west'])
+    const queue = ['lower-west']
+    while (queue.length > 0) {
+      const current = queue.shift()
+      if (current === undefined) continue
+      for (const direction of ['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'] as const) {
+        const next = spatialNeighbor(formerlyStranded, current, direction, 'top-down')
+        if (next !== null && !reached.has(next)) {
+          reached.add(next)
+          queue.push(next)
+        }
+      }
+    }
+
+    expect(reached).toEqual(new Set(formerlyStranded.map((node) => node.id)))
   })
 })
 

@@ -85,6 +85,7 @@ import {
 import type { GraphOrientation } from './graphOrientation'
 import { CanvasNodeActionsContext, type CanvasNodeActions } from './nodeActions'
 import {
+  spatialNavigationEntry,
   spatialNeighbor,
   toSpatialNodes,
   type SpatialDirection,
@@ -328,15 +329,6 @@ function ArchitectureCanvasInner({
   // camera change never re-mounts the flow.
   const [initialViewport] = useState<Viewport>(() => useUiStore.getState().camera)
 
-  // `graph.nodes` is already what `collapse.ts` left visible, so the accessible
-  // names describe exactly the boxes that are drawn — a component behind a
-  // closed container is not a tab stop and is not named as one.
-  const visibleNodeIds = useMemo(() => new Set(graph.nodes.map((node) => node.id)), [graph.nodes])
-  const rovingNodeId = useMemo(() => {
-    if (focusedNodeId !== null && visibleNodeIds.has(focusedNodeId)) return focusedNodeId
-    return graph.nodes[0]?.id ?? null
-  }, [focusedNodeId, graph.nodes, visibleNodeIds])
-
   const positionedNodes = useMemo(
     () => {
       const relatedNodeIds = new Set(
@@ -370,6 +362,20 @@ function ArchitectureCanvasInner({
       visualSelectedRelationshipId,
     ],
   )
+
+  const spatialNodes = useMemo(() => toSpatialNodes(positionedNodes), [positionedNodes])
+  const navigationEntryId = useMemo(
+    () => spatialNavigationEntry(spatialNodes, orientation, graph.nodes[0]?.id),
+    [graph.nodes, orientation, spatialNodes],
+  )
+  // `graph.nodes` is already what `collapse.ts` left visible, so the accessible
+  // names describe exactly the boxes that are drawn — a component behind a
+  // closed container is not a tab stop and is not named as one.
+  const visibleNodeIds = useMemo(() => new Set(graph.nodes.map((node) => node.id)), [graph.nodes])
+  const rovingNodeId = useMemo(() => {
+    if (focusedNodeId !== null && visibleNodeIds.has(focusedNodeId)) return focusedNodeId
+    return navigationEntryId ?? graph.nodes[0]?.id ?? null
+  }, [focusedNodeId, graph.nodes, navigationEntryId, visibleNodeIds])
 
   const nodes = useMemo(
     () => withNodeAccessibility(positionedNodes, voice, rovingNodeId),
@@ -830,9 +836,9 @@ function ArchitectureCanvasInner({
 
   // A collapse, orientation change or live replacement can remove the node
   // that owns the roving entry. Keep the entry on the nearest visible ancestor
-  // where possible, otherwise use the first node in the canonical projection
-  // order. Wait for the new layout so a stale in-flight graph cannot steal the
-  // focus state back while ELK is solving.
+  // where possible, otherwise use the deterministic spatial entry. Wait for
+  // the new layout so a stale in-flight graph cannot steal the focus state back
+  // while ELK is solving.
   const graphNodes = graph.nodes
   const graphAncestorsOf = graph.ancestorsOf
   const graphIsRelayouting = graph.isRelayouting
@@ -845,9 +851,10 @@ function ArchitectureCanvasInner({
         ? current
         : current !== null
           ? [...graphAncestorsOf(current)].reverse().find((id) => visibleNodeIds.has(id)) ??
+            navigationEntryId ??
             graphNodes[0]?.id ??
             null
-          : graphNodes[0]?.id ?? null
+          : navigationEntryId ?? graphNodes[0]?.id ?? null
     if (fallback === current) return
 
     // Defer the state write to the next microtask. `rovingNodeId` already
@@ -875,6 +882,7 @@ function ArchitectureCanvasInner({
     graphIsRelayouting,
     graphNodes,
     visibleNodeIds,
+    navigationEntryId,
   ])
 
   // Endpoint names for the edge labels. Derived from the laid-out graph rather
@@ -1085,8 +1093,6 @@ function ArchitectureCanvasInner({
     },
     [setNodePosition],
   )
-
-  const spatialNodes = useMemo(() => toSpatialNodes(positionedNodes), [positionedNodes])
 
   const focusSpatialNode = useCallback(
     (componentId: ComponentId, direction: SpatialDirection) => {

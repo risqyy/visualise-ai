@@ -687,63 +687,60 @@ test('2 · the self run supports a complete spatial keyboard walk and safe focus
     | 'top-down'
     | 'left-right'
   const visited = new Set<string>([entryId!])
-  const keyboardReachable = new Set<string>([entryId!])
+  const geometry = await page.locator('.react-flow__node').evaluateAll((elements) =>
+    elements.map((element, order) => {
+      const rect = element.getBoundingClientRect()
+      return {
+        id: element.getAttribute('data-id') ?? '',
+        x: rect.x,
+        y: rect.y,
+        width: rect.width,
+        height: rect.height,
+        order,
+      }
+    }),
+  )
+  const pathsFromEntry = spatialPaths(geometry, entryId!, orientation)
+  const keyboardReachable = new Set(pathsFromEntry.keys())
+  let current = entryId!
 
-  // A directed spatial-neighbour graph need not have one Hamiltonian walk: a
-  // local minimum can make a branch unreachable from the current node. Probe
-  // every reachable target from the canonical entry instead. Each re-entry is
-  // keyboard-only (Tab reaches the one roving node); every target transition
-  // below is therefore an actual Arrow-key result, never a synthetic focus.
+  // The walk starts at the one real Tab entry and reaches every visible node
+  // through actual Arrow transitions. When the next target is not directly
+  // reachable from the current node, the deterministic route returns to the
+  // canonical entry using arrows before taking the entry-to-target route. No
+  // target is focused by the test harness, and every transition is asserted
+  // against the same rendered rectangles used by the application.
   for (const target of nodeIds) {
     if (target === entryId) continue
-    await page.reload()
-    await expect(page.getByTestId('live-connection-state')).toHaveAttribute(
-      'data-state',
-      'live',
-    )
-    await expect(canvas).toBeVisible()
-    await expect(canvas).toHaveAttribute('data-layouting', 'false')
-    await showWholeModel(page)
-
-    const reenteredId = await enterGraphWithKeyboard(page)
-    expect(reenteredId).toBe(entryId)
-    const routeGeometry = await page.locator('.react-flow__node').evaluateAll((elements) =>
-      elements.map((element, order) => {
-        const rect = element.getBoundingClientRect()
-        return {
-          id: element.getAttribute('data-id') ?? '',
-          x: rect.x,
-          y: rect.y,
-          width: rect.width,
-          height: rect.height,
-          order,
-        }
-      }),
-    )
-    const routePaths = spatialPaths(routeGeometry, entryId!, orientation)
-    for (const reachableId of routePaths.keys()) keyboardReachable.add(reachableId)
-    const path = routePaths.get(target)
-    if (path === undefined) continue
-    let current = reenteredId
-    for (const direction of path) {
+    const path = pathsFromEntry.get(target)
+    expect(path, `canonical entry cannot reach visible target ${target}`).toBeDefined()
+    let route = spatialPaths(geometry, current, orientation).get(target)
+    if (route === undefined) {
+      const toEntry = spatialPaths(geometry, current, orientation).get(entryId!)
+      expect(toEntry, `focused node ${current} cannot return to canonical entry`).toBeDefined()
+      route = [...(toEntry ?? []), ...(path ?? [])]
+    }
+    let currentNode = current
+    for (const direction of route) {
       await page.keyboard.press(direction)
       const next = await page.evaluate(() =>
         document.activeElement?.closest('.react-flow__node')?.getAttribute('data-id') ?? null,
       )
       expect(next).not.toBeNull()
-      const expected = spatialNext(routeGeometry, current, direction, orientation)
+      const expected = spatialNext(geometry, currentNode, direction, orientation)
       expect(
         next,
-        `target=${target} source=${current} direction=${direction} expected=${expected ?? current}`,
-      ).toBe(expected ?? current)
-      current = next!
+        `target=${target} source=${currentNode} direction=${direction} expected=${expected ?? currentNode}`,
+      ).toBe(expected ?? currentNode)
+      currentNode = next!
     }
+    current = currentNode
     expect(current).toBe(target)
     visited.add(target)
     await expect(page.locator('.react-flow__node[tabindex="0"]')).toHaveCount(1)
   }
-  expect([...visited].sort()).toEqual([...keyboardReachable].sort())
-  expect(visited.size).toBeGreaterThan(10)
+  expect([...visited].sort()).toEqual([...nodeIds].sort())
+  expect([...keyboardReachable].sort()).toEqual([...nodeIds].sort())
 
   // At a larger zoom the model extends beyond the pane. An arrow transition
   // into an off-screen neighbour must pan while preserving the scale.

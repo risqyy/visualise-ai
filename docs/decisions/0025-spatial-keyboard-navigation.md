@@ -20,13 +20,18 @@ Arrow keys use the absolute rectangles of the current React Flow layout,
 including accumulated parent positions. A candidate must lie in the requested
 half-plane; distance on the requested axis, alignment on the other axis, the
 orientation's reading axis, and finally the stable component id provide
-deterministic tie-breaking. The focused node is selected/opened only by Enter
-or Space. Moving focus pans the viewport when necessary through the existing
-focus camera policy and preserves zoom; it never changes node positions.
+deterministic tie-breaking. The canonical Tab entry is chosen from the visible
+layout as the node whose directional neighbour graph reaches the largest
+deterministic set of visible nodes; the canonical projection order breaks equal
+scores. This prevents a local spatial minimum from stranding a visible branch
+while preserving the directional meaning of each Arrow transition. The focused
+node is selected/opened only by Enter or Space. Moving focus pans the viewport
+when necessary through the existing focus camera policy and preserves zoom; it
+never changes node positions.
 
 When a relayout, collapse/expand, orientation change, live update or removal
 invalidates the focused id, focus falls back to the nearest visible ancestor
-or the first visible canonical node. The German and English graph instructions
+or the visible spatial entry. The German and English graph instructions
 describe the single Tab entry, spatial arrows, pan-without-zoom behavior and
 independent node controls.
 
@@ -41,5 +46,7 @@ this decision or this branch.
 
 The graph no longer exposes every node or relationship as a linear Tab walk;
 keyboard users discover spatial neighbors instead. The interaction is stable
-for both top-down and left-right layouts, but tests and future layout changes
-must continue to use the actual laid-out rectangles rather than model order.
+for both top-down and left-right layouts, and the canonical entry is computed
+from reachability rather than blindly taking the first projection item. Tests
+and future layout changes must continue to use the actual laid-out rectangles
+rather than model order.
