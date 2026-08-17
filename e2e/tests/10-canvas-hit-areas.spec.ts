@@ -1,4 +1,4 @@
-import { expect, test, type Page } from '@playwright/test'
+import { expect, test, type Locator, type Page } from '@playwright/test'
 
 import { BASE_URL, MAIN_PROJECT, MAIN_RUN } from '../src/config.js'
 import { showWholeModel } from '../src/canvas.js'
@@ -65,6 +65,40 @@ async function assertTarget(
   expect(box!.height, `${label}: height`).toBeGreaterThanOrEqual(
     minimum - BROWSER_GEOMETRY_TOLERANCE,
   )
+}
+
+/**
+ * Returns the first target whose complete browser box is inside the canvas.
+ * React Flow can keep an off-screen node in the DOM after zooming; a normal
+ * user click cannot activate that control, so the interaction check must use
+ * the same visible geometry rather than relying on DOM order alone.
+ */
+async function firstCanvasViewportTarget(
+  page: Page,
+  selector: string,
+  label: string,
+): Promise<Locator> {
+  const targets = page.locator(selector)
+  const index = await targets.evaluateAll((elements) => {
+    const canvas = document.querySelector('[data-testid="architecture-canvas"]')
+    if (!canvas) return -1
+    const canvasBox = canvas.getBoundingClientRect()
+    return elements.findIndex((element) => {
+      const box = element.getBoundingClientRect()
+      return (
+        box.width > 0 &&
+        box.height > 0 &&
+        box.left >= canvasBox.left &&
+        box.right <= canvasBox.right &&
+        box.top >= canvasBox.top &&
+        box.bottom <= canvasBox.bottom
+      )
+    })
+  })
+  expect(index, `${label}: no target fully inside the canvas viewport`).toBeGreaterThanOrEqual(0)
+  const target = targets.nth(index)
+  await expect(target, `${label}: target is not visible`).toBeVisible()
+  return target
 }
 
 /**
@@ -226,9 +260,13 @@ test('10 · canvas hit areas stay measurable at several zoom levels for fine and
       // gesture. Disclosure relayouts the graph but never moves the camera;
       // selecting a relationship must not move it either.
       const canvas = page.getByTestId('architecture-canvas')
+      const disclosure = await firstCanvasViewportTarget(
+        page,
+        '[data-testid^="node-disclosure-"]',
+        `${pointer.name} disclosure interaction`,
+      )
       const beforeTransform = await viewportTransform(page)
       const beforeFitCount = await canvas.getAttribute('data-fit-view-count')
-      const disclosure = page.locator('[data-testid^="node-disclosure-"]').first()
       const wasExpanded = (await disclosure.getAttribute('aria-expanded')) === 'true'
       await disclosure.click()
       await expect(disclosure).toHaveAttribute('aria-expanded', wasExpanded ? 'false' : 'true')
@@ -236,11 +274,11 @@ test('10 · canvas hit areas stay measurable at several zoom levels for fine and
       await expect(canvas).toHaveAttribute('data-fit-view-count', beforeFitCount ?? '')
       expect(await viewportTransform(page)).toBe(beforeTransform)
 
-      const relationship = page
-        .locator(
-          '[data-testid^="edge-bundle-"], [data-testid^="edge-label-"], [data-testid^="edge-collapse-"]',
-        )
-        .first()
+      const relationship = await firstCanvasViewportTarget(
+        page,
+        '[data-testid^="edge-bundle-"], [data-testid^="edge-label-"], [data-testid^="edge-collapse-"]',
+        `${pointer.name} relationship interaction`,
+      )
       await relationship.click()
       await expect(canvas).toHaveAttribute('data-fit-view-count', beforeFitCount ?? '')
       expect(await viewportTransform(page)).toBe(beforeTransform)
