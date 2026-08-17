@@ -455,10 +455,61 @@ test('2 · arrow navigation exposes the active result and deep links keep jump e
   const pane = page.locator('.react-flow__pane')
   const paneBox = await pane.boundingBox()
   expect(paneBox).not.toBeNull()
-  await page.mouse.move(paneBox!.x + paneBox!.width / 2, paneBox!.y + paneBox!.height / 2)
+
+  // The deep link may already be visible in the initial camera. Start on an
+  // actually empty part of the React Flow pane so this is a canvas pan, not a
+  // drag of whichever node happens to be under its centre at this layout.
+  const pan = await page.evaluate(() => {
+    const pane = document.querySelector<HTMLElement>('.react-flow__pane')
+    const selected = document.querySelector<HTMLElement>(
+      '[data-testid="canvas-node-shop-platform.orders.domain.pricing"]',
+    )
+    if (pane === null || selected === null) return null
+
+    const paneRect = pane.getBoundingClientRect()
+    const selectedRect = selected.getBoundingClientRect()
+    const moveRight =
+      selectedRect.left + selectedRect.width / 2 >= paneRect.left + paneRect.width / 2
+    const startColumns = moveRight
+      ? [paneRect.left + 32, paneRect.left + 64, paneRect.left + paneRect.width * 0.25]
+      : [paneRect.right - 32, paneRect.right - 64, paneRect.left + paneRect.width * 0.75]
+    const rows = [
+      paneRect.top + 32,
+      paneRect.top + paneRect.height * 0.25,
+      paneRect.top + paneRect.height * 0.5,
+      paneRect.top + paneRect.height * 0.75,
+      paneRect.bottom - 32,
+    ]
+    const start = startColumns
+      .flatMap((x) => rows.map((y) => ({ x, y })))
+      .find(({ x, y }) => {
+        const target = document.elementFromPoint(x, y)
+        return (
+          target?.closest('.react-flow__pane') === pane &&
+          target.closest(
+            '.react-flow__node, .react-flow__panel, .react-flow__controls, .react-flow__minimap, .react-flow__attribution',
+          ) === null
+        )
+      })
+    if (start === undefined) return null
+
+    return {
+      start,
+      end: {
+        x: moveRight ? paneRect.right - 16 : paneRect.left + 16,
+        y: start.y,
+      },
+    }
+  })
+  expect(pan).not.toBeNull()
+  const viewportBeforePan = await page.locator('.react-flow__viewport').getAttribute('style')
+  await page.mouse.move(pan!.start.x, pan!.start.y)
   await page.mouse.down()
-  await page.mouse.move(paneBox!.x + paneBox!.width / 2 + 700, paneBox!.y + paneBox!.height / 2)
+  await page.mouse.move(pan!.end.x, pan!.end.y, { steps: 8 })
   await page.mouse.up()
+  await expect
+    .poll(() => page.locator('.react-flow__viewport').getAttribute('style'))
+    .not.toBe(viewportBeforePan)
 
   const jump = page.getByTestId('canvas-jump-to-selection')
   await expect(jump).toBeVisible()
