@@ -12,6 +12,10 @@ import { showWholeModel } from '../src/canvas.js'
 const VIEWPORT = { width: 1920, height: 1080 } as const
 const DESKTOP_TARGET = 32
 const COARSE_TARGET = 44
+// Chromium can serialize the computed SVG stroke and its transform as a
+// fraction just below the mathematical value. Keep this tolerance exclusive
+// to the derived SVG stroke measurement; HTML hit-area boxes stay exact.
+const SVG_STROKE_TOLERANCE = 0.01
 const CANVAS_URL = `/projects/${MAIN_PROJECT}/runs/${MAIN_RUN}`
 
 const TOOLBAR_ACTIONS = [
@@ -100,9 +104,10 @@ async function assertRelationshipAction(
       effectiveStrokeWidth: strokeWidth * zoom,
     }
   })
-  expect(measurement.effectiveStrokeWidth, `${label}: effective edge hit width`).toBeGreaterThanOrEqual(
-    minimum,
-  )
+  expect(
+    measurement.effectiveStrokeWidth,
+    `${label}: effective edge hit width (SVG tolerance ${SVG_STROKE_TOLERANCE}px)`,
+  ).toBeGreaterThanOrEqual(minimum - SVG_STROKE_TOLERANCE)
   expect(
     Math.max(measurement.width, measurement.height),
     `${label}: edge path has no measurable browser box`,
