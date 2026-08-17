@@ -121,7 +121,7 @@ async function waitForCanvas(): Promise<HTMLElement> {
   return canvas
 }
 
-/** Every node React Flow made a tab stop, as the accessibility tree sees it. */
+/** Every visible component node, including its roving tab state. */
 function nodeElements(): HTMLElement[] {
   return [...document.querySelectorAll<HTMLElement>('.react-flow__node')]
 }
@@ -147,13 +147,17 @@ describe('accessible architecture graph — every node arrives named', () => {
 
       const nodes = nodeElements()
       expect(nodes.length).toBe(NESTED_COMPONENTS.length)
+      expect(nodes.filter((node) => node.getAttribute('tabindex') === '0')).toHaveLength(1)
+      expect(nodes.filter((node) => node.getAttribute('tabindex') === '-1')).toHaveLength(
+        nodes.length - 1,
+      )
 
       const names: string[] = []
       for (const node of nodes) {
         // Before this change every one of these was an *unnamed* group. The
         // role stays `group` — a container holds a real disclosure button, and
         // a widget role would make that child presentational.
-        expect(node).toHaveAttribute('tabindex', '0')
+        expect(node).toHaveAttribute('tabindex', expect.stringMatching(/^(0|-1)$/))
         expect(node).toHaveAttribute('role', 'group')
         const name = node.getAttribute('aria-label')
         expect(name).toBeTruthy()
@@ -222,6 +226,7 @@ describe('accessible architecture graph — every node arrives named', () => {
       const edges = [...document.querySelectorAll('.react-flow__edge')]
       expect(edges.length).toBeGreaterThan(0)
       for (const edge of edges) {
+        expect(edge).toHaveAttribute('tabindex', '-1')
         const name = edge.getAttribute('aria-label') ?? ''
         expect(name).not.toMatch(/^Edge from /)
         expect(name).toContain('Beziehung von ')
@@ -417,6 +422,59 @@ describe('accessible architecture graph — selection by keyboard alone', () => 
       const live = [...document.querySelectorAll('[aria-live]')]
       expect(live.length).toBeGreaterThan(0)
       for (const region of live) expect(region.textContent).toBe('')
+    },
+    CANVAS_TIMEOUT,
+  )
+
+  it(
+    'roves one graph tab stop spatially without moving nodes',
+    async () => {
+      const user = userEvent.setup()
+      const { router } = renderGraph()
+      const canvas = await waitForCanvas()
+      const nodes = nodeElements()
+      const entry = nodes.find((node) => node.getAttribute('tabindex') === '0')
+      expect(entry).not.toBeUndefined()
+      const entryId = entry?.getAttribute('data-id')
+      const entryTransform = entry?.style.transform
+      const zoom = canvas.getAttribute('data-canvas-zoom')
+      let next: Element | null = null
+      for (const key of ['ArrowDown', 'ArrowRight', 'ArrowUp', 'ArrowLeft']) {
+        entry?.focus()
+        await user.keyboard(`{${key}}`)
+        if (document.activeElement !== entry) {
+          next = document.activeElement
+          break
+        }
+      }
+
+      expect(next).not.toBeNull()
+      expect(next).toHaveClass('react-flow__node')
+      expect(next).not.toBe(entry)
+      expect(next).toHaveAttribute('tabindex', '0')
+      expect(nodes.filter((node) => node.getAttribute('tabindex') === '0')).toHaveLength(1)
+      expect(entry).toHaveAttribute('tabindex', '-1')
+      expect(entry?.getAttribute('data-id')).toBe(entryId)
+      expect(entry?.style.transform).toBe(entryTransform)
+      expect(router.state.location.search).toEqual({})
+      expect(canvas).toHaveAttribute('data-canvas-zoom', zoom ?? '')
+    },
+    CANVAS_TIMEOUT,
+  )
+
+  it(
+    'does not capture arrow keys from an interactive disclosure control',
+    async () => {
+      const user = userEvent.setup()
+      renderGraph()
+      await waitForCanvas()
+
+      const disclosure = within(nodeElement('platform.core')).getByRole('button')
+      disclosure.focus()
+      await user.keyboard('{ArrowRight}')
+
+      expect(document.activeElement).toBe(disclosure)
+      expect(disclosure).toHaveAttribute('aria-expanded', 'true')
     },
     CANVAS_TIMEOUT,
   )

@@ -34,6 +34,7 @@ import {
   useMemo,
   useRef,
   useState,
+  type FocusEvent as ReactFocusEvent,
   type KeyboardEvent as ReactKeyboardEvent,
 } from 'react'
 import { useTranslation } from 'react-i18next'
@@ -84,6 +85,11 @@ import {
 import type { GraphOrientation } from './graphOrientation'
 import { CanvasNodeActionsContext, type CanvasNodeActions } from './nodeActions'
 import {
+  spatialNeighbor,
+  toSpatialNodes,
+  type SpatialDirection,
+} from './spatialNavigation'
+import {
   applyTemporaryPositions,
   routesInvalidatedByDrag,
   useArchitectureGraph,
@@ -107,7 +113,9 @@ import { useCanvasVoice } from './useCanvasVoice'
  *    pick a drag up as a domain change.
  * 3. **The camera is the user's.** `fitView` runs on the first model of a
  *    project and on an explicit click, never because data arrived.
- * 4. **The first picture is readable.** The automatic camera never goes below
+ * 4. **Keyboard focus is spatial.** Visible nodes share one roving Tab entry;
+ *    arrow keys move focus through the actual layout and never move a node.
+ * 5. **The first picture is readable.** The automatic camera never goes below
  *    `MIN_READABLE_ZOOM`, and a project opens on its top levels with deeper
  *    containers collapsed (`collapse.ts`). Both are undone by the explicit
  *    spatial "Gesamtkarte", never by anything the data does.
@@ -126,10 +134,8 @@ const EDGE_TYPES = ARCHITECTURE_EDGE_TYPES
 
 /**
  * Arrow keys reach React Flow's node handler, which announces "Moved selected
- * node …" over an aria-live region. Nothing moves: the graph is fully
- * controlled and has no `onNodesChange`, so the position change is dropped. The
- * canvas therefore stops the keys before that announcement can be made — a
- * screen reader must never be told about a change that did not happen.
+ * node …" over an aria-live region. This graph owns spatial focus instead, so
+ * the canvas stops the keys before React Flow can move or announce a node.
  */
 const ARROW_KEYS = new Set(['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'])
 
@@ -227,6 +233,10 @@ function ArchitectureCanvasInner({
   const [searchOpen, setSearchOpen] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
   const [activeSearchIndex, setActiveSearchIndex] = useState(0)
+  // The graph is a composite widget: one visible node owns the Tab entry and
+  // arrow keys move focus spatially without changing the URL selection.
+  const [focusedNodeId, setFocusedNodeId] = useState<ComponentId | null>(null)
+  const graphHasNodeFocusRef = useRef(false)
   const searchInputRef = useRef<HTMLInputElement | null>(null)
   const searchTriggerRef = useRef<HTMLButtonElement | null>(null)
   const wasSearchOpenRef = useRef(false)
@@ -321,7 +331,13 @@ function ArchitectureCanvasInner({
   // `graph.nodes` is already what `collapse.ts` left visible, so the accessible
   // names describe exactly the boxes that are drawn — a component behind a
   // closed container is not a tab stop and is not named as one.
-  const nodes = useMemo(
+  const visibleNodeIds = useMemo(() => new Set(graph.nodes.map((node) => node.id)), [graph.nodes])
+  const rovingNodeId = useMemo(() => {
+    if (focusedNodeId !== null && visibleNodeIds.has(focusedNodeId)) return focusedNodeId
+    return graph.nodes[0]?.id ?? null
+  }, [focusedNodeId, graph.nodes, visibleNodeIds])
+
+  const positionedNodes = useMemo(
     () => {
       const relatedNodeIds = new Set(
         visualSelectedRelationshipId === null
@@ -344,7 +360,7 @@ function ArchitectureCanvasInner({
           ? { ...node, data: { ...node.data, relationshipSelected: true } }
           : node,
       )
-      return withNodeAccessibility(positioned, voice)
+      return positioned
     },
     [
       graph.edges,
@@ -352,8 +368,12 @@ function ArchitectureCanvasInner({
       nodePositions,
       selectedComponentId,
       visualSelectedRelationshipId,
-      voice,
     ],
+  )
+
+  const nodes = useMemo(
+    () => withNodeAccessibility(positionedNodes, voice, rovingNodeId),
+    [positionedNodes, rovingNodeId, voice],
   )
 
   /**
@@ -808,6 +828,55 @@ function ArchitectureCanvasInner({
     focusComponentInView(componentId)
   }, [focusComponentInView, graph.isRelayouting, graph.nodes.length, graph.signature])
 
+  // A collapse, orientation change or live replacement can remove the node
+  // that owns the roving entry. Keep the entry on the nearest visible ancestor
+  // where possible, otherwise use the first node in the canonical projection
+  // order. Wait for the new layout so a stale in-flight graph cannot steal the
+  // focus state back while ELK is solving.
+  const graphNodes = graph.nodes
+  const graphAncestorsOf = graph.ancestorsOf
+  const graphIsRelayouting = graph.isRelayouting
+  useEffect(() => {
+    if (graphIsRelayouting) return
+
+    const current = focusedNodeId
+    const fallback =
+      current !== null && visibleNodeIds.has(current)
+        ? current
+        : current !== null
+          ? graphAncestorsOf(current).find((id) => visibleNodeIds.has(id)) ??
+            graphNodes[0]?.id ??
+            null
+          : graphNodes[0]?.id ?? null
+    if (fallback === current) return
+
+    // Defer the state write to the next microtask. `rovingNodeId` already
+    // derives the valid fallback during this render, and the deferred write
+    // avoids a cascading render directly from the synchronization effect.
+    queueMicrotask(() =>
+      setFocusedNodeId((previous) => (previous === current ? fallback : previous)),
+    )
+    if (!graphHasNodeFocusRef.current) return
+
+    const active = document.activeElement
+    const activeNode = active instanceof HTMLElement ? active.closest('.react-flow__node') : null
+    const activeNodeId = activeNode?.getAttribute('data-id')
+    if (active !== document.body && activeNodeId !== current) return
+
+    queueMicrotask(() => {
+      const next = [...document.querySelectorAll<HTMLElement>('.react-flow__node')].find(
+        (element) => element.getAttribute('data-id') === fallback,
+      )
+      next?.focus()
+    })
+  }, [
+    focusedNodeId,
+    graphAncestorsOf,
+    graphIsRelayouting,
+    graphNodes,
+    visibleNodeIds,
+  ])
+
   // Endpoint names for the edge labels. Derived from the laid-out graph rather
   // than from `nodes`, so a selection — which changes nothing an edge says —
   // does not rebuild every edge. `collapse.ts` lifts a hidden endpoint onto its
@@ -1017,6 +1086,43 @@ function ArchitectureCanvasInner({
     [setNodePosition],
   )
 
+  const spatialNodes = useMemo(() => toSpatialNodes(positionedNodes), [positionedNodes])
+
+  const focusSpatialNode = useCallback(
+    (componentId: ComponentId, direction: SpatialDirection) => {
+      const nextId = spatialNeighbor(spatialNodes, componentId, direction, orientation)
+      if (nextId === null) return
+
+      setFocusedNodeId(nextId)
+      // This helper preserves the current zoom and only pans when needed. It
+      // also makes keyboard focus reliable in browsers where programmatic
+      // focus does not match React Flow's :focus-visible auto-pan check.
+      focusComponentInView(nextId)
+      const next = [...document.querySelectorAll<HTMLElement>('.react-flow__node')].find(
+        (element) => element.getAttribute('data-id') === nextId,
+      )
+      next?.focus()
+    },
+    [focusComponentInView, orientation, spatialNodes],
+  )
+
+  const onSurfaceFocusCapture = useCallback((event: ReactFocusEvent<HTMLDivElement>) => {
+    const target = event.target
+    if (!(target instanceof Element)) return
+    const node = target.closest('.react-flow__node')
+    const componentId = node?.getAttribute('data-id')
+    if (componentId === null || componentId === undefined) return
+    graphHasNodeFocusRef.current = true
+    setFocusedNodeId(componentId)
+  }, [])
+
+  const onSurfaceBlurCapture = useCallback((event: ReactFocusEvent<HTMLDivElement>) => {
+    const next = event.relatedTarget
+    if (!(next instanceof globalThis.Node) || !surfaceRef.current?.contains(next)) {
+      graphHasNodeFocusRef.current = false
+    }
+  }, [])
+
   // React Flow passes `null` for a programmatic move and the real input event
   // for a user one — which is exactly the distinction the camera policy needs.
   const onMoveStart = useCallback((event: unknown) => {
@@ -1107,8 +1213,14 @@ function ArchitectureCanvasInner({
           onSelectComponent(null)
           return
         }
-        // Swallowed, never announced. See ARROW_KEYS.
-        if (ARROW_KEYS.has(event.key)) event.stopPropagation()
+        if (ARROW_KEYS.has(event.key)) {
+          // Spatial navigation owns the arrow keys. React Flow's default
+          // handler would otherwise try to move a selected node and announce
+          // a position update that this controlled, read-only graph discards.
+          event.preventDefault()
+          event.stopPropagation()
+          focusSpatialNode(componentId, event.key as SpatialDirection)
+        }
         return
       }
 
@@ -1156,6 +1268,7 @@ function ArchitectureCanvasInner({
       setStoredSelectedRelationshipId,
       detailLevel,
       openSearch,
+      focusSpatialNode,
       toggleEdgeExpanded,
     ],
   )
@@ -1243,6 +1356,8 @@ function ArchitectureCanvasInner({
     <div
       ref={surfaceRef}
       className="relative h-full w-full min-w-0"
+      onFocusCapture={onSurfaceFocusCapture}
+      onBlurCapture={onSurfaceBlurCapture}
       onKeyDownCapture={onSurfaceKeyDownCapture}
       data-testid="architecture-canvas"
       data-fit-view-count={fitViewCount}
@@ -1287,6 +1402,7 @@ function ArchitectureCanvasInner({
           onMoveEnd={onMoveEnd}
           nodesDraggable
           nodesConnectable={false}
+          edgesFocusable
           edgesReconnectable={false}
           elementsSelectable
           // Selection is owned by the URL, so React Flow must not manage its own.
