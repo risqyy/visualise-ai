@@ -161,6 +161,34 @@ describe('architecture canvas — rendering', () => {
     },
     CANVAS_TIMEOUT,
   )
+
+  it(
+    'keeps a nested edge label above its own SVG hit path',
+    async () => {
+      renderCanvas()
+      await waitForCanvas()
+
+      const label = await screen.findByTestId(`edge-bundle-${BUNDLE_EDGE_ID}`)
+      const edgeGroup = document.querySelector<SVGGElement>(
+        `.react-flow__edge[data-id="${BUNDLE_EDGE_ID}"]`,
+      )
+      const edgeSvg = edgeGroup?.closest('svg')
+      const renderer = document.querySelector<HTMLElement>(
+        '.react-flow__edgelabel-renderer',
+      )
+
+      expect(edgeSvg).not.toBeNull()
+      expect(renderer).not.toBeNull()
+      // The portal stays unstacked. The label itself carries the contextual
+      // z-index, so a deeper parent chain cannot put its transparent SVG hit
+      // path in front of the button.
+      expect(renderer).not.toHaveStyle({ zIndex: '1' })
+      expect(Number(label.style.zIndex)).toBeGreaterThan(
+        Number(edgeSvg?.style.zIndex ?? 0),
+      )
+    },
+    CANVAS_TIMEOUT,
+  )
 })
 
 describe('architecture canvas — colour-independent relationship kinds', () => {
@@ -218,6 +246,36 @@ describe('architecture canvas — colour-independent relationship kinds', () => 
 
 describe('architecture canvas — edge bundling stays resolvable', () => {
   it(
+    'selects a single relationship from its line in the overview',
+    async () => {
+      const user = userEvent.setup()
+      const { router } = renderCanvas()
+      const canvas = await waitForCanvas()
+
+      // The initial fit intentionally stays readable. Explicitly fitting the
+      // whole model gives this test the actual overview interaction state.
+      await user.click(screen.getByTestId('canvas-fit-view'))
+      await waitFor(() => expect(canvas).toHaveAttribute('data-detail-level', 'overview'))
+
+      // Individual labels stay hidden at overview so the graph does not become
+      // a wall of long reported values. The line itself remains the hit target.
+      expect(screen.queryByTestId('edge-label-r-01')).not.toBeInTheDocument()
+      await user.click(
+        screen.getByTestId('edge-path-rel:platform.api.http.router~>platform.core.orders'),
+      )
+
+      await waitFor(() =>
+        expect(router.state.location.search).toEqual({ relationship: 'r-01' }),
+      )
+      expect(await screen.findByTestId('inspector-relationship-context')).toHaveAttribute(
+        'data-relationship-id',
+        'r-01',
+      )
+    },
+    CANVAS_TIMEOUT,
+  )
+
+  it(
     'bundles the three NATS topics and makes each of them reachable by clicking',
     async () => {
       const user = userEvent.setup()
@@ -233,6 +291,9 @@ describe('architecture canvas — edge bundling stays resolvable', () => {
 
       // Unfolding it is an interaction on the canvas, available at any zoom.
       await user.click(bundle)
+      // Opening a bundle is a disclosure action, not an implicit selection of
+      // whichever relationship happens to be first in its list.
+      expect(useUiStore.getState().selectedRelationshipId).toBeNull()
 
       // Every single topic is now individually addressable, labelled with its
       // own channel — the bundle was a rendering, never a merge.
@@ -274,6 +335,116 @@ describe('architecture canvas — edge bundling stays resolvable', () => {
       await user.click(screen.getByTestId('edge-label-r-06'))
 
       expect(useUiStore.getState().selectedRelationshipId).toBe('r-06')
+      await waitFor(() => {
+        expect(screen.getByTestId('edge-path-r-06')).not.toHaveClass('opacity-25')
+        expect(screen.getByTestId('edge-path-r-05')).toHaveClass('opacity-25')
+        expect(screen.getByTestId('edge-path-r-07')).toHaveClass('opacity-25')
+        expect(screen.getByTestId('edge-label-r-06')).not.toHaveClass('opacity-25')
+        expect(screen.getByTestId('edge-label-r-05')).toHaveClass('opacity-25')
+        expect(screen.getByTestId('edge-label-r-06')).toHaveAttribute('aria-current', 'true')
+        expect(screen.getByTestId('edge-label-r-05')).not.toHaveAttribute('aria-current')
+      })
+    },
+    CANVAS_TIMEOUT,
+  )
+
+  it(
+    'writes an individual relationship selection to the URL and inspector',
+    async () => {
+      const user = userEvent.setup()
+      const { router } = renderCanvas()
+      await waitForCanvas()
+
+      await user.click(await screen.findByTestId(`edge-bundle-${BUNDLE_EDGE_ID}`))
+      await user.click(screen.getByTestId('edge-label-r-06'))
+
+      await waitFor(() =>
+        expect(router.state.location.search).toEqual({ relationship: 'r-06' }),
+      )
+      expect(await screen.findByTestId('inspector-relationship-context')).toHaveAttribute(
+        'data-relationship-id',
+        'r-06',
+      )
+      expect(screen.getByTestId('inspector-relationship-bundle')).toHaveTextContent(
+        'NATS · orders.cancelled',
+      )
+    },
+    CANVAS_TIMEOUT,
+  )
+
+  it(
+    'restores a relationship selection from a deep link without selecting a component',
+    async () => {
+      const { router } = renderCanvas(`${WORKSPACE_URL}?relationship=r-06`)
+      await waitForCanvas()
+
+      await waitFor(() =>
+        expect(router.state.location.search).toEqual({ relationship: 'r-06' }),
+      )
+      expect(await screen.findByTestId('inspector-relationship-context')).toBeInTheDocument()
+      expect(useUiStore.getState().selectedComponentId).toBeNull()
+      expect(useUiStore.getState().selectedRelationshipId).toBe('r-06')
+    },
+    CANVAS_TIMEOUT,
+  )
+
+  it(
+    'keeps the canvas undimmed for a valid-looking but missing relationship id',
+    async () => {
+      const { router } = renderCanvas(`${WORKSPACE_URL}?relationship=not-in-snapshot`)
+      await waitForCanvas()
+
+      await waitFor(() =>
+        expect(router.state.location.search).toEqual({
+          relationship: 'not-in-snapshot',
+        }),
+      )
+      expect(await screen.findByTestId('inspector-relationship-context')).toHaveTextContent(
+        'nicht im aktuellen Architektur-Snapshot',
+      )
+      expect(
+        screen.getByTestId('edge-path-rel:platform.api.http.router~>platform.core.orders'),
+      ).not.toHaveClass('opacity-25')
+      expect(screen.getByTestId('canvas-node-platform.db')).not.toHaveAttribute(
+        'data-relationship-selected',
+        'true',
+      )
+    },
+    CANVAS_TIMEOUT,
+  )
+
+  it(
+    'does not resurrect a stale store relationship when the URL has no selection',
+    async () => {
+      useUiStore.getState().setSelectedRelationshipId('r-06')
+      const { router } = renderCanvas()
+      await waitForCanvas()
+
+      expect(router.state.location.search).toEqual({})
+      expect(
+        screen.getByTestId('edge-path-rel:platform.api.http.router~>platform.core.orders'),
+      ).not.toHaveClass('opacity-25')
+      expect(
+        screen.getByTestId('edge-path-rel:platform.core.orders~>platform.bus'),
+      ).not.toHaveClass('opacity-25')
+    },
+    CANVAS_TIMEOUT,
+  )
+
+  it(
+    'clears a selected relationship when Escape is pressed on the folded bundle control',
+    async () => {
+      const user = userEvent.setup()
+      const { router } = renderCanvas(`${WORKSPACE_URL}?relationship=r-06`)
+      await waitForCanvas()
+
+      const bundle = await screen.findByTestId(`edge-bundle-${BUNDLE_EDGE_ID}`)
+      act(() => bundle.focus())
+      await user.keyboard('{Escape}')
+
+      await waitFor(() => expect(router.state.location.search).toEqual({}))
+      expect(useUiStore.getState().selectedRelationshipId).toBeNull()
+      expect(document.activeElement).toBe(bundle)
     },
     CANVAS_TIMEOUT,
   )

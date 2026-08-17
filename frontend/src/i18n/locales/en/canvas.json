@@ -61,7 +61,7 @@
     "protocol": "Protocol: {{value}}"
   },
   "graph": {
-    "edgeInstructions": "Enter or Space selects this rendered connection; on a bundled edge it unfolds and folds the reported relationships it contains. Escape clears the selection.",
+    "edgeInstructions": "Enter or Space opens a bundled connection or selects a single relationship and shows it in the inspector; a bundle only unfolds and folds its reported relationships. Escape clears the selection.",
     "instructions": "Architecture graph of the project. Use Tab to move between the components and the rendered connections. Enter or Space selects the focused component and shows it in the inspector; activating it again clears the selection, as does Escape. Every component names its reported name, its kind, whether it contains further components, which container it sits in, and what change status an agent reported for it. Reported relationships may be rendered as one bundled connection. The graph is an observation: the applied architecture model cannot be edited here.",
     "label": "Interactive architecture graph",
     "layouting": "Computing the layout…",

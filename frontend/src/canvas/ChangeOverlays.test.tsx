@@ -724,6 +724,12 @@ describe('live change overlays — relationship metrics stay current', () => {
           '8 gemeldete Beziehungen · 7 Verbindungen dargestellt',
         ),
       )
+
+      const mark = screen.getByTestId('overlay-mark-relationship-r-10')
+      expect(mark).toHaveAttribute('data-work-state', 'planned')
+      // The state badge is explanatory only. It must remain visible and
+      // accessible without intercepting the edge's selection/bundle hit area.
+      expect(mark.parentElement).toHaveClass('pointer-events-none')
     },
     CANVAS_TIMEOUT,
   )

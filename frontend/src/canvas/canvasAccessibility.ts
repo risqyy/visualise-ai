@@ -1,6 +1,6 @@
 import type { TFunction } from 'i18next'
 
-import type { ComponentId } from '@/api/types'
+import type { ComponentId, Identifier } from '@/api/types'
 import type { CanvasKey } from '@/i18n'
 
 import { dominantOverlay, overlayLabel, type ChangeOverlay } from './changeOverlays'
@@ -391,7 +391,9 @@ export function withNodeAccessibility(
       'aria-roledescription': node.data.isCompound
         ? voice.t(CANVAS_A11Y_KEYS.containerRoleDescription)
         : voice.t(CANVAS_A11Y_KEYS.componentRoleDescription),
-      ...(node.selected === true ? { 'aria-current': true as const } : {}),
+      ...(node.selected === true || node.data.relationshipSelected === true
+        ? { 'aria-current': true as const }
+        : {}),
     },
   }))
 }
@@ -474,12 +476,19 @@ export function withEdgeAccessibility(
   edges: readonly ArchitectureEdge[],
   names: ReadonlyMap<ComponentId, string>,
   voice: CanvasVoice,
+  selectedRelationshipId: Identifier | null = null,
 ): ArchitectureEdge[] {
   return edges.map((edge) => ({
     ...edge,
     ariaLabel: edgeAccessibleName(edge, names, voice),
     domAttributes: {
       'aria-roledescription': voice.t(CANVAS_A11Y_KEYS.relationshipRoleDescription),
+      ...(selectedRelationshipId !== null &&
+      edge.data?.relationships.some(
+        (relationship) => relationship.relationshipId === selectedRelationshipId,
+      )
+        ? { 'aria-current': true as const }
+        : {}),
     },
   }))
 }

@@ -10,6 +10,7 @@ import {
   useReactFlow,
   useStore,
   useStoreApi,
+  type EdgeMouseHandler,
   type NodeMouseHandler,
   type OnNodeDrag,
   type Viewport,
@@ -30,7 +31,7 @@ import { useTranslation } from 'react-i18next'
 
 import '@xyflow/react/dist/style.css'
 
-import type { ComponentId, ProjectId } from '@/api/types'
+import type { ComponentId, Identifier, ProjectId } from '@/api/types'
 import { Button } from '@/components/ui/button'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { useUiStore } from '@/state/uiStore'
@@ -132,9 +133,11 @@ export interface ArchitectureCanvasProps {
   projectId: ProjectId
   model: ArchitectureModel
   selectedComponentId?: ComponentId | undefined
+  selectedRelationshipId?: Identifier | null | undefined
   onSelectComponent: (componentId: ComponentId | null) => void
   orientation: GraphOrientation
   onOrientationChange: (orientation: GraphOrientation) => void
+  onSelectRelationship?: (relationshipId: Identifier | null) => void
   /** Reports the counts the canvas actually draws to the pane header. */
   onMetricsChange?: (metrics: ArchitectureCanvasMetrics) => void
 }
@@ -160,10 +163,12 @@ function ArchitectureCanvasInner({
   projectId,
   model,
   selectedComponentId,
+  selectedRelationshipId,
   onSelectComponent,
   orientation,
   onOrientationChange,
   onMetricsChange,
+  onSelectRelationship,
 }: ArchitectureCanvasProps) {
   const { t } = useTranslation('canvas')
   // The words *and* the counted nouns the accessible names are built from —
@@ -174,6 +179,17 @@ function ArchitectureCanvasInner({
   const setCollapsedComponentIds = useUiStore((state) => state.setCollapsedComponentIds)
   const setComponentCollapsed = useUiStore((state) => state.setComponentCollapsed)
 
+  const relationshipRevealIds = useMemo(() => {
+    if (!selectedRelationshipId) return [] as ComponentId[]
+    const relationship = [
+      ...model.relationships,
+      ...(model.overlay?.extraRelationships ?? []).map((entry) => entry.relationship),
+    ].find((entry) => entry.relationshipId === selectedRelationshipId)
+    return relationship
+      ? [relationship.sourceComponentId, relationship.targetComponentId]
+      : []
+  }, [model, selectedRelationshipId])
+
   const graph = useArchitectureGraph(model, {
     collapsedComponentIds,
     // A deep link is a statement about *what to look at*. Opening the
@@ -182,6 +198,7 @@ function ArchitectureCanvasInner({
     // policy is untouched by it.
     revealComponentId: selectedComponentId ?? null,
     orientation,
+    revealComponentIds: relationshipRevealIds,
   })
   const flow = useReactFlow()
   const storeApi = useStoreApi()
@@ -195,8 +212,32 @@ function ArchitectureCanvasInner({
   const setMinimapVisible = useUiStore((state) => state.setMinimapVisible)
   const clearExpandedEdges = useUiStore((state) => state.clearExpandedEdges)
   const toggleEdgeExpanded = useUiStore((state) => state.toggleEdgeExpanded)
-  const selectedRelationshipId = useUiStore((state) => state.selectedRelationshipId)
-  const setSelectedRelationshipId = useUiStore((state) => state.setSelectedRelationshipId)
+  const storedSelectedRelationshipId = useUiStore((state) => state.selectedRelationshipId)
+  const setStoredSelectedRelationshipId = useUiStore(
+    (state) => state.setSelectedRelationshipId,
+  )
+  // Workspace selection is URL-backed. The store fallback keeps the canvas
+  // useful in isolated renders while the URL effect is catching up.
+  const activeSelectedRelationshipId = onSelectRelationship
+    ? (selectedRelationshipId !== undefined ? selectedRelationshipId : null)
+    : (selectedRelationshipId !== undefined
+      ? selectedRelationshipId
+      : storedSelectedRelationshipId)
+
+  // A syntactically valid URL id may still be absent from this snapshot (or
+  // point at a dangling relationship that projection cannot draw). Keep that
+  // useful not-found inspector state, but never treat it as a visual selection:
+  // otherwise every rendered edge would be dimmed with nothing to highlight.
+  const visualSelectedRelationshipId = useMemo(() => {
+    if (activeSelectedRelationshipId === null) return null
+    return graph.edges.some((edge) =>
+      edge.data?.relationships.some(
+        (relationship) => relationship.relationshipId === activeSelectedRelationshipId,
+      ),
+    )
+      ? activeSelectedRelationshipId
+      : null
+  }, [activeSelectedRelationshipId, graph.edges])
 
   // The size of the drawing surface, as React Flow measures it. Subscribing
   // here is what lets the initial fit wait for the three panes to settle
@@ -231,12 +272,38 @@ function ArchitectureCanvasInner({
   // names describe exactly the boxes that are drawn — a component behind a
   // closed container is not a tab stop and is not named as one.
   const nodes = useMemo(
-    () =>
-      withNodeAccessibility(
-        applyTemporaryPositions(graph.nodes, nodePositions, selectedComponentId ?? null),
-        voice,
-      ),
-    [graph.nodes, nodePositions, selectedComponentId, voice],
+    () => {
+      const relatedNodeIds = new Set(
+        visualSelectedRelationshipId === null
+          ? []
+          : graph.edges.flatMap((edge) =>
+              edge.data?.relationships.some(
+                (relationship) =>
+                  relationship.relationshipId === visualSelectedRelationshipId,
+              )
+                ? [edge.source, edge.target]
+                : [],
+            ),
+      )
+      const positioned = applyTemporaryPositions(
+        graph.nodes,
+        nodePositions,
+        selectedComponentId ?? null,
+      ).map((node) =>
+        relatedNodeIds.has(node.id)
+          ? { ...node, data: { ...node.data, relationshipSelected: true } }
+          : node,
+      )
+      return withNodeAccessibility(positioned, voice)
+    },
+    [
+      graph.edges,
+      graph.nodes,
+      nodePositions,
+      selectedComponentId,
+      visualSelectedRelationshipId,
+      voice,
+    ],
   )
 
   /**
@@ -435,14 +502,66 @@ function ArchitectureCanvasInner({
       if (!edge.data) return edge
       return { ...edge, data: { ...edge.data, ...(route ? { route } : {}) } }
     })
-    return withEdgeAccessibility(routed, nodeNames, voice)
-  }, [graph.edges, graph.routes, nodePositions, nodeNames, voice])
+    return withEdgeAccessibility(
+      routed,
+      nodeNames,
+      voice,
+      visualSelectedRelationshipId,
+    ).map((edge) => ({
+      ...edge,
+      ...(edge.data
+        ? {
+            data: {
+              ...edge.data,
+              selectedRelationshipId: visualSelectedRelationshipId,
+              onSelectRelationship:
+                onSelectRelationship ?? setStoredSelectedRelationshipId,
+            },
+          }
+        : {}),
+    }))
+  }, [
+    graph.edges,
+    graph.routes,
+    nodePositions,
+    nodeNames,
+    onSelectRelationship,
+    setStoredSelectedRelationshipId,
+    visualSelectedRelationshipId,
+    voice,
+  ])
 
   const onNodeClick = useCallback<NodeMouseHandler>(
     (_event, node) => {
       onSelectComponent(node.id === selectedComponentId ? null : node.id)
     },
     [onSelectComponent, selectedComponentId],
+  )
+
+  /**
+   * The path is the hit target in overview, where an individual relationship
+   * deliberately has no label. Bundles remain a disclosure action: the path
+   * opens them, while their expanded labels select one member at a time.
+   */
+  const onEdgeClick = useCallback<EdgeMouseHandler<ArchitectureEdge>>(
+    (_event, edge) => {
+      const relationships = edge.data?.relationships ?? []
+      if (relationships.length > 1) {
+        toggleEdgeExpanded(edge.id)
+        return
+      }
+      const only = relationships[0]
+      if (!only) return
+      ;(onSelectRelationship ?? setStoredSelectedRelationshipId)(
+        only.relationshipId === visualSelectedRelationshipId ? null : only.relationshipId,
+      )
+    },
+    [
+      onSelectRelationship,
+      setStoredSelectedRelationshipId,
+      toggleEdgeExpanded,
+      visualSelectedRelationshipId,
+    ],
   )
 
   // Temporary, local, never persisted and never sent anywhere.
@@ -535,12 +654,12 @@ function ArchitectureCanvasInner({
       const edgeId = edgeElement.getAttribute('data-id')
       if (edgeId === null) return
       if (!ACTIVATION_KEYS.has(event.key) && event.key !== 'Escape') return
-      if (event.key === 'Escape' && selectedRelationshipId === null) return
+      if (event.key === 'Escape' && activeSelectedRelationshipId === null) return
 
       event.preventDefault()
       event.stopPropagation()
       if (event.key === 'Escape') {
-        setSelectedRelationshipId(null)
+        ;(onSelectRelationship ?? setStoredSelectedRelationshipId)(null)
         return
       }
       const edge = edges.find((candidate) => candidate.id === edgeId)
@@ -551,16 +670,17 @@ function ArchitectureCanvasInner({
       }
       const only = relationships[0]
       if (!only) return
-      setSelectedRelationshipId(
-        only.relationshipId === selectedRelationshipId ? null : only.relationshipId,
+      ;(onSelectRelationship ?? setStoredSelectedRelationshipId)(
+        only.relationshipId === activeSelectedRelationshipId ? null : only.relationshipId,
       )
     },
     [
       edges,
       onSelectComponent,
       selectedComponentId,
-      selectedRelationshipId,
-      setSelectedRelationshipId,
+      activeSelectedRelationshipId,
+      onSelectRelationship,
+      setStoredSelectedRelationshipId,
       toggleEdgeExpanded,
     ],
   )
@@ -685,6 +805,7 @@ function ArchitectureCanvasInner({
           minZoom={MIN_ZOOM}
           maxZoom={MAX_ZOOM}
           onNodeClick={onNodeClick}
+          onEdgeClick={onEdgeClick}
           onNodeDragStop={onNodeDragStop}
           onMoveStart={onMoveStart}
           onMove={onMove}

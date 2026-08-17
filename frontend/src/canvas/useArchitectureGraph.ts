@@ -82,6 +82,8 @@ export interface ArchitectureGraphOptions {
   revealComponentId?: ComponentId | null
   /** Direction used for handles, ports and the ELK layered layout. */
   orientation?: GraphOrientation
+  /** Components at both ends of a relationship deep link that must be visible. */
+  revealComponentIds?: readonly ComponentId[]
 }
 
 /**
@@ -109,6 +111,7 @@ export function useArchitectureGraph(
     revealComponentId,
     orientation = DEFAULT_GRAPH_ORIENTATION,
   } = options
+  const { revealComponentIds = [] } = options
   const reportedRelationshipCount = model?.relationships.length ?? 0
 
   const projection = useMemo(
@@ -125,13 +128,19 @@ export function useArchitectureGraph(
    */
   const collapsedKey = useMemo(() => {
     const base = collapsedComponentIds ?? initialCollapsedIds(projection.nodes)
-    if (!revealComponentId) return [...base].sort().join(KEY_SEPARATOR)
-    const revealed = new Set(ancestorIds(projection.nodes, revealComponentId))
+    const revealIds = [
+      ...(revealComponentId ? [revealComponentId] : []),
+      ...revealComponentIds,
+    ]
+    if (revealIds.length === 0) return [...base].sort().join(KEY_SEPARATOR)
+    const revealed = new Set(
+      revealIds.flatMap((componentId) => ancestorIds(projection.nodes, componentId)),
+    )
     return base
       .filter((componentId) => !revealed.has(componentId))
       .sort()
       .join(KEY_SEPARATOR)
-  }, [collapsedComponentIds, revealComponentId, projection.nodes])
+  }, [collapsedComponentIds, revealComponentId, revealComponentIds, projection.nodes])
 
   const visible = useMemo(
     () =>
@@ -191,13 +200,17 @@ export function useArchitectureGraph(
   return useMemo<ArchitectureGraph>(() => {
     const isEmpty = visible.nodes.length === 0
     const isCurrent = laidOut !== null && laidOut.signature === layoutSignature
+    // Keep the last layout's positions while ELK solves the new structure, but
+    // do not keep its data. A removal can turn an applied node into a ghost
+    // without changing its id, and the overlay state must be visible in that
+    // first render (the metrics below are already derived from `visible`).
+    // `withCurrentData` intentionally matches only ids that are still drawn;
+    // genuinely new proposal nodes wait for their first valid layout.
+    const nodesWithCurrentData =
+      laidOut === null ? [] : withCurrentData(laidOut.nodes, visible.nodes)
 
     return {
-      nodes: isEmpty
-        ? []
-        : isCurrent
-          ? withCurrentData(laidOut.nodes, visible.nodes)
-          : (laidOut?.nodes ?? []),
+      nodes: isEmpty ? [] : nodesWithCurrentData,
       edges: visible.edges,
       routes: isCurrent ? laidOut.routes : {},
       diagnostics: projection.diagnostics ?? EMPTY_DIAGNOSTICS,

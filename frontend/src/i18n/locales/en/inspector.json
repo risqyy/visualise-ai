@@ -107,6 +107,21 @@
     "emptyTitle": "No problems reported",
     "label": "Problems"
   },
+  "relationship": {
+    "agents": "{{count, number}} reporting agent(s)",
+    "bundleLabel": "Bundled relationships",
+    "changeLabel": "Change state",
+    "channel": "Channel",
+    "label": "Relationship context",
+    "noChange": "No change state reported.",
+    "notFound": "This relationship is not in the current architecture snapshot.",
+    "operation": "Operation",
+    "protocol": "Protocol",
+    "reportedBy": "Reported by agent",
+    "reportedLabel": "Reported label",
+    "source": "Source",
+    "target": "Target"
+  },
   "risk": {
     "emptyDescription": "For this component no risk.reported was reported in this run.",
     "emptyTitle": "No risks reported",

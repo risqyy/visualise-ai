@@ -349,6 +349,36 @@ test('2 · every relationship kind is drawn, and every reported NATS topic stays
   )
 })
 
+test('2 · selecting one relationship is a reproducible URL and inspector context', async ({
+  page,
+}) => {
+  await openWorkspace(page)
+  await showWholeModel(page)
+  await zoomToFullDetail(page)
+
+  const label = page.getByTestId('edge-label-rel-orders-publishes-order-created')
+  await expect(label).toBeVisible()
+  await label.click()
+
+  await expect(page).toHaveURL(/relationship=rel-orders-publishes-order-created/)
+  const inspector = page.getByTestId('inspector-relationship-context')
+  await expect(inspector).toBeVisible()
+  await expect(inspector).toContainText('rel-orders-publishes-order-created')
+  // This is the single publisher -> topic relationship. The other two
+  // `orders.order.created` relationships terminate at different consumers, so
+  // the ordered-endpoint bundling rule does not make them inspector siblings.
+  await expect(inspector).toContainText('NATS · orders.order.created')
+  await expect(inspector).toContainText('Orders Service')
+  await expect(inspector).toContainText('publishes')
+  await expect(inspector).toContainText('NATS')
+  await expect(page.getByTestId('inspector-relationship-bundle')).not.toBeAttached()
+
+  // Escape clears the typed selection while the canvas remains the focused
+  // interaction surface, so the next keyboard action has a stable target.
+  await page.keyboard.press('Escape')
+  await expect(page).not.toHaveURL(/relationship=/)
+})
+
 test('2 · the self run keeps 28 model components apart from its open proposal at initial depth', async ({
   page,
 }) => {

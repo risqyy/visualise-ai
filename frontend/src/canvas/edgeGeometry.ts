@@ -183,6 +183,33 @@ export function fallbackRoute(
   ]
 }
 
+/**
+ * A visible loop for a relationship whose source and target are the same node.
+ * ELK intentionally omits self references from its layout input; drawing the
+ * fallback as a straight line would put its label inside the node. The loop
+ * leaves both handles where React Flow expects them and reserves a clear label
+ * point above the box.
+ */
+export function selfLoopRoute(
+  source: LayoutPoint,
+  target: LayoutPoint,
+): LayoutPoint[] {
+  // Keep the badge's roughly 10 px height clear of a 96 px leaf box: the
+  // handle is centred at y=48, so a centre 72 px above it leaves a visible
+  // gap instead of touching the node's top border.
+  const top = Math.min(source.y, target.y) - 72
+  const right = Math.max(source.x, target.x) + 48
+  const left = Math.min(source.x, target.x) - 48
+  return [
+    source,
+    { x: right, y: source.y },
+    { x: right, y: top },
+    { x: left, y: top },
+    { x: left, y: target.y },
+    target,
+  ]
+}
+
 function round(value: number): number {
   return Math.round(value * 100) / 100
 }
