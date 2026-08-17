@@ -50,6 +50,7 @@ import { EdgeMarkerDefs } from './RelationshipEdge'
 import {
   INITIAL_CAMERA_POLICY,
   isBoundsFullyVisible,
+  MIN_FIT_VIEWPORT,
   onLayoutReady,
   onProjectChanged,
   onUserFitRequest,
@@ -394,13 +395,21 @@ function ArchitectureCanvasInner({
    */
   const fitView = useCallback(
     (mode: FitMode, focusComponentId: ComponentId | null = null) => {
-      setFitViewCount((count) => count + 1)
-
       const { width, height, nodeLookup } = storeApi.getState()
-      if (nodeLookup.size === 0) return
+      if (nodeLookup.size === 0) return false
 
       const bounds = getNodesBounds([...nodeLookup.values()], { nodeLookup })
-      if (width <= 0 || height <= 0 || bounds.width <= 0 || bounds.height <= 0) return
+      // React Flow reports zero (and briefly undersized) surfaces while a
+      // pane is mounting or changing size. Do not consume an explicit request
+      // against that surface: callers can safely retry after measurement.
+      if (
+        width < MIN_FIT_VIEWPORT ||
+        height < MIN_FIT_VIEWPORT ||
+        bounds.width <= 0 ||
+        bounds.height <= 0
+      ) {
+        return false
+      }
 
       // The absolute box of the node the URL points at. `getNodesBounds` is what
       // resolves a nested node's parent-relative position for us, so the focus
@@ -419,6 +428,8 @@ function ArchitectureCanvasInner({
       setCamera(viewport)
       setDetailLevel(detailLevelForZoom(viewport.zoom))
       publishZoom(viewport.zoom)
+      setFitViewCount((count) => count + 1)
+      return true
     },
     [flow, storeApi, setCamera, publishZoom],
   )
@@ -441,6 +452,10 @@ function ArchitectureCanvasInner({
 
     if (entering || leaving) {
       architectureFocusFitPendingRef.current = entering ? 'enter' : 'exit'
+      // The pane resize that follows this state change is not a camera
+      // command. Claim the camera before React Flow reports the new size so
+      // the settling policy cannot win a race with this explicit fit.
+      userMovedCameraRef.current = true
     }
     if (architectureFocusFitPendingRef.current === null) return
 
@@ -455,13 +470,29 @@ function ArchitectureCanvasInner({
       ) {
         return
       }
+
+      const { width, height, nodeLookup } = storeApi.getState()
+      if (
+        graph.isRelayouting ||
+        nodeLookup.size === 0 ||
+        width < MIN_FIT_VIEWPORT ||
+        height < MIN_FIT_VIEWPORT
+      ) {
+        // Keep the request parked. React Flow publishes its next dimensions
+        // through the dependencies below, which schedules another attempt.
+        return
+      }
+
+      if (!fitView('user')) return
+
       architectureFocusFitPendingRef.current = null
-      // The fit is an explicit camera hand-off. Mark it as such before the
-      // collapsed panes report their new surface size, otherwise the settling
-      // policy could interpret that same resize as a second automatic fit.
-      userMovedCameraRef.current = true
-      policyRef.current = onUserFitRequest(policyRef.current).state
-      fitView('user')
+      // A focus fit can be the first usable picture of a project. Record that
+      // fact so the policy does not replay an automatic initial fit after this
+      // explicit request completes.
+      policyRef.current = {
+        fittedProjectId: projectId,
+        fittedSize: { width, height },
+      }
     }, 0)
 
     return () => {
@@ -470,7 +501,17 @@ function ArchitectureCanvasInner({
         architectureFocusFitTimerRef.current = null
       }
     }
-  }, [architectureFocus, fitView, surfaceHeight, surfaceWidth])
+  }, [
+    architectureFocus,
+    fitView,
+    graph.isRelayouting,
+    graph.nodes.length,
+    graph.signature,
+    projectId,
+    storeApi,
+    surfaceHeight,
+    surfaceWidth,
+  ])
 
   /** Explicitly reveals one laid-out component without changing the zoom. */
   const focusComponentInView = useCallback(
@@ -583,6 +624,10 @@ function ArchitectureCanvasInner({
   // selection change must run the policy again and be told `null` — which is
   // exactly the assertion that a click never moves the camera.
   useEffect(() => {
+    // An architecture-focus transition owns the next camera movement. Leave
+    // the automatic initial/resize policy untouched until that explicit fit
+    // has a valid measured surface.
+    if (architectureFocusFitPendingRef.current !== null) return
     const decision = onLayoutReady(policyRef.current, {
       projectId,
       hasLayout: graph.nodes.length > 0,

@@ -79,11 +79,35 @@ async function assertOverlayGeometry(page: Page, label: string): Promise<void> {
         rects['.react-flow__controls'] ?? null,
         rects['.react-flow__attribution'] ?? null,
       ),
+      toolbarOverflow:
+        (() => {
+          const toolbar = document.querySelector<HTMLElement>('.architecture-toolbar')
+          return toolbar === null || toolbar.scrollWidth > toolbar.clientWidth + 1
+        })(),
+      toolbarControlOutside: (() => {
+        const toolbar = document.querySelector<HTMLElement>('.architecture-toolbar')
+        if (toolbar === null) return true
+        const toolbarRect = toolbar.getBoundingClientRect()
+        return Array.from(toolbar.querySelectorAll('button')).some((button) => {
+          const rect = button.getBoundingClientRect()
+          return (
+            rect.left < toolbarRect.left ||
+            rect.right > toolbarRect.right ||
+            rect.top < toolbarRect.top ||
+            rect.bottom > toolbarRect.bottom
+          )
+        })
+      })(),
     }
   })
 
   expect(geometry.toolbarMinimap, `${label}: toolbar/minimap overlap`).toBe(false)
   expect(geometry.controlsAttribution, `${label}: zoom controls/attribution overlap`).toBe(false)
+  expect(geometry.toolbarOverflow, `${label}: wrapped toolbar overflows its surface`).toBe(false)
+  expect(
+    geometry.toolbarControlOutside,
+    `${label}: wrapped toolbar control escapes its surface`,
+  ).toBe(false)
 
   const reports = await probeControls(page, FOCUS_CONTROLS)
   const broken = reports.filter(
@@ -140,7 +164,7 @@ for (const language of ['de', 'en'] as const) {
             await page.getByTestId('architecture-canvas').getAttribute('data-fit-view-count'),
           ),
         )
-        .toBeGreaterThan(fitBefore)
+        .toBe(fitBefore + 1)
       expect(page.url()).toBe(urlBefore)
       const fitAfterFocus = Number(
         await page.getByTestId('architecture-canvas').getAttribute('data-fit-view-count'),
@@ -156,7 +180,7 @@ for (const language of ['de', 'en'] as const) {
             await page.getByTestId('architecture-canvas').getAttribute('data-fit-view-count'),
           ),
         )
-        .toBeGreaterThan(fitAfterFocus)
+        .toBe(fitAfterFocus + 1)
       expect(await paneSnapshot(page)).toEqual(before)
       await expect(page.getByTestId('inspector-context')).toHaveAttribute(
         'data-component-id',
@@ -165,3 +189,60 @@ for (const language of ['de', 'en'] as const) {
     }
   })
 }
+
+test('architecture focus overlays and graph controls stay keyboard-operable', async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 720 })
+  await page.goto(WORKSPACE_URL)
+  await expect(page.getByTestId('architecture-canvas')).toBeVisible()
+
+  const canvas = page.getByTestId('architecture-canvas')
+  const focus = page.getByTestId('canvas-toggle-architecture-focus')
+  const fitBefore = Number(await canvas.getAttribute('data-fit-view-count'))
+  await focus.focus()
+  await expect(focus).toBeFocused()
+  await page.keyboard.press('Space')
+  await expect(focus).toHaveAttribute('aria-pressed', 'true')
+  await expect.poll(async () => Number(await canvas.getAttribute('data-fit-view-count'))).toBe(
+    fitBefore + 1,
+  )
+
+  // The same control is the keyboard exit path, and one transition means one
+  // explicit fit even while the panel resize is settling.
+  const fitAfterEnter = Number(await canvas.getAttribute('data-fit-view-count'))
+  await page.keyboard.press('Space')
+  await expect(focus).toHaveAttribute('aria-pressed', 'false')
+  await expect.poll(async () => Number(await canvas.getAttribute('data-fit-view-count'))).toBe(
+    fitAfterEnter + 1,
+  )
+
+  const minimapToggle = page.getByTestId('canvas-toggle-minimap')
+  await minimapToggle.focus()
+  await expect(minimapToggle).toBeFocused()
+  await page.keyboard.press('Enter')
+  await expect(minimapToggle).toHaveAttribute('aria-pressed', 'false')
+  await expect(page.locator('.react-flow__minimap')).toHaveCount(0)
+  await page.keyboard.press('Space')
+  await expect(minimapToggle).toHaveAttribute('aria-pressed', 'true')
+  await expect(page.locator('.react-flow__minimap')).toHaveCount(1)
+
+  // Disclosure is a real nested button, not an action delegated to the node's
+  // generic activation handler, so its keyboard state is independently visible.
+  const disclosure = page.getByTestId('node-disclosure-shop-platform.orders')
+  await disclosure.focus()
+  await page.keyboard.press('Enter')
+  await expect(disclosure).toHaveAttribute('aria-expanded', 'true')
+
+  // Relationship labels are also buttons. Activating one from the keyboard
+  // must produce the same URL-backed inspector context as a pointer click.
+  await page.getByTestId('canvas-fit-view').click()
+  for (let attempt = 0; attempt < 24; attempt += 1) {
+    if ((await canvas.getAttribute('data-detail-level')) === 'full') break
+    await page.locator('.react-flow__controls-zoomin').click()
+  }
+  const relationship = page.getByTestId('edge-label-rel-orders-publishes-order-created')
+  await expect(relationship).toBeVisible()
+  await relationship.focus()
+  await page.keyboard.press('Enter')
+  await expect(page).toHaveURL(/relationship=rel-orders-publishes-order-created/)
+  await expect(page.getByTestId('inspector-relationship-context')).toBeVisible()
+})
