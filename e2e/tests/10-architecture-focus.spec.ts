@@ -142,10 +142,11 @@ for (const language of ['de', 'en'] as const) {
 
       // Start from a non-default arrangement: architecture focus must restore
       // an already collapsed inspector, not just the default three-pane split.
-      if ((await page.getByTestId('pane-rail-right').count()) === 0) {
-        const inspectorToggle = page.locator('header button[aria-expanded]').last()
+      const inspectorToggle = page.getByRole('button', { name: 'Inspector', exact: true })
+      if ((await inspectorToggle.getAttribute('aria-expanded')) !== 'false') {
         await inspectorToggle.click()
       }
+      await expect(inspectorToggle).toHaveAttribute('aria-expanded', 'false')
       await expect(page.getByTestId('pane-rail-right')).toBeVisible()
       const before = await paneSnapshot(page)
       const urlBefore = page.url()
@@ -217,6 +218,7 @@ for (const language of ['de', 'en'] as const) {
 
       await focus.click()
       await expect(focus).toHaveAttribute('aria-pressed', 'false')
+      await expect(inspectorToggle).toHaveAttribute('aria-expanded', 'false')
       await expect(page.getByTestId('pane-rail-right')).toBeVisible()
       await expect(page.getByTestId('pane-run-agents')).toBeVisible()
       await expect
@@ -241,12 +243,28 @@ test('architecture focus overlays and graph controls stay keyboard-operable', as
   await expect(page.getByTestId('architecture-canvas')).toBeVisible()
 
   const canvas = page.getByTestId('architecture-canvas')
+  // The deep link reveals the selected component's ancestors, so the orders
+  // container is already open on a fresh page. Establish the keyboard test's
+  // state explicitly instead of assuming the initial disclosure rule wins.
+  const disclosure = page.getByTestId('node-disclosure-shop-platform.orders')
+  await expect(disclosure).toBeVisible()
+  if ((await disclosure.getAttribute('aria-expanded')) !== 'false') {
+    await disclosure.focus()
+    await page.keyboard.press('Enter')
+  }
+  await expect(disclosure).toHaveAttribute('aria-expanded', 'false')
+  await disclosure.focus()
+  await page.keyboard.press('Enter')
+  await expect(disclosure).toHaveAttribute('aria-expanded', 'true')
+  await expect(canvas).toHaveAttribute('data-layouting', 'false')
+
   const focus = page.getByTestId('canvas-toggle-architecture-focus')
   const fitBefore = Number(await canvas.getAttribute('data-fit-view-count'))
   await focus.focus()
   await expect(focus).toBeFocused()
   await page.keyboard.press('Space')
   await expect(focus).toHaveAttribute('aria-pressed', 'true')
+  await expect(disclosure).toHaveAttribute('aria-expanded', 'true')
   await expect.poll(async () => Number(await canvas.getAttribute('data-fit-view-count'))).toBe(
     fitBefore + 1,
   )
@@ -256,6 +274,7 @@ test('architecture focus overlays and graph controls stay keyboard-operable', as
   const fitAfterEnter = Number(await canvas.getAttribute('data-fit-view-count'))
   await page.keyboard.press('Space')
   await expect(focus).toHaveAttribute('aria-pressed', 'false')
+  await expect(disclosure).toHaveAttribute('aria-expanded', 'true')
   await expect.poll(async () => Number(await canvas.getAttribute('data-fit-view-count'))).toBe(
     fitAfterEnter + 1,
   )
@@ -269,13 +288,6 @@ test('architecture focus overlays and graph controls stay keyboard-operable', as
   await page.keyboard.press('Space')
   await expect(minimapToggle).toHaveAttribute('aria-pressed', 'true')
   await expect(page.locator('.react-flow__minimap')).toHaveCount(1)
-
-  // Disclosure is a real nested button, not an action delegated to the node's
-  // generic activation handler, so its keyboard state is independently visible.
-  const disclosure = page.getByTestId('node-disclosure-shop-platform.orders')
-  await disclosure.focus()
-  await page.keyboard.press('Enter')
-  await expect(disclosure).toHaveAttribute('aria-expanded', 'true')
 
   // Relationship labels are also buttons. Activating one from the keyboard
   // must produce the same URL-backed inspector context as a pointer click.
