@@ -172,3 +172,21 @@ export function relationshipDisplayName(relationship: Relationship): string {
   const discriminator = relationshipDiscriminator(relationship)
   return discriminator ? `${abbreviation} · ${discriminator}` : abbreviation
 }
+
+/** Maximum adjunct length that can sit on a route without becoming a paragraph. */
+export const MAX_CANVAS_RELATIONSHIP_ADJUNCT_LENGTH = 24
+
+/**
+ * Returns the bounded detail allowed on a normal canvas label. Long reported
+ * discriminators remain available through the label title, focus state and
+ * relationship inspector instead of colliding with nodes and other edges.
+ */
+export function shortRelationshipDiscriminator(
+  relationship: Relationship,
+): string | null {
+  const discriminator = relationshipDiscriminator(relationship)
+  return discriminator !== null &&
+    discriminator.length <= MAX_CANVAS_RELATIONSHIP_ADJUNCT_LENGTH
+    ? discriminator
+    : null
+}

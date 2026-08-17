@@ -131,6 +131,8 @@ export interface ComponentNodeData extends Record<string, unknown> {
    * agent is doing to it.
    */
   overlayRolledUp?: boolean
+  /** `true` when this visible endpoint belongs to the selected relationship. */
+  relationshipSelected?: boolean
 }
 
 export type ArchitectureNode = Node<ComponentNodeData, ArchitectureNodeType>
@@ -158,6 +160,10 @@ export interface RelationshipEdgeData extends Record<string, unknown> {
    * the edge then falls back to a plain orthogonal connection.
    */
   route?: { x: number; y: number }[]
+  /** URL-backed selection callback injected by the canvas shell. */
+  onSelectRelationship?: (relationshipId: Identifier | null) => void
+  /** URL-backed relationship selection used for immediate rendering. */
+  selectedRelationshipId?: Identifier | null
 }
 
 export type ArchitectureEdge = Edge<RelationshipEdgeData, typeof RELATIONSHIP_EDGE_TYPE>

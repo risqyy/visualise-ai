@@ -7,6 +7,7 @@ import {
   fanRoute,
   pointAtRatio,
   roundedPolylinePath,
+  selfLoopRoute,
 } from './edgeGeometry'
 
 describe('edge geometry', () => {
@@ -125,5 +126,12 @@ describe('edge geometry', () => {
       const current = fanned[index] as { x: number; y: number }
       expect(previous.x === current.x || previous.y === current.y).toBe(true)
     }
+  })
+
+  it('routes a self relationship around the node for a safe label point', () => {
+    const route = selfLoopRoute({ x: 228, y: 48 }, { x: 0, y: 48 })
+    expect(route[0]).toEqual({ x: 228, y: 48 })
+    expect(route[route.length - 1]).toEqual({ x: 0, y: 48 })
+    expect(pointAtRatio(route)).toEqual({ x: 114, y: -24 })
   })
 })

@@ -26,11 +26,19 @@ const componentIdSchema = z.preprocess(
   z.string().min(1).max(128),
 )
 
+/** `Identifier` per contract: max 128 characters, never empty. */
+const relationshipIdSchema = z.preprocess(
+  (value) => (typeof value === 'number' ? String(value) : value),
+  z.string().min(1).max(128),
+)
+
 export const workspaceSearchSchema = z.object({
   /** Selected component; drives the inspector. */
   component: componentIdSchema.optional().catch(undefined),
   /** Reading direction of the architecture graph. */
   layout: z.enum(GRAPH_ORIENTATIONS).optional().catch(undefined),
+  /** Selected reported relationship; drives the relationship inspector. */
+  relationship: relationshipIdSchema.optional().catch(undefined),
   /** Deep-focus target for large feedback or diff content. */
   focus: z.enum(DEEP_FOCUS_TARGETS).optional().catch(undefined),
   /** Show the component history instead of the current run. */

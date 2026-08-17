@@ -3,9 +3,11 @@ import userEvent from '@testing-library/user-event'
 import { describe, expect, it } from 'vitest'
 
 import type {
+  ArchitectureResponse,
   ComponentHistoryResponse,
   ComponentInspectorResponse,
   ReportedDiff,
+  Relationship,
 } from '@/api/types'
 import { applyLiveEvent } from '@/api/useLiveStream'
 import {
@@ -29,6 +31,11 @@ import {
   inspectorPage,
   reportedDiff,
 } from '@/test/inspectorFixtures'
+import {
+  activeChange,
+  appliedComponent,
+  appliedRelationship,
+} from '@/test/architectureFixtures'
 import { renderApp } from '@/test/renderApp'
 
 const WORKSPACE_URL = `/projects/${PROJECT_ID}/runs/${RUN_ID}`
@@ -48,6 +55,7 @@ const CANVAS_TIMEOUT = 15_000
 function inspectorServer(options: {
   pages?: ComponentInspectorResponse[]
   history?: ComponentHistoryResponse[]
+  architecture?: ArchitectureResponse
 } = {}) {
   const state = {
     pages: options.pages ?? [inspectorPage()],
@@ -55,7 +63,7 @@ function inspectorServer(options: {
   }
 
   const base = createFakeFetch({
-    [ARCHITECTURE_PATH]: {
+    [ARCHITECTURE_PATH]: options.architecture ?? {
       projectPosition: 42,
       components: [component({ componentId: COMPONENT_ID, name: 'Tax', kind: 'module' })],
       relationships: [],
@@ -99,6 +107,54 @@ function inspectorServer(options: {
       state.pages = pages
     },
   }
+}
+
+const RELATIONSHIP_SOURCE_ID = 'relationship-source'
+const RELATIONSHIP_TARGET_ID = 'relationship-target'
+const APPLIED_RELATIONSHIP_ID = 'relationship-applied'
+const PROPOSED_RELATIONSHIP: Relationship = {
+  relationshipId: 'relationship-proposed',
+  sourceComponentId: RELATIONSHIP_SOURCE_ID,
+  targetComponentId: RELATIONSHIP_TARGET_ID,
+  kind: 'nats_topic',
+  protocol: 'NATS',
+  operation: 'publish',
+  channel: 'orders.created',
+  label: '',
+}
+const APPLIED_RELATIONSHIP = appliedRelationship({
+  relationshipId: APPLIED_RELATIONSHIP_ID,
+  sourceComponentId: RELATIONSHIP_SOURCE_ID,
+  targetComponentId: RELATIONSHIP_TARGET_ID,
+  kind: 'http',
+  protocol: 'HTTP',
+  operation: 'GET',
+  label: 'Read orders',
+})
+const RELATIONSHIP_ARCHITECTURE: ArchitectureResponse = {
+  projectPosition: 42,
+  components: [
+    appliedComponent({
+      componentId: RELATIONSHIP_SOURCE_ID,
+      name: 'Relationship source',
+      kind: 'service',
+      parentComponentId: null,
+    }),
+    appliedComponent({
+      componentId: RELATIONSHIP_TARGET_ID,
+      name: 'Relationship target',
+      kind: 'service',
+      parentComponentId: null,
+    }),
+  ],
+  relationships: [APPLIED_RELATIONSHIP],
+  activeChanges: [
+    activeChange({
+      targetKind: 'relationship',
+      targetId: PROPOSED_RELATIONSHIP.relationshipId,
+      snapshot: PROPOSED_RELATIONSHIP as unknown as Record<string, unknown>,
+    }),
+  ],
 }
 
 function jsonResponse(body: unknown): Response {
@@ -221,6 +277,23 @@ describe('inspector — component selection', () => {
     expect(await screen.findByText('Keine Komponente ausgewählt')).toBeInTheDocument()
     expect(screen.queryByTestId('inspector-context')).not.toBeInTheDocument()
     expect(screen.queryByRole('tablist', { name: 'Belegquelle' })).not.toBeInTheDocument()
+  })
+})
+
+describe('inspector — relationship selection', () => {
+  it('keeps applied and proposed edges separate when their endpoints match', async () => {
+    const server = inspectorServer({ architecture: RELATIONSHIP_ARCHITECTURE })
+    renderApp(
+      `${WORKSPACE_URL}?relationship=${PROPOSED_RELATIONSHIP.relationshipId}`,
+      { fetchImpl: server.fetchImpl },
+    )
+
+    const context = await screen.findByTestId('inspector-relationship-context')
+    await waitFor(() => {
+      expect(context).toHaveAttribute('data-relationship-id', PROPOSED_RELATIONSHIP.relationshipId)
+      expect(context).toHaveTextContent(`NATS · ${PROPOSED_RELATIONSHIP.channel}`)
+    })
+    expect(screen.queryByTestId('inspector-relationship-bundle')).not.toBeInTheDocument()
   })
 })
 

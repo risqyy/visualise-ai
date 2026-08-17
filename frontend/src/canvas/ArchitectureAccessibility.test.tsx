@@ -247,6 +247,40 @@ describe('accessible architecture graph — every node arrives named', () => {
 
 describe('accessible architecture graph — selection by keyboard alone', () => {
   it(
+    'selects a single relationship with Enter and preserves edge focus',
+    async () => {
+      const user = userEvent.setup()
+      const { router } = renderGraph()
+      await waitForCanvas()
+
+      const edge = document.querySelector<HTMLElement>(
+        '.react-flow__edge[data-id="rel:platform.api.http.router~>platform.core.orders"]',
+      )
+      expect(edge).not.toBeNull()
+      edge?.focus()
+      await user.keyboard('{Enter}')
+
+      await waitFor(() =>
+        expect(router.state.location.search).toEqual({ relationship: 'r-01' }),
+      )
+      expect(await screen.findByTestId('inspector-relationship-context')).toHaveAttribute(
+        'data-relationship-id',
+        'r-01',
+      )
+      await waitFor(() => {
+        expect(edge).toHaveAttribute('aria-current', 'true')
+        expect(nodeElement('platform.api.http.router')).toHaveAttribute(
+          'aria-current',
+          'true',
+        )
+        expect(nodeElement('platform.core.orders')).toHaveAttribute('aria-current', 'true')
+      })
+      expect(document.activeElement).toBe(edge)
+    },
+    CANVAS_TIMEOUT,
+  )
+
+  it(
     'selects with Enter, writes the URL and hands the component to the inspector',
     async () => {
       const user = userEvent.setup()

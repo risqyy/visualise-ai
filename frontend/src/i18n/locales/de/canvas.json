@@ -61,7 +61,7 @@
     "protocol": "Protokoll: {{value}}"
   },
   "graph": {
-    "edgeInstructions": "Enter oder Leertaste wählt diese dargestellte Verbindung aus; bei einer Sammelkante klappt sie die enthaltenen gemeldeten Beziehungen auf und wieder zu. Escape hebt die Auswahl auf.",
+    "edgeInstructions": "Enter oder Leertaste öffnet eine Sammelkante oder wählt eine einzelne Beziehung und zeigt sie im Inspector; eine Sammelkante klappt nur ihre gemeldeten Beziehungen auf und wieder zu. Escape hebt die Auswahl auf.",
     "instructions": "Architekturgraph des Projekts. Mit der Tabulatortaste zwischen den Komponenten und den dargestellten Verbindungen wechseln. Enter oder Leertaste wählt die fokussierte Komponente aus und zeigt sie im Inspector; eine erneute Aktivierung hebt die Auswahl auf, Escape ebenfalls. Jede Komponente nennt ihren gemeldeten Namen, ihre Art, ob sie weitere Komponenten enthält, in welchem Container sie liegt und welchen Änderungsstatus ein Agent für sie gemeldet hat. Gemeldete Beziehungen können als eine gebündelte Verbindung dargestellt werden. Der Graph ist eine Beobachtung: das angewandte Architekturmodell lässt sich hier nicht bearbeiten.",
     "label": "Interaktiver Architekturgraph",
     "layouting": "Layout wird berechnet…",

@@ -218,7 +218,7 @@ export const ComponentNode = memo(function ComponentNode({
 }: NodeProps<ArchitectureNode>) {
   const { t } = useTranslation('canvas')
   const level = useDetailLevel()
-  const { component, overlay, applied } = data
+  const { component, overlay, applied, relationshipSelected } = data
   const kind = componentKindStyle(component.kind)
   const Icon = kind.icon
   const technology = technologyParts(component.technology)
@@ -235,12 +235,14 @@ export const ComponentNode = memo(function ComponentNode({
         'hover:border-muted-foreground/60',
         box.className,
         selected && 'ring-ring border-ring/70 ring-2',
+        relationshipSelected && !selected && 'ring-ring/60 border-ring/60 ring-1',
       )}
       style={box.style}
       data-testid={`canvas-node-${component.componentId}`}
       data-component-id={component.componentId}
       data-detail-level={level}
       data-selected={selected ? 'true' : 'false'}
+      data-relationship-selected={relationshipSelected ? 'true' : 'false'}
       {...box.attributes}
     >
       <div className="flex items-start gap-1.5">
@@ -272,8 +274,15 @@ export const CompoundNode = memo(function CompoundNode({
   const { t } = useTranslation('canvas')
   const { t: tCommon } = useTranslation('common')
   const level = useDetailLevel()
-  const { component, childCount, overlay, applied, collapsed, hiddenDescendantCount } =
-    data
+  const {
+    component,
+    childCount,
+    overlay,
+    applied,
+    collapsed,
+    hiddenDescendantCount,
+    relationshipSelected,
+  } = data
   const kind = componentKindStyle(component.kind)
   const Icon = kind.icon
   const technology = technologyParts(component.technology)
@@ -292,6 +301,7 @@ export const CompoundNode = memo(function CompoundNode({
           'bg-card/95 shadow-[4px_4px_0_-1px_var(--card),4px_4px_0_var(--border)]',
         box.className,
         selected && 'ring-ring border-ring/70 ring-2',
+        relationshipSelected && !selected && 'ring-ring/60 border-ring/60 ring-1',
       )}
       style={box.style}
       data-testid={`canvas-node-${component.componentId}`}
@@ -299,6 +309,7 @@ export const CompoundNode = memo(function CompoundNode({
       data-detail-level={level}
       data-compound="true"
       data-selected={selected ? 'true' : 'false'}
+      data-relationship-selected={relationshipSelected ? 'true' : 'false'}
       {...(collapsed
         ? {
             'data-collapsed': 'true',

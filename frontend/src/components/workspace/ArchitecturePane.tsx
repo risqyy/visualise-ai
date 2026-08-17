@@ -2,7 +2,7 @@ import { useCallback, useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
 import { useArchitecture } from '@/api/queries'
-import type { ComponentId, ProjectId } from '@/api/types'
+import type { ComponentId, Identifier, ProjectId } from '@/api/types'
 import {
   ArchitectureCanvas,
   type ArchitectureCanvasMetrics,
@@ -21,10 +21,14 @@ export interface ArchitecturePaneProps {
   projectId: ProjectId
   /** Selection from the URL; the canvas mirrors it, it never owns it. */
   selectedComponentId?: ComponentId | undefined
+  /** Selection from the URL for one reported relationship. */
+  selectedRelationshipId?: Identifier | null | undefined
   /** Writes the selection back into the `component` search param. */
   onSelectComponent: (componentId: ComponentId | null) => void
   orientation: GraphOrientation
   onOrientationChange: (orientation: GraphOrientation) => void
+  /** Writes a relationship selection to the `relationship` search param. */
+  onSelectRelationship: (relationshipId: Identifier | null) => void
 }
 
 /**
@@ -39,9 +43,11 @@ export interface ArchitecturePaneProps {
 export function ArchitecturePane({
   projectId,
   selectedComponentId,
+  selectedRelationshipId,
   onSelectComponent,
   orientation,
   onOrientationChange,
+  onSelectRelationship,
 }: ArchitecturePaneProps) {
   const { t } = useTranslation('canvas')
   const architecture = useArchitecture(projectId)
@@ -186,9 +192,11 @@ export function ArchitecturePane({
             projectId={projectId}
             model={model}
             selectedComponentId={selectedComponentId}
+            selectedRelationshipId={selectedRelationshipId}
             onSelectComponent={onSelectComponent}
             orientation={orientation}
             onOrientationChange={onOrientationChange}
+            onSelectRelationship={onSelectRelationship}
             onMetricsChange={onCanvasMetricsChange}
           />
         )}
