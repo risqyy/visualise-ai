@@ -48,7 +48,10 @@ export function ChangeOverlayMark({
   return (
     <span
       className={cn(
-        'inline-flex max-w-full shrink-0 items-center gap-1 rounded-sm border px-1 py-px text-[10px] leading-tight',
+        // Overlay labels are secondary text. At zoom 0.93 they therefore use
+        // 11 px (10.2 effective px); the compact form keeps only the icon when
+        // even primary text is below its floor.
+        'inline-flex max-w-full shrink-0 items-center gap-1 rounded-sm border px-1 py-px text-[11px] leading-tight',
         'bg-card/90',
         className,
       )}

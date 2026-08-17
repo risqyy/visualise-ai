@@ -174,7 +174,9 @@ function EdgeBadge({
 }) {
   const [focused, setFocused] = useState(false)
   const className = cn(
-    'pointer-events-auto rounded-sm border px-1 py-px font-mono text-[10px] leading-tight whitespace-nowrap',
+    // Relationship badges are secondary text. An 11 px base keeps their
+    // effective size above 10 px in the readable overview (zoom 0.93).
+    'pointer-events-auto rounded-sm border px-1 py-px font-mono text-[11px] leading-tight whitespace-nowrap',
     emphasised
       ? 'border-ring/70 bg-popover text-foreground'
       : 'border-border bg-popover/95 text-muted-foreground',
@@ -242,12 +244,14 @@ function EdgeOverlayMark({
   overlay,
   zIndex,
   dimmed = false,
+  compact = false,
 }: {
   point: LayoutPoint
   overlay: ChangeOverlay
   /** Keep the visual mark above its edge without intercepting edge input. */
   zIndex: number
   dimmed?: boolean
+  compact?: boolean
 }) {
   return (
     <span
@@ -258,7 +262,7 @@ function EdgeOverlayMark({
       }}
       className={cn('pointer-events-none', dimmed && 'opacity-25')}
     >
-      <ChangeOverlayMark overlay={overlay} />
+      <ChangeOverlayMark overlay={overlay} compact={compact} />
     </span>
   )
 }
@@ -337,7 +341,10 @@ export const RelationshipEdge = memo(function RelationshipEdge({
 
   const overlays = data.overlays ?? {}
   const bundled = resolved.length > 1
-  const unfolded = bundled && (unfoldsBundles(level) || expandedEdgeIds.includes(id))
+  const unfolded =
+    bundled &&
+    level !== 'minimal' &&
+    (unfoldsBundles(level) || expandedEdgeIds.includes(id))
   const selectedEntry = resolved.find(
     (entry) => entry.relationship.relationshipId === selectedRelationshipId,
   )
@@ -389,9 +396,10 @@ export const RelationshipEdge = memo(function RelationshipEdge({
               overlay={edgeOverlay}
               zIndex={edgeLabelZIndex}
               dimmed={dimmed}
+              compact={level === 'minimal'}
             />
           )}
-          {bundled ? (
+          {bundled && level !== 'minimal' ? (
             <EdgeBadge
               point={badgePoint}
               zIndex={edgeLabelZIndex}
@@ -408,7 +416,7 @@ export const RelationshipEdge = memo(function RelationshipEdge({
               {badgeLabel} ▸
             </EdgeBadge>
           ) : (
-            level !== 'overview' &&
+            (level === 'standard' || level === 'full') &&
             single && (
               <EdgeBadge
                 point={badgePoint}

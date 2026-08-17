@@ -548,7 +548,7 @@ describe('accessible architecture graph — the state a screen reader hears is t
  *
  * A **pan** is a different matter. React Flow's `autoPanOnNodeFocus` brings a
  * node that lies outside the viewport into view at the same zoom, and it is
- * deliberately left on (ADR 0018): since ADR 0017 the entry zoom is 0.77 rather
+ * deliberately left on (ADR 0018): since ADR 0024 the entry zoom is 0.93 rather
  * than 0.20, so a large model no longer fits on screen and a focus ring on an
  * off-screen node would be a ring nobody can see. That pan is requested by the
  * user's own Tab press — never by arriving data.

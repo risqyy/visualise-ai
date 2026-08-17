@@ -169,6 +169,42 @@ async function zoomToFullDetail(page: Page): Promise<void> {
   await expect(canvas).toHaveAttribute('data-detail-level', 'full')
 }
 
+test('2 · readable semantic stages expose only content that fits at both desktop sizes', async ({
+  page,
+}) => {
+  for (const viewport of [
+    { width: 1280, height: 720 },
+    { width: 1920, height: 1080 },
+  ] as const) {
+    await page.setViewportSize(viewport)
+    await openWorkspace(page)
+
+    const canvas = page.getByTestId('architecture-canvas')
+    await expect(canvas).toHaveAttribute('data-fit-view-count', '1')
+    const zoom = Number(await canvas.getAttribute('data-canvas-zoom'))
+    expect(zoom).toBeGreaterThanOrEqual(0.93)
+    const initialLevel = await canvas.getAttribute('data-detail-level')
+    expect(['overview', 'standard']).toContain(initialLevel)
+
+    // The readable entry picture keeps primary names but does not paint the
+    // 10 px technology rows/badges below their effective 10 px floor.
+    await expect(page.locator('[data-testid="node-name"]').first()).toBeVisible()
+    if (initialLevel === 'overview') {
+      await expect(page.locator('[data-testid="node-technology"]')).toHaveCount(0)
+    }
+
+    const zoomIn = page.locator('.react-flow__controls-zoomin')
+    if (initialLevel === 'overview') {
+      await zoomIn.click()
+      await expect(canvas).toHaveAttribute('data-detail-level', 'standard')
+    }
+    await expect(page.locator('[data-testid="node-technology"]').first()).toBeVisible()
+
+    await zoomToFullDetail(page)
+    await expect(canvas).toHaveAttribute('data-detail-level', 'full')
+  }
+})
+
 test.describe.configure({ mode: 'serial' })
 
 test('2 · the canvas draws the reported hierarchy across four nesting levels', async ({

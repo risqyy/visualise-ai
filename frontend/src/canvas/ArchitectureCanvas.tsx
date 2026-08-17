@@ -106,8 +106,8 @@ import { useCanvasVoice } from './useCanvasVoice'
  *    project and on an explicit click, never because data arrived.
  * 4. **The first picture is readable.** The automatic camera never goes below
  *    `MIN_READABLE_ZOOM`, and a project opens on its top levels with deeper
- *    containers collapsed (`collapse.ts`). Both are undone by an explicit
- *    "Gesamtes Modell einpassen", never by anything the data does.
+ *    containers collapsed (`collapse.ts`). Both are undone by the explicit
+ *    spatial "Gesamtkarte", never by anything the data does.
  *
  * The accessible surface — names, roles and states of the nodes and edges —
  * lives in `./canvasAccessibility`; this component only wires it up, owns the
@@ -489,7 +489,7 @@ function ArchitectureCanvasInner({
   const requestFit = useCallback(
     (mode: FitMode, afterRelayout: boolean) => {
       invalidatePendingSearchFocus()
-      // "Systemebene" reproduces the entry picture, and the entry picture keeps
+      // "Lesbare Systemübersicht" reproduces the entry picture, and the entry picture keeps
       // the selected component on screen. The whole-model overview does not: it
       // is about the model, not about one component of it.
       const focusComponentId =
@@ -924,7 +924,7 @@ function ArchitectureCanvasInner({
     [onToggleCollapsed],
   )
 
-  /** "Gesamtes Modell einpassen": everything open, everything on screen. */
+  /** "Gesamtkarte": everything open, everything on screen for orientation. */
   const onShowWholeModel = useCallback(() => {
     const willRelayout = graph.collapsedIds.length > 0
     if (willRelayout) setCollapsedComponentIds([])
