@@ -1,5 +1,7 @@
 import { z } from 'zod'
 
+import { GRAPH_ORIENTATIONS } from '@/canvas/graphOrientation'
+
 /**
  * Search parameters of the workspace route.
  *
@@ -27,6 +29,8 @@ const componentIdSchema = z.preprocess(
 export const workspaceSearchSchema = z.object({
   /** Selected component; drives the inspector. */
   component: componentIdSchema.optional().catch(undefined),
+  /** Reading direction of the architecture graph. */
+  layout: z.enum(GRAPH_ORIENTATIONS).optional().catch(undefined),
   /** Deep-focus target for large feedback or diff content. */
   focus: z.enum(DEEP_FOCUS_TARGETS).optional().catch(undefined),
   /** Show the component history instead of the current run. */

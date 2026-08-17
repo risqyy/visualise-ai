@@ -1,4 +1,8 @@
 import type { LayoutPoint } from './elkLayout'
+import {
+  DEFAULT_GRAPH_ORIENTATION,
+  type GraphOrientation,
+} from './graphOrientation'
 
 /**
  * Path helpers for the relationship edges.
@@ -20,7 +24,7 @@ const lerp = (from: LayoutPoint, to: LayoutPoint, ratio: number): LayoutPoint =>
 /** Default corner radius of a routed edge. */
 export const EDGE_CORNER_RADIUS = 10
 
-/** Vertical distance between two lines of a fanned-out bundle. */
+/** Perpendicular distance between two lines of a fanned-out bundle. */
 export const BUNDLE_FAN_SPACING = 13
 
 /**
@@ -72,6 +76,7 @@ export function roundedPolylinePath(
 export function fanRoute(
   points: readonly LayoutPoint[],
   offsetY: number,
+  orientation: GraphOrientation = DEFAULT_GRAPH_ORIENTATION,
 ): LayoutPoint[] {
   if (points.length < 2 || offsetY === 0) return [...points]
 
@@ -82,15 +87,38 @@ export function fanRoute(
     working = [start, lerp(start, end, 0.3), lerp(start, end, 0.7), end]
   }
 
-  return working.map((point, index) =>
+  const shifted = working.map((point, index) =>
     index === 0 || index === working.length - 1
       ? point
-      : { x: point.x, y: point.y + offsetY },
+      : orientation === 'top-down'
+        ? { x: point.x + offsetY, y: point.y }
+        : { x: point.x, y: point.y + offsetY },
   )
+
+  // Keep the first and last points on their handles while connecting them to
+  // the shifted interior with orthogonal bends. Translating the interior of a
+  // route otherwise turns its first/last segment into a diagonal at the
+  // handle. The first bend follows the reading direction so a left-to-right
+  // route leaves its source horizontally and a top-down route leaves it
+  // vertically.
+  const result: LayoutPoint[] = [shifted[0] as LayoutPoint]
+  for (let index = 1; index < shifted.length; index += 1) {
+    const next = shifted[index] as LayoutPoint
+    const current = result[result.length - 1] as LayoutPoint
+    if (current.x !== next.x && current.y !== next.y) {
+      result.push(
+        orientation === 'top-down'
+          ? { x: current.x, y: next.y }
+          : { x: next.x, y: current.y },
+      )
+    }
+    result.push(next)
+  }
+  return result
 }
 
 /**
- * Vertical offset of entry `index` of a bundle of `total` entries, centred
+ * Perpendicular offset of entry `index` of a bundle of `total` entries, centred
  * around the original route.
  */
 export function fanOffset(index: number, total: number): number {
@@ -132,7 +160,19 @@ export function pointAtRatio(
 export function fallbackRoute(
   source: LayoutPoint,
   target: LayoutPoint,
+  orientation: GraphOrientation = DEFAULT_GRAPH_ORIENTATION,
 ): LayoutPoint[] {
+  if (orientation === 'top-down') {
+    if (Math.abs(source.x - target.x) < 0.5) return [source, target]
+    const middleY = (source.y + target.y) / 2
+    return [
+      source,
+      { x: source.x, y: middleY },
+      { x: target.x, y: middleY },
+      target,
+    ]
+  }
+
   if (Math.abs(source.y - target.y) < 0.5) return [source, target]
   const middleX = (source.x + target.x) / 2
   return [

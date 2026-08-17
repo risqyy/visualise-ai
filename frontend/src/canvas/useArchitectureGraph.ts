@@ -5,6 +5,11 @@ import type { ComponentId } from '@/api/types'
 import { ancestorIds, collapseGraph, initialCollapsedIds } from './collapse'
 import { layoutArchitecture, type EdgeRoutes } from './elkLayout'
 import {
+  DEFAULT_GRAPH_ORIENTATION,
+  elkDirectionForOrientation,
+  type GraphOrientation,
+} from './graphOrientation'
+import {
   EMPTY_DIAGNOSTICS,
   projectArchitecture,
   projectionSignature,
@@ -75,6 +80,8 @@ export interface ArchitectureGraphOptions {
    * levels down actually arrive.
    */
   revealComponentId?: ComponentId | null
+  /** Direction used for handles, ports and the ELK layered layout. */
+  orientation?: GraphOrientation
 }
 
 /**
@@ -92,14 +99,21 @@ export interface ArchitectureGraphOptions {
  */
 export function useArchitectureGraph(
   model: ArchitectureModel | undefined,
-  options: ArchitectureGraphOptions = { collapsedComponentIds: [] },
+  options: ArchitectureGraphOptions = {
+    collapsedComponentIds: [],
+    orientation: DEFAULT_GRAPH_ORIENTATION,
+  },
 ): ArchitectureGraph {
-  const { collapsedComponentIds, revealComponentId } = options
+  const {
+    collapsedComponentIds,
+    revealComponentId,
+    orientation = DEFAULT_GRAPH_ORIENTATION,
+  } = options
   const reportedRelationshipCount = model?.relationships.length ?? 0
 
   const projection = useMemo(
-    () => projectArchitecture(model ?? EMPTY_MODEL),
-    [model],
+    () => projectArchitecture(model ?? EMPTY_MODEL, orientation),
+    [model, orientation],
   )
 
   /**
@@ -125,11 +139,17 @@ export function useArchitectureGraph(
         projection.nodes,
         projection.edges,
         collapsedKey === '' ? [] : collapsedKey.split(KEY_SEPARATOR),
+        orientation,
       ),
-    [projection, collapsedKey],
+    [projection, collapsedKey, orientation],
   )
 
   const signature = useMemo(() => projectionSignature(visible), [visible])
+  // Orientation is part of what ELK solves even though it does not alter the
+  // projected component/relationship inventory. Including it in the layout
+  // signature prevents the previous direction from being treated as current
+  // while the new solve is still running.
+  const layoutSignature = `${orientation}\u0001${signature}`
 
   const [laidOut, setLaidOut] = useState<LayoutState | null>(null)
   const [error, setError] = useState<unknown>(null)
@@ -145,10 +165,12 @@ export function useArchitectureGraph(
     runIdRef.current = runId
 
     let cancelled = false
-    void layoutArchitecture(visible.nodes, visible.edges)
+    void layoutArchitecture(visible.nodes, visible.edges, {
+      direction: elkDirectionForOrientation(orientation),
+    })
       .then((layout) => {
         if (cancelled || runIdRef.current !== runId) return
-        setLaidOut({ signature, nodes: layout.nodes, routes: layout.routes })
+        setLaidOut({ signature: layoutSignature, nodes: layout.nodes, routes: layout.routes })
         setError(null)
       })
       .catch((cause: unknown) => {
@@ -161,14 +183,14 @@ export function useArchitectureGraph(
     }
     // `signature` is derived from `visible`; both are listed so a graph that is
     // structurally identical after a refetch does not re-run ELK.
-  }, [visible, signature])
+  }, [visible, layoutSignature, orientation])
 
   // The edges always come from the current projection — an incoming update must
   // show up immediately, even if its layout is still being computed. Only the
   // node positions wait for ELK.
   return useMemo<ArchitectureGraph>(() => {
     const isEmpty = visible.nodes.length === 0
-    const isCurrent = laidOut !== null && laidOut.signature === signature
+    const isCurrent = laidOut !== null && laidOut.signature === layoutSignature
 
     return {
       nodes: isEmpty
@@ -182,7 +204,7 @@ export function useArchitectureGraph(
       isInitialLayout: !isEmpty && laidOut === null,
       isRelayouting: !isEmpty && !isCurrent,
       error,
-      signature,
+      signature: layoutSignature,
       // Counted on the *reported* model, not on what is open: a collapsed
       // container hides components, it does not remove them, and the pane's
       // "28 Komponenten" must keep saying 28.
@@ -198,7 +220,7 @@ export function useArchitectureGraph(
       reportedRelationshipCount,
       ancestorsOf: (componentId) => ancestorIds(projection.nodes, componentId),
     }
-  }, [laidOut, projection, visible, signature, error, reportedRelationshipCount])
+  }, [laidOut, projection, visible, layoutSignature, error, reportedRelationshipCount])
 }
 
 /**

@@ -3,6 +3,10 @@ import type { ComponentId, Identifier } from '@/api/types'
 import { dominantOverlay, type ChangeOverlay } from './changeOverlays'
 import { INITIAL_EXPANDED_DEPTH } from './detailLevel'
 import {
+  DEFAULT_GRAPH_ORIENTATION,
+  type GraphOrientation,
+} from './graphOrientation'
+import {
   HANDLE_IDS,
   LEAF_NODE_SIZE,
   RELATIONSHIP_EDGE_TYPE,
@@ -127,6 +131,7 @@ export function collapseGraph(
   nodes: readonly ArchitectureNode[],
   edges: readonly ArchitectureEdge[],
   collapsed: readonly ComponentId[],
+  orientation: GraphOrientation = DEFAULT_GRAPH_ORIENTATION,
 ): VisibleGraph {
   const requested = new Set(collapsed)
   const parentOf = parentIndex(nodes)
@@ -195,7 +200,7 @@ export function collapseGraph(
         width: LEAF_NODE_SIZE.width,
         height: LEAF_NODE_SIZE.height,
         measured: { width: LEAF_NODE_SIZE.width, height: LEAF_NODE_SIZE.height },
-        handles: nodeHandles(LEAF_NODE_SIZE.width, LEAF_NODE_SIZE.height),
+        handles: nodeHandles(LEAF_NODE_SIZE.width, LEAF_NODE_SIZE.height, orientation),
         data: {
           ...node.data,
           collapsed: true,
@@ -229,6 +234,8 @@ export function collapseGraph(
     applied: boolean
     relationships: NonNullable<ArchitectureEdge['data']>['relationships']
     overlays: Record<Identifier, ChangeOverlay>
+    /** Direction retained when this bundle was lifted onto visible ancestors. */
+    fallbackOrientation: GraphOrientation
     /** The untouched edge, when this bundle is exactly one unlifted edge. */
     original: ArchitectureEdge | null
   }
@@ -260,6 +267,7 @@ export function collapseGraph(
       applied: data.applied,
       relationships: data.relationships,
       overlays: data.overlays,
+      fallbackOrientation: data.fallbackOrientation ?? orientation,
       original: untouched ? edge : null,
     })
   }
@@ -285,6 +293,7 @@ export function collapseGraph(
           applied: bundle.applied,
           overlays: bundle.overlays,
           bundled: relationships.length > 1,
+          fallbackOrientation: bundle.fallbackOrientation,
         },
       } as ArchitectureEdge
     })

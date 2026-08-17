@@ -64,6 +64,7 @@ import {
   type ArchitectureEdge,
   type ArchitectureModel,
 } from './graphProjection'
+import type { GraphOrientation } from './graphOrientation'
 import { CanvasNodeActionsContext, type CanvasNodeActions } from './nodeActions'
 import {
   applyTemporaryPositions,
@@ -132,6 +133,8 @@ export interface ArchitectureCanvasProps {
   model: ArchitectureModel
   selectedComponentId?: ComponentId | undefined
   onSelectComponent: (componentId: ComponentId | null) => void
+  orientation: GraphOrientation
+  onOrientationChange: (orientation: GraphOrientation) => void
   /** Reports the counts the canvas actually draws to the pane header. */
   onMetricsChange?: (metrics: ArchitectureCanvasMetrics) => void
 }
@@ -158,6 +161,8 @@ function ArchitectureCanvasInner({
   model,
   selectedComponentId,
   onSelectComponent,
+  orientation,
+  onOrientationChange,
   onMetricsChange,
 }: ArchitectureCanvasProps) {
   const { t } = useTranslation('canvas')
@@ -176,6 +181,7 @@ function ArchitectureCanvasInner({
     // is — so a link into a component four levels down arrives, and the camera
     // policy is untouched by it.
     revealComponentId: selectedComponentId ?? null,
+    orientation,
   })
   const flow = useReactFlow()
   const storeApi = useStoreApi()
@@ -214,6 +220,9 @@ function ArchitectureCanvasInner({
   // Flipped by the first pan or zoom that came from a real input event. From
   // then on the camera is the user's and nothing but "Einpassen" touches it.
   const userMovedCameraRef = useRef(false)
+  // A direction switch is an explicit user action. It invalidates local drag
+  // positions and parks one fit until the direction-specific layout lands.
+  const orientationRef = useRef<GraphOrientation | null>(null)
   // The very first viewport React Flow renders with. Read once so a later
   // camera change never re-mounts the flow.
   const [initialViewport] = useState<Viewport>(() => useUiStore.getState().camera)
@@ -310,6 +319,20 @@ function ArchitectureCanvasInner({
   const pendingFitRef = useRef<{ mode: FitMode; focusComponentId: ComponentId | null } | null>(
     null,
   )
+
+  useEffect(() => {
+    const previous = orientationRef.current
+    orientationRef.current = orientation
+    // The first orientation is the URL/default input for the initial picture,
+    // not a second explicit camera movement.
+    if (previous === null || previous === orientation) return
+
+    // Positions are meaningful only in the coordinate system that produced
+    // them. Resetting them here keeps one transient set instead of persisting
+    // two direction-specific sets, while selection and disclosure stay intact.
+    clearNodePositions()
+    pendingFitRef.current = { mode: 'user', focusComponentId: null }
+  }, [clearNodePositions, orientation])
 
   /** Fits now if the graph is already the right one, otherwise after re-layout. */
   const requestFit = useCallback(
@@ -639,6 +662,7 @@ function ArchitectureCanvasInner({
       data-total-element-count={graph.appliedNodeCount + graph.overlayNodeCount}
       data-hidden-node-count={hiddenCount}
       data-collapsed-count={graph.collapsedIds.length}
+      data-layout-orientation={orientation}
       // The surface the camera was computed against. Reported so "is this node
       // actually on screen" is answerable from outside without a layout engine.
       data-surface-width={surfaceWidth}
@@ -777,6 +801,38 @@ function ArchitectureCanvasInner({
                   <TooltipContent>{t('tool.resetPositionsHint')}</TooltipContent>
                 </Tooltip>
               )}
+
+              <span className="bg-border mx-0.5 h-4 w-px" aria-hidden="true" />
+
+              <div
+                className="border-border/70 flex items-center rounded-sm border"
+                role="group"
+                aria-label={t('tool.layoutOrientation')}
+                data-testid="canvas-layout-orientation"
+              >
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-7 gap-1 px-2 text-xs"
+                  aria-pressed={orientation === 'top-down'}
+                  onClick={() => onOrientationChange('top-down')}
+                  data-testid="canvas-layout-top-down"
+                >
+                  <span aria-hidden="true">↓ </span>
+                  {t('tool.layoutTopDown')}
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-7 gap-1 px-2 text-xs"
+                  aria-pressed={orientation === 'left-right'}
+                  onClick={() => onOrientationChange('left-right')}
+                  data-testid="canvas-layout-left-right"
+                >
+                  <span aria-hidden="true">→ </span>
+                  {t('tool.layoutLeftRight')}
+                </Button>
+              </div>
 
               <Tooltip>
                 <TooltipTrigger asChild>

@@ -125,6 +125,39 @@ describe('collapsing the graph', () => {
     expect(service?.data.isCompound).toBe(true)
   })
 
+  it('keeps left-to-right handles on a collapsed container', () => {
+    const projection = projectArchitecture(
+      {
+        components: LARGE_COMPONENTS,
+        relationships: LARGE_RELATIONSHIPS,
+      },
+      'left-right',
+    )
+    const visible = collapseGraph(projection.nodes, projection.edges, ['mesh.s1'], 'left-right')
+    const service = visible.nodes.find((node) => node.id === 'mesh.s1')
+
+    expect(service?.handles).toEqual([
+      {
+        id: 'in',
+        type: 'target',
+        position: 'left',
+        x: 0,
+        y: LEAF_NODE_SIZE.height / 2,
+        width: 1,
+        height: 1,
+      },
+      {
+        id: 'out',
+        type: 'source',
+        position: 'right',
+        x: LEAF_NODE_SIZE.width,
+        y: LEAF_NODE_SIZE.height / 2,
+        width: 1,
+        height: 1,
+      },
+    ])
+  })
+
   it('lifts a relationship onto the nearest visible ancestor instead of dropping it', () => {
     const visible = collapseGraph(large.nodes, large.edges, initialCollapsedIds(large.nodes))
 
@@ -150,6 +183,26 @@ describe('collapsing the graph', () => {
     // equal to what the applied model reported.
     expect(visible.edges).toHaveLength(9)
     expect(countRelationships(visible.edges)).toBe(LARGE_RELATIONSHIPS.length)
+  })
+
+  it('keeps the left-to-right fallback orientation on lifted edges', () => {
+    const projection = projectArchitecture(
+      {
+        components: LARGE_COMPONENTS,
+        relationships: LARGE_RELATIONSHIPS,
+      },
+      'left-right',
+    )
+    const visible = collapseGraph(
+      projection.nodes,
+      projection.edges,
+      initialCollapsedIds(projection.nodes),
+      'left-right',
+    )
+
+    expect(visible.edges.every((edge) => edge.data?.fallbackOrientation === 'left-right')).toBe(
+      true,
+    )
   })
 
   it('does not draw a relationship whose two ends collapsed into the same box', () => {

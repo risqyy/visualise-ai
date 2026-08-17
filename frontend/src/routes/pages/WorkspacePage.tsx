@@ -10,6 +10,10 @@ import { WorkspaceHeader } from '@/components/workspace/WorkspaceHeader'
 import { WorkspaceLayout } from '@/components/workspace/WorkspaceLayout'
 import { useUiStore } from '@/state/uiStore'
 import type { DeepFocusTarget } from '@/routes/searchParams'
+import {
+  DEFAULT_GRAPH_ORIENTATION,
+  type GraphOrientation,
+} from '@/canvas/graphOrientation'
 
 const route = getRouteApi('/projects/$projectId/runs/$runId')
 
@@ -81,6 +85,16 @@ export function WorkspacePage() {
     [navigate],
   )
 
+  const setGraphOrientation = useCallback(
+    (layout: GraphOrientation) => {
+      void navigate({
+        search: (previous) => ({ ...previous, layout }),
+        replace: true,
+      })
+    },
+    [navigate],
+  )
+
   // Escape leaves deep focus — the mode enlarges content, it must never trap.
   useEffect(() => {
     if (!search.focus) return
@@ -101,6 +115,8 @@ export function WorkspacePage() {
             projectId={projectId}
             selectedComponentId={search.component}
             onSelectComponent={setSelectedComponent}
+            orientation={search.layout ?? DEFAULT_GRAPH_ORIENTATION}
+            onOrientationChange={setGraphOrientation}
           />
         }
         right={

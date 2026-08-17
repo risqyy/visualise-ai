@@ -79,6 +79,8 @@ const TEXTS: TextProbe[] = [
   { name: 'tab · selected', selector: '[role="tab"][aria-selected="true"]' },
   { name: 'tab · unselected', selector: '[role="tab"][aria-selected="false"]' },
   { name: 'button · fit view', selector: '[data-testid="canvas-fit-view"]' },
+  { name: 'button · top-down layout', selector: '[data-testid="canvas-layout-top-down"]' },
+  { name: 'button · left-to-right layout', selector: '[data-testid="canvas-layout-left-right"]' },
   { name: 'button · minimap', selector: '[data-testid="canvas-toggle-minimap"]' },
   { name: 'button · detail level', selector: '[data-testid="canvas-detail-level"]' },
   { name: 'status value · live connection', selector: '[data-testid="live-connection-state"]' },
@@ -95,6 +97,8 @@ const TEXTS: TextProbe[] = [
 const CONTROLS: ControlProbe[] = [
   { name: 'run selection (current run)', selector: `[data-testid="run-option-${MAIN_RUN}"]` },
   { name: 'canvas control · fit view', selector: '[data-testid="canvas-fit-view"]' },
+  { name: 'canvas control · top-down layout', selector: '[data-testid="canvas-layout-top-down"]' },
+  { name: 'canvas control · left-to-right layout', selector: '[data-testid="canvas-layout-left-right"]' },
   { name: 'canvas control · minimap toggle', selector: '[data-testid="canvas-toggle-minimap"]' },
   { name: 'canvas control · zoom in', selector: '.react-flow__controls-zoomin' },
   { name: 'canvas control · zoom out', selector: '.react-flow__controls-zoomout' },

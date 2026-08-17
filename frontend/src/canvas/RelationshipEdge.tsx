@@ -231,7 +231,12 @@ export const RelationshipEdge = memo(function RelationshipEdge({
   // The route comes from ELK when it is still valid. After a drag it is not,
   // and a plain orthogonal fallback between the two handles takes over.
   const route: LayoutPoint[] =
-    data.route ?? fallbackRoute({ x: sourceX, y: sourceY }, { x: targetX, y: targetY })
+    data.route ??
+    fallbackRoute(
+      { x: sourceX, y: sourceY },
+      { x: targetX, y: targetY },
+      data.fallbackOrientation,
+    )
 
   const overlays = data.overlays ?? {}
   const bundled = resolved.length > 1
@@ -316,7 +321,11 @@ export const RelationshipEdge = memo(function RelationshipEdge({
     <>
       {resolved.map((entry) => {
         const style = RELATIONSHIP_KIND_STYLE_BY_ID[entry.relationship.kind]
-        const fanned = fanRoute(route, fanOffset(entry.index, entry.total))
+        const fanned = fanRoute(
+          route,
+          fanOffset(entry.index, entry.total),
+          data.fallbackOrientation,
+        )
         const emphasised = entry.relationship.relationshipId === selectedRelationshipId
         return (
           <EdgeRoute
@@ -336,7 +345,11 @@ export const RelationshipEdge = memo(function RelationshipEdge({
         {resolved.map((entry) => {
           const overlay = overlays[entry.relationship.relationshipId]
           if (!overlay) return null
-          const fanned = fanRoute(route, fanOffset(entry.index, entry.total))
+          const fanned = fanRoute(
+            route,
+            fanOffset(entry.index, entry.total),
+            data.fallbackOrientation,
+          )
           return (
             <EdgeOverlayMark
               key={`state-${entry.relationship.relationshipId}`}
@@ -347,7 +360,11 @@ export const RelationshipEdge = memo(function RelationshipEdge({
         })}
         {resolved.map((entry) => {
           const style = RELATIONSHIP_KIND_STYLE_BY_ID[entry.relationship.kind]
-          const fanned = fanRoute(route, fanOffset(entry.index, entry.total))
+          const fanned = fanRoute(
+            route,
+            fanOffset(entry.index, entry.total),
+            data.fallbackOrientation,
+          )
           const emphasised = entry.relationship.relationshipId === selectedRelationshipId
           return (
             <EdgeBadge
