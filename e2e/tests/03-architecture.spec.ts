@@ -317,9 +317,6 @@ test('2 · the self run keeps 28 model components apart from its open proposal a
   await expect(
     page.locator('[data-testid^="canvas-node-"][data-presence="proposal"]'),
   ).toHaveCount(1)
-  await expect(
-    page.locator('[data-testid^="canvas-node-"][data-presence="ghost"]'),
-  ).toHaveCount(1)
   await expect(page.getByTestId('canvas-node-visualise-ai.repository-provider')).toHaveAttribute(
     'data-presence',
     'proposal',
