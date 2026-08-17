@@ -1,9 +1,12 @@
-import { useMemo } from 'react'
+import { useCallback, useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
 import { useArchitecture } from '@/api/queries'
 import type { ComponentId, ProjectId } from '@/api/types'
-import { ArchitectureCanvas } from '@/canvas/ArchitectureCanvas'
+import {
+  ArchitectureCanvas,
+  type ArchitectureCanvasMetrics,
+} from '@/canvas/ArchitectureCanvas'
 import { useChangeOverlays } from '@/canvas/useChangeOverlays'
 import { AsyncState } from '@/components/AsyncState'
 import { StatusLegend } from '@/components/StatusLegend'
@@ -41,6 +44,27 @@ export function ArchitecturePane({
 
   const componentCount = architecture.data?.components.length ?? 0
   const relationshipCount = architecture.data?.relationships.length ?? 0
+  const proposalComponentCount = overlay.extraComponents.filter(
+    (entry) => entry.overlay.presence === 'proposal',
+  ).length
+  const evidenceComponentCount = overlay.extraComponents.filter(
+    (entry) => entry.overlay.presence === 'ghost',
+  ).length
+  const [canvasMetrics, setCanvasMetrics] = useState<ArchitectureCanvasMetrics | null>(null)
+  const onCanvasMetricsChange = useCallback(
+    (metrics: ArchitectureCanvasMetrics) => setCanvasMetrics(metrics),
+    [],
+  )
+
+  // Ignore a metric from the previous snapshot for the one render between a
+  // refetch and the next canvas effect. A count is only meaningful when it
+  // describes the same reported model and the same element inventory.
+  const currentMetrics =
+    canvasMetrics !== null &&
+    canvasMetrics.reportedRelationshipCount === relationshipCount &&
+    canvasMetrics.totalElementCount === componentCount + overlay.extraComponents.length
+      ? canvasMetrics
+      : null
 
   // The legend is a key to what is drawn, so it lists only the kinds actually
   // reported. Deriving it here keeps the legend and the canvas reading from the
@@ -82,11 +106,46 @@ export function ArchitecturePane({
                 issue's: the words moved into the catalogue, the `_one`/`_other`
                 forms follow with the locale-aware formatting service.
               */}
-              <Badge variant="outline" className="text-2xs font-normal">
-                {t('pane.components', { count: componentCount })}
+              <Badge
+                variant="outline"
+                className="text-2xs font-normal"
+                data-testid="architecture-model-count"
+              >
+                {t('pane.modelComponents', { count: componentCount })}
               </Badge>
-              <Badge variant="outline" className="text-2xs font-normal">
-                {t('pane.relationships', { count: relationshipCount })}
+              {proposalComponentCount > 0 && (
+                <Badge
+                  variant="outline"
+                  className="text-2xs font-normal"
+                  data-testid="architecture-proposal-count"
+                >
+                  {t('pane.proposedComponents', { count: proposalComponentCount })}
+                </Badge>
+              )}
+              {evidenceComponentCount > 0 && (
+                <Badge
+                  variant="outline"
+                  className="text-2xs font-normal"
+                  data-testid="architecture-evidence-count"
+                >
+                  {t('pane.evidenceComponents', { count: evidenceComponentCount })}
+                </Badge>
+              )}
+              <Badge
+                variant="outline"
+                className="text-2xs font-normal"
+                title={t('pane.relationshipSummaryHint')}
+                data-testid="architecture-relationship-count"
+              >
+                {t('pane.reportedRelationships', { count: relationshipCount })}
+                {currentMetrics !== null && (
+                  <>
+                    {' · '}
+                    {t('pane.renderedConnections', {
+                      count: currentMetrics.visibleConnectionCount,
+                    })}
+                  </>
+                )}
               </Badge>
             </div>
           )
@@ -118,6 +177,7 @@ export function ArchitecturePane({
             model={model}
             selectedComponentId={selectedComponentId}
             onSelectComponent={onSelectComponent}
+            onMetricsChange={onCanvasMetricsChange}
           />
         )}
       </div>

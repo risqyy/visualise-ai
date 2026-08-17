@@ -1,21 +1,21 @@
 {
   "a11y": {
     "agentsReporting": "{{agents}} are reporting on it",
-    "bundleOf": "bundled edge with {{relationships}}",
+    "bundleOf": "bundled edge with {{relationships}}, rendered connection",
     "collapsedNote": "collapsed, {{components}} hidden",
     "componentRole": "architecture component",
     "containerRole": "architecture container",
     "contains": "container holding {{components}}",
     "fitView": "Fit the view",
-    "fromTo": "Relationship from {{source}} to {{target}}",
+    "fromTo": "Reported relationship from {{source}} to {{target}}",
     "furtherRelationships": "and {{relationships}} more",
-    "ghostNote": "no longer part of the applied architecture model",
+    "ghostNote": "no longer part of the applied architecture model, shown as evidence only",
     "handle": "Connection point",
     "identifiedBy": "component id {{componentId}}",
     "inContainer": "in {{container}}",
     "noWorkState": "no change status reported",
     "proposalNote": "announced, not part of the applied architecture model yet",
-    "relationshipRole": "architecture relationship",
+    "relationshipRole": "architecture relationship, rendered connection",
     "rolledUpNote": "reported for a collapsed component inside it",
     "toggleInteractive": "Toggle interactivity",
     "zoomControls": "Zoom controls of the architecture graph",
@@ -61,8 +61,8 @@
     "protocol": "Protocol: {{value}}"
   },
   "graph": {
-    "edgeInstructions": "Enter or Space selects this relationship; on a bundled edge it unfolds and folds the relationships it contains. Escape clears the selection.",
-    "instructions": "Architecture graph of the project. Use Tab to move between the components and the relationships. Enter or Space selects the focused component and shows it in the inspector; activating it again clears the selection, as does Escape. Every component names its reported name, its kind, whether it contains further components, which container it sits in, and what change status an agent reported for it. The graph is an observation: the reported architecture model cannot be edited here.",
+    "edgeInstructions": "Enter or Space selects this rendered connection; on a bundled edge it unfolds and folds the reported relationships it contains. Escape clears the selection.",
+    "instructions": "Architecture graph of the project. Use Tab to move between the components and the rendered connections. Enter or Space selects the focused component and shows it in the inspector; activating it again clears the selection, as does Escape. Every component names its reported name, its kind, whether it contains further components, which container it sits in, and what change status an agent reported for it. Reported relationships may be rendered as one bundled connection. The graph is an observation: the applied architecture model cannot be edited here.",
     "label": "Interactive architecture graph",
     "layouting": "Computing the layout…",
     "minimapLabel": "Overview map of the architecture",
@@ -98,11 +98,20 @@
     "workStepRunning": "Work step running: {{title}}"
   },
   "pane": {
-    "components": "{{count}} components",
     "emptyDescription": "The model appears as soon as an agent sends architecture.snapshot_published.",
     "emptyTitle": "No architecture model reported yet",
+    "evidenceComponents_one": "+ {{count, number}} component shown as evidence only",
+    "evidenceComponents_other": "+ {{count, number}} components shown as evidence only",
     "label": "Architecture surface",
-    "relationships": "{{count}} relationships",
+    "modelComponents_one": "{{count, number}} model component",
+    "modelComponents_other": "{{count, number}} model components",
+    "proposedComponents_one": "+ {{count, number}} proposal",
+    "proposedComponents_other": "+ {{count, number}} proposals",
+    "relationshipSummaryHint": "Relationships are reported statements of the applied model. Connections are the lines currently rendered; collapse, lifting and bundling can show several relationships as one connection.",
+    "reportedRelationships_one": "{{count, number}} reported relationship",
+    "reportedRelationships_other": "{{count, number}} reported relationships",
+    "renderedConnections_one": "{{count, number}} connection rendered",
+    "renderedConnections_other": "{{count, number}} connections rendered",
     "title": "Architecture"
   },
   "relationshipKind": {
@@ -145,8 +154,9 @@
     "showMinimap": "Show the overview map"
   },
   "visibility": {
-    "hint": "Deeper components are collapsed behind their container so the upper levels stay readable. Expand them through the triangle on the container, through a deep link or through “Fit the whole model”.",
-    "summary": "{{visible}} of {{total}} components visible"
+    "hint": "Deeper components are collapsed behind their container so the upper levels stay readable. Connections to collapsed components are lifted to the visible container. Relationships whose two ends are inside the same collapsed container are intentionally not drawn. Parallel reported relationships may be bundled into one connection. Expand them through the triangle on the container, through a deep link or through “Fit the whole model”.",
+    "summary_one": "{{visible, number}} of {{total, number}} element visible",
+    "summary_other": "{{visible, number}} of {{total, number}} elements visible"
   },
   "workState": {
     "active": {

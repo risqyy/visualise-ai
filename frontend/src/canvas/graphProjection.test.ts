@@ -10,6 +10,7 @@ import {
   appliedRelationship,
   reorder,
 } from '@/test/architectureFixtures'
+import type { ChangeOverlay, ChangeOverlayModel } from './changeOverlays'
 
 import {
   COMPONENT_NODE_TYPE,
@@ -196,6 +197,58 @@ describe('projectArchitecture — bundling and NATS topics', () => {
     const { edges } = projectArchitecture({ components, relationships })
     expect(edges).toHaveLength(2)
     expect(edges.every((edge) => edge.data?.bundled === false)).toBe(true)
+  })
+})
+
+describe('projectArchitecture — model and overlay counts', () => {
+  it('keeps proposed elements out of the applied model count', () => {
+    const proposal = appliedComponent({
+      componentId: 'platform.proposal',
+      name: 'Proposed component',
+      kind: 'module',
+      parentComponentId: null,
+    })
+    const proposalRelationship = appliedRelationship({
+      relationshipId: 'r-proposal',
+      sourceComponentId: 'platform.proposal',
+      targetComponentId: 'platform.db',
+      kind: 'dependency',
+    })
+    const proposalOverlay: ChangeOverlay = {
+      targetKind: 'component',
+      targetId: proposal.componentId,
+      state: 'planned',
+      presence: 'proposal',
+      operation: 'add',
+      contributions: [],
+      agentIds: [],
+      descriptor: proposal,
+    }
+    const relationshipOverlay: ChangeOverlay = {
+      ...proposalOverlay,
+      targetKind: 'relationship',
+      targetId: proposalRelationship.relationshipId,
+      descriptor: proposalRelationship,
+    }
+    const overlay: ChangeOverlayModel = {
+      components: new Map(),
+      relationships: new Map(),
+      extraComponents: [{ component: proposal, overlay: proposalOverlay }],
+      extraRelationships: [{ relationship: proposalRelationship, overlay: relationshipOverlay }],
+      counts: { planned: 2, active: 0, recently_applied: 0, removed: 0 },
+      total: 2,
+    }
+
+    const projection = projectArchitecture({
+      components: NESTED_COMPONENTS,
+      relationships: NESTED_RELATIONSHIPS,
+      overlay,
+    })
+
+    expect(projection.appliedNodeCount).toBe(NESTED_COMPONENTS.length)
+    expect(projection.overlayNodeCount).toBe(1)
+    expect(projection.appliedEdgeCount).toBe(6)
+    expect(projection.overlayEdgeCount).toBe(1)
   })
 })
 

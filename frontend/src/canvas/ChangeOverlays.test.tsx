@@ -1,7 +1,7 @@
 import { act, screen, waitFor, within } from '@testing-library/react'
 import { describe, expect, it } from 'vitest'
 
-import type { ArchitectureResponse, Component } from '@/api/types'
+import type { ArchitectureResponse, Component, Relationship } from '@/api/types'
 import { applyLiveEvent } from '@/api/useLiveStream'
 import { DEFAULT_CAMERA, useUiStore } from '@/state/uiStore'
 import { WORK_STATES } from '@/state/workStates'
@@ -39,6 +39,15 @@ const PAYMENTS_DESCRIPTOR: Component = {
   name: 'Payment Provider',
   kind: 'external',
   parentComponentId: null,
+}
+
+/** A relationship-only proposal whose endpoints are already in the model. */
+const RELATIONSHIP_ONLY_PROPOSAL: Relationship = {
+  relationshipId: 'r-10',
+  sourceComponentId: 'platform.core.orders',
+  targetComponentId: 'external.payments',
+  kind: 'dependency',
+  label: 'Order payment dependency',
 }
 
 /** The nested model after the payment provider and its edge were removed. */
@@ -128,6 +137,15 @@ describe('live change overlays — every state appears after its own event', () 
       const edgesBefore = canvas.getAttribute('data-edge-count')
       expect(nodesBefore).toBe(String(NESTED_COMPONENTS.length))
       expect(canvas.getAttribute('data-overlay-node-count')).toBe('0')
+      expect(canvas.getAttribute('data-total-element-count')).toBe(
+        String(NESTED_COMPONENTS.length),
+      )
+      expect(canvas.getAttribute('data-visible-connection-count')).toBe('6')
+      await waitFor(() =>
+        expect(screen.getByTestId('architecture-relationship-count')).toHaveTextContent(
+          '8 gemeldete Beziehungen · 6 Verbindungen dargestellt',
+        ),
+      )
       expect(screen.queryByTestId('canvas-node-platform.core.shipping')).toBeNull()
 
       // A planned change never enters `components`/`relationships` — the read
@@ -161,6 +179,16 @@ describe('live change overlays — every state appears after its own event', () 
       expect(canvas.getAttribute('data-edge-count')).toBe(edgesBefore)
       // …and the proposal is drawn next to it, marked as a proposal.
       expect(canvas.getAttribute('data-overlay-node-count')).toBe('1')
+      expect(canvas.getAttribute('data-total-element-count')).toBe(
+        String(NESTED_COMPONENTS.length + 1),
+      )
+      expect(screen.getByTestId('architecture-model-count')).toHaveTextContent(
+        `${NESTED_COMPONENTS.length} Modellkomponenten`,
+      )
+      expect(screen.getByTestId('architecture-proposal-count')).toHaveTextContent('+ 1 Vorschlag')
+      expect(screen.getByTestId('canvas-visibility')).toHaveTextContent(
+        `${NESTED_COMPONENTS.length + 1} von ${NESTED_COMPONENTS.length + 1} Elementen sichtbar`,
+      )
       expect(proposal).toHaveAttribute('data-work-state', 'planned')
       expect(proposal).toHaveAttribute('data-work-state-label', 'geplant')
       expect(proposal).toHaveAttribute('data-presence', 'proposal')
@@ -527,6 +555,9 @@ describe('live change overlays — a replacing snapshot', () => {
           'ghost',
         ),
       )
+      expect(screen.getByTestId('architecture-evidence-count')).toHaveTextContent(
+        '+ 1 Komponente nur als Beleg',
+      )
 
       // Then a snapshot that contains the component again. A ghost of it would
       // now contradict the model on screen.
@@ -642,6 +673,56 @@ describe('live change overlays — the camera and the selection stay put', () =>
       expect(screen.getByTestId('canvas-node-platform.db')).toHaveAttribute(
         'data-selected',
         'true',
+      )
+    },
+    CANVAS_TIMEOUT,
+  )
+})
+
+describe('live change overlays — relationship metrics stay current', () => {
+  it(
+    'updates rendered connections for a relationship-only proposal',
+    async () => {
+      const { queryClient, publish } = renderCanvas()
+      const canvas = await waitForCanvas()
+
+      await waitFor(() =>
+        expect(screen.getByTestId('architecture-relationship-count')).toHaveTextContent(
+          '8 gemeldete Beziehungen · 6 Verbindungen dargestellt',
+        ),
+      )
+
+      publish(
+        architectureWithChanges([
+          activeChange({
+            changeId: 'change-rel-only',
+            targetKind: 'relationship',
+            targetId: RELATIONSHIP_ONLY_PROPOSAL.relationshipId,
+            snapshot: RELATIONSHIP_ONLY_PROPOSAL as unknown as Record<string, unknown>,
+          }),
+        ]),
+      )
+      await act(async () => {
+        applyLiveEvent(
+          queryClient,
+          streamedEvent(
+            'relationship.change_planned',
+            {
+              changeId: 'change-rel-only',
+              operation: 'add',
+              relationship: RELATIONSHIP_ONLY_PROPOSAL,
+            },
+            { position: 59 },
+          ),
+        )
+      })
+
+      await waitForSettledLayout(canvas)
+      expect(canvas.getAttribute('data-overlay-edge-count')).toBe('1')
+      await waitFor(() =>
+        expect(screen.getByTestId('architecture-relationship-count')).toHaveTextContent(
+          '8 gemeldete Beziehungen · 7 Verbindungen dargestellt',
+        ),
       )
     },
     CANVAS_TIMEOUT,

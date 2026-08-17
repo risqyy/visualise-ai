@@ -1,21 +1,21 @@
 {
   "a11y": {
     "agentsReporting": "{{agents}} melden dazu",
-    "bundleOf": "Sammelkante mit {{relationships}}",
+    "bundleOf": "Sammelkante mit {{relationships}}, dargestellte Verbindung",
     "collapsedNote": "eingeklappt, {{components}} verborgen",
     "componentRole": "Architekturkomponente",
     "containerRole": "Architekturcontainer",
     "contains": "Container mit {{components}}",
     "fitView": "Ansicht einpassen",
-    "fromTo": "Beziehung von {{source}} zu {{target}}",
+    "fromTo": "Gemeldete Beziehung von {{source}} zu {{target}}",
     "furtherRelationships": "und {{relationships}} weitere",
-    "ghostNote": "nicht mehr Teil des angewandten Architekturmodells",
+    "ghostNote": "nicht mehr Teil des angewandten Architekturmodells, nur noch als Beleg dargestellt",
     "handle": "Verbindungspunkt",
     "identifiedBy": "Komponenten-ID {{componentId}}",
     "inContainer": "in {{container}}",
     "noWorkState": "kein Änderungsstatus gemeldet",
     "proposalNote": "angekündigt, noch nicht Teil des angewandten Architekturmodells",
-    "relationshipRole": "Architekturbeziehung",
+    "relationshipRole": "Architekturbeziehung, dargestellte Verbindung",
     "rolledUpNote": "gemeldet für eine eingeklappte Komponente darin",
     "toggleInteractive": "Interaktivität umschalten",
     "zoomControls": "Zoomsteuerung des Architekturgraphen",
@@ -61,8 +61,8 @@
     "protocol": "Protokoll: {{value}}"
   },
   "graph": {
-    "edgeInstructions": "Enter oder Leertaste wählt diese Beziehung aus; bei einer Sammelkante klappt sie die enthaltenen Beziehungen auf und wieder zu. Escape hebt die Auswahl auf.",
-    "instructions": "Architekturgraph des Projekts. Mit der Tabulatortaste zwischen den Komponenten und Beziehungen wechseln. Enter oder Leertaste wählt die fokussierte Komponente aus und zeigt sie im Inspector; eine erneute Aktivierung hebt die Auswahl auf, Escape ebenfalls. Jede Komponente nennt ihren gemeldeten Namen, ihre Art, ob sie weitere Komponenten enthält, in welchem Container sie liegt und welchen Änderungsstatus ein Agent für sie gemeldet hat. Der Graph ist eine Beobachtung: das gemeldete Architekturmodell lässt sich hier nicht bearbeiten.",
+    "edgeInstructions": "Enter oder Leertaste wählt diese dargestellte Verbindung aus; bei einer Sammelkante klappt sie die enthaltenen gemeldeten Beziehungen auf und wieder zu. Escape hebt die Auswahl auf.",
+    "instructions": "Architekturgraph des Projekts. Mit der Tabulatortaste zwischen den Komponenten und den dargestellten Verbindungen wechseln. Enter oder Leertaste wählt die fokussierte Komponente aus und zeigt sie im Inspector; eine erneute Aktivierung hebt die Auswahl auf, Escape ebenfalls. Jede Komponente nennt ihren gemeldeten Namen, ihre Art, ob sie weitere Komponenten enthält, in welchem Container sie liegt und welchen Änderungsstatus ein Agent für sie gemeldet hat. Gemeldete Beziehungen können als eine gebündelte Verbindung dargestellt werden. Der Graph ist eine Beobachtung: das angewandte Architekturmodell lässt sich hier nicht bearbeiten.",
     "label": "Interaktiver Architekturgraph",
     "layouting": "Layout wird berechnet…",
     "minimapLabel": "Übersichtskarte der Architektur",
@@ -98,11 +98,20 @@
     "workStepRunning": "Arbeitsschritt läuft: {{title}}"
   },
   "pane": {
-    "components": "{{count}} Komponenten",
     "emptyDescription": "Das Modell erscheint, sobald ein Agent architecture.snapshot_published sendet.",
     "emptyTitle": "Noch kein Architekturmodell gemeldet",
+    "evidenceComponents_one": "+ {{count, number}} Komponente nur als Beleg",
+    "evidenceComponents_other": "+ {{count, number}} Komponenten nur als Beleg",
     "label": "Architekturfläche",
-    "relationships": "{{count}} Beziehungen",
+    "modelComponents_one": "{{count, number}} Modellkomponente",
+    "modelComponents_other": "{{count, number}} Modellkomponenten",
+    "proposedComponents_one": "+ {{count, number}} Vorschlag",
+    "proposedComponents_other": "+ {{count, number}} Vorschläge",
+    "relationshipSummaryHint": "Beziehungen sind die gemeldeten Aussagen des angewandten Modells. Verbindungen sind die aktuell dargestellten Linien; Einklappen, Anheben und Bündeln können mehrere Beziehungen als eine Verbindung zeigen.",
+    "reportedRelationships_one": "{{count, number}} gemeldete Beziehung",
+    "reportedRelationships_other": "{{count, number}} gemeldete Beziehungen",
+    "renderedConnections_one": "{{count, number}} Verbindung dargestellt",
+    "renderedConnections_other": "{{count, number}} Verbindungen dargestellt",
     "title": "Architektur"
   },
   "relationshipKind": {
@@ -145,8 +154,9 @@
     "showMinimap": "Übersichtskarte einblenden"
   },
   "visibility": {
-    "hint": "Tiefere Komponenten sind hinter ihrem Container eingeklappt, damit die oberen Ebenen lesbar bleiben. Aufklappen über das Dreieck am Container, über einen Deep Link oder über „Gesamtes Modell einpassen\".",
-    "summary": "{{visible}} von {{total}} Komponenten sichtbar"
+    "hint": "Tiefere Komponenten werden hinter ihrem Container eingeklappt, damit die oberen Ebenen lesbar bleiben. Verbindungen zu eingeklappten Komponenten werden auf den sichtbaren Container angehoben. Beziehungen innerhalb desselben eingeklappten Containers werden absichtlich nicht gezeichnet. Parallele gemeldete Beziehungen können als eine Sammelverbindung gebündelt werden. Aufklappen über das Dreieck am Container, über einen Deep Link oder über „Gesamtes Modell einpassen\".",
+    "summary_one": "{{visible, number}} von {{total, number}} Element sichtbar",
+    "summary_other": "{{visible, number}} von {{total, number}} Elementen sichtbar"
   },
   "workState": {
     "active": {

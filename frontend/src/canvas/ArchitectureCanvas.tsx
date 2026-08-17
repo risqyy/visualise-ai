@@ -132,6 +132,17 @@ export interface ArchitectureCanvasProps {
   model: ArchitectureModel
   selectedComponentId?: ComponentId | undefined
   onSelectComponent: (componentId: ComponentId | null) => void
+  /** Reports the counts the canvas actually draws to the pane header. */
+  onMetricsChange?: (metrics: ArchitectureCanvasMetrics) => void
+}
+
+export interface ArchitectureCanvasMetrics {
+  appliedComponentCount: number
+  overlayComponentCount: number
+  visibleElementCount: number
+  totalElementCount: number
+  reportedRelationshipCount: number
+  visibleConnectionCount: number
 }
 
 export function ArchitectureCanvas(props: ArchitectureCanvasProps) {
@@ -147,6 +158,7 @@ function ArchitectureCanvasInner({
   model,
   selectedComponentId,
   onSelectComponent,
+  onMetricsChange,
 }: ArchitectureCanvasProps) {
   const { t } = useTranslation('canvas')
   // The words *and* the counted nouns the accessible names are built from —
@@ -580,6 +592,31 @@ function ArchitectureCanvasInner({
   const problemCount = diagnosticsCount(graph.diagnostics)
   const hiddenCount = graph.hiddenComponentIds.size
 
+  const canvasMetrics = useMemo<ArchitectureCanvasMetrics>(
+    () => ({
+      appliedComponentCount: graph.appliedNodeCount,
+      overlayComponentCount: graph.overlayNodeCount,
+      visibleElementCount: graph.visibleNodeCount,
+      totalElementCount: graph.appliedNodeCount + graph.overlayNodeCount,
+      reportedRelationshipCount: graph.reportedRelationshipCount,
+      visibleConnectionCount: graph.visibleEdgeCount,
+    }),
+    [
+      graph.appliedNodeCount,
+      graph.overlayNodeCount,
+      graph.visibleNodeCount,
+      graph.reportedRelationshipCount,
+      graph.visibleEdgeCount,
+    ],
+  )
+
+  // Publish before the browser paints. Collapse and overlay updates change the
+  // visible connection count without necessarily changing the pane's model
+  // counts, so a passive effect would briefly expose the previous number.
+  useLayoutEffect(() => {
+    onMetricsChange?.(canvasMetrics)
+  }, [canvasMetrics, onMetricsChange])
+
   // The applied model and the overlay are counted separately on purpose: a
   // planned change must become visible on the canvas **without** changing what
   // the applied model contains, and these two numbers are how that stays
@@ -597,6 +634,9 @@ function ArchitectureCanvasInner({
       data-overlay-node-count={graph.overlayNodeCount}
       data-overlay-edge-count={graph.overlayEdgeCount}
       data-visible-node-count={graph.visibleNodeCount}
+      data-visible-connection-count={graph.visibleEdgeCount}
+      data-reported-relationship-count={graph.reportedRelationshipCount}
+      data-total-element-count={graph.appliedNodeCount + graph.overlayNodeCount}
       data-hidden-node-count={hiddenCount}
       data-collapsed-count={graph.collapsedIds.length}
       // The surface the camera was computed against. Reported so "is this node
@@ -781,7 +821,7 @@ function ArchitectureCanvasInner({
                 </TooltipContent>
               </Tooltip>
 
-              {hiddenCount > 0 && (
+              {graph.appliedNodeCount + graph.overlayNodeCount > 0 && (
                 <Tooltip>
                   <TooltipTrigger asChild>
                     <span
@@ -790,7 +830,8 @@ function ArchitectureCanvasInner({
                     >
                       {t(DISCLOSURE_LABEL_KEYS.visibility, {
                         visible: graph.visibleNodeCount,
-                        total: graph.visibleNodeCount + hiddenCount,
+                        total: graph.appliedNodeCount + graph.overlayNodeCount,
+                        count: graph.appliedNodeCount + graph.overlayNodeCount,
                       })}
                     </span>
                   </TooltipTrigger>
@@ -899,4 +940,3 @@ function diagnosticLines(
   }
   return lines
 }
-

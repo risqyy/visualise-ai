@@ -1,8 +1,16 @@
 import { expect, test, type Page } from '@playwright/test'
 
-import { getJson } from '../src/api.js'
+import { asAccepted, bootstrapEvent, getJson, postEvent } from '../src/api.js'
 import { showWholeModel } from '../src/canvas.js'
-import { MAIN_PROJECT, MAIN_RUN } from '../src/config.js'
+import {
+  MAIN_PROJECT,
+  MAIN_RUN,
+  SELF_BOOTSTRAP_AGENT,
+  SELF_BOOTSTRAP_RUN,
+  SELF_PROJECT,
+  SELF_RUN,
+} from '../src/config.js'
+import { startSimulator } from '../src/simulator.js'
 
 /**
  * Mandatory check 2 — the full architecture canvas: hierarchy and typed
@@ -48,6 +56,8 @@ const RELATIONSHIP_KINDS = [
   'nats_topic',
   'dependency',
 ] as const
+
+const SELF_BOOTSTRAP_EVENT_ID = '22222222-0000-4000-8000-000000000002'
 
 async function openWorkspace(page: Page): Promise<void> {
   await page.goto(`/projects/${MAIN_PROJECT}/runs/${MAIN_RUN}`)
@@ -250,6 +260,67 @@ test('2 · every relationship kind is drawn, and every reported NATS topic stays
   expect(edgeInventory.appliedEdges).toBe(architecture.relationships.length)
   expect(edgeInventory.labels).toBe(
     edgeInventory.appliedEdges + edgeInventory.overlayEdges,
+  )
+})
+
+test('2 · the self run keeps 28 model components apart from its open proposal at initial depth', async ({
+  page,
+}) => {
+  const opened = await postEvent(
+    bootstrapEvent({
+      clientEventId: SELF_BOOTSTRAP_EVENT_ID,
+      projectId: SELF_PROJECT,
+      runId: SELF_BOOTSTRAP_RUN,
+      agentId: SELF_BOOTSTRAP_AGENT,
+      displayName: 'Self-run acceptance bootstrap',
+    }),
+  )
+  expect(opened.status, JSON.stringify(opened.body)).toBe(201)
+  expect(asAccepted(opened).position).toBe(1)
+
+  await page.goto(`/projects/${SELF_PROJECT}/runs/${SELF_RUN}`)
+  await expect(page.getByTestId('live-connection-state')).toHaveAttribute(
+    'data-state',
+    'live',
+  )
+
+  // The browser is subscribed before the self scenario publishes its snapshot;
+  // speed 0 keeps this structural check short without sampling transient work states.
+  const simulator = startSimulator({ scenario: 'self', speed: 0 })
+  await expect(page.getByTestId('architecture-canvas')).toBeVisible({ timeout: 120_000 })
+
+  const summary = await simulator.done
+  expect(summary.scenario).toBe('self')
+  expect(summary.projectId).toBe(SELF_PROJECT)
+  expect(summary.runId).toBe(SELF_RUN)
+  expect(summary.conflicts).toBe(0)
+  expect(summary.duplicates).toBe(0)
+  expect(summary.created).toBe(summary.eventsSent)
+  expect(summary.endPosition).toBe(summary.eventsSent + 1)
+
+  const canvas = page.getByTestId('architecture-canvas')
+  await expect(canvas).toHaveAttribute('data-node-count', '28')
+  await expect(canvas).toHaveAttribute('data-overlay-node-count', '1')
+  await expect(canvas).toHaveAttribute('data-total-element-count', '29')
+  await expect(canvas).toHaveAttribute('data-reported-relationship-count', '35')
+  await expect(page.getByTestId('architecture-model-count')).toContainText(
+    '28 Modellkomponenten',
+  )
+  await expect(page.getByTestId('architecture-proposal-count')).toContainText(
+    '+ 1 Vorschlag',
+  )
+  await expect(page.getByTestId('canvas-node-visualise-ai.repository-provider')).toHaveAttribute(
+    'data-presence',
+    'proposal',
+  )
+
+  // The initial depth shows ten of the 29 total elements. The open proposal is
+  // included in that visible-element count but remains outside the 28-model
+  // component count above; nine connections are visible at this depth.
+  await expect(canvas).toHaveAttribute('data-visible-node-count', '10')
+  await expect(canvas).toHaveAttribute('data-visible-connection-count', '9')
+  await expect(page.getByTestId('architecture-relationship-count')).toContainText(
+    '35 gemeldete Beziehungen · 9 Verbindungen dargestellt',
   )
 })
 
