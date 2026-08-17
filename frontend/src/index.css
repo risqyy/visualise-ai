@@ -247,6 +247,7 @@
 }
 
 .canvas-toolbar-action {
+  min-width: var(--vai-hit-area-size);
   min-height: var(--vai-hit-area-size);
   touch-action: manipulation;
 }
