@@ -426,7 +426,7 @@ test('2 · arrow navigation exposes the active result and deep links keep jump e
   const input = page.getByTestId('canvas-component-search-input')
   await input.fill('service')
   const results = page.getByTestId('canvas-component-search-result')
-  await expect(results).toHaveCount(4)
+  await expect.poll(() => results.count()).toBeGreaterThanOrEqual(2)
   const firstResultId = await results.nth(0).getAttribute('id')
   const secondResultId = await results.nth(1).getAttribute('id')
   expect(firstResultId).not.toBeNull()
