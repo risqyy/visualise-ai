@@ -46,6 +46,12 @@ export interface ArchitectureGraph {
   /** Containers that are currently collapsed, in canonical order. */
   collapsedIds: ComponentId[]
   /**
+   * The complete collapse state requested by the user, including containers
+   * below a currently collapsed parent. `collapsedIds` cannot carry those IDs
+   * because they are not visible until that parent is opened.
+   */
+  requestedCollapsedIds: ComponentId[]
+  /**
    * The collapsed set this model opens with. Kept here rather than recomputed
    * by the canvas because it needs the *full* hierarchy, which only the
    * projection still has once containers are closed.
@@ -126,8 +132,14 @@ export function useArchitectureGraph(
    * what keeps a re-render that produced an equal set from re-running ELK — the
    * same reason `projectionSignature` exists.
    */
+  const requestedCollapsedIds = useMemo(
+    () =>
+      [...(collapsedComponentIds ?? initialCollapsedIds(projection.nodes))].sort(),
+    [collapsedComponentIds, projection.nodes],
+  )
+
   const collapsedKey = useMemo(() => {
-    const base = collapsedComponentIds ?? initialCollapsedIds(projection.nodes)
+    const base = requestedCollapsedIds
     const revealIds = [
       ...(revealComponentId ? [revealComponentId] : []),
       ...revealComponentIds,
@@ -140,7 +152,7 @@ export function useArchitectureGraph(
       .filter((componentId) => !revealed.has(componentId))
       .sort()
       .join(KEY_SEPARATOR)
-  }, [collapsedComponentIds, revealComponentId, revealComponentIds, projection.nodes])
+  }, [requestedCollapsedIds, revealComponentId, revealComponentIds, projection.nodes])
 
   const visible = useMemo(
     () =>
@@ -226,6 +238,7 @@ export function useArchitectureGraph(
       appliedEdgeCount: projection.appliedEdgeCount,
       overlayEdgeCount: projection.overlayEdgeCount,
       collapsedIds: [...visible.collapsedComponentIds].sort(),
+      requestedCollapsedIds,
       initialCollapsedIds: initialCollapsedIds(projection.nodes),
       hiddenComponentIds: visible.hiddenComponentIds,
       visibleNodeCount: visible.nodes.length,
@@ -233,7 +246,7 @@ export function useArchitectureGraph(
       reportedRelationshipCount,
       ancestorsOf: (componentId) => ancestorIds(projection.nodes, componentId),
     }
-  }, [laidOut, projection, visible, layoutSignature, error, reportedRelationshipCount])
+  }, [laidOut, projection, visible, layoutSignature, error, reportedRelationshipCount, requestedCollapsedIds])
 }
 
 /**

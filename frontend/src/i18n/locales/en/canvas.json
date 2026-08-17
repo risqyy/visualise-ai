@@ -114,6 +114,18 @@
     "renderedConnections_other": "{{count, number}} connections rendered",
     "title": "Architecture"
   },
+  "search": {
+    "close": "Close component search",
+    "empty": "Type a name, kind, technology, tag or component id to search.",
+    "hint": "Search name, kind, technology, tags or component id",
+    "noResults": "No components match this search.",
+    "resultCount_one": "{{count, number}} component found",
+    "resultCount_other": "{{count, number}} components found",
+    "root": "Root level",
+    "trigger": "Search components",
+    "jumpToSelection": "Jump to selection",
+    "jumpToSelectionHint": "Pan only as far as needed to show the selected component."
+  },
   "relationshipKind": {
     "async": {
       "description": "Asynchronous message flow without an immediate reply.",

@@ -4,10 +4,12 @@ import {
   FIT_VIEW_PADDING,
   INITIAL_CAMERA_POLICY,
   MIN_FIT_VIEWPORT,
+  isBoundsFullyVisible,
   onLayoutReady,
   onProjectChanged,
   onUserFitRequest,
   viewportForBounds,
+  viewportForFocus,
   type CameraPolicyInput,
 } from './cameraPolicy'
 import { MIN_LEGIBLE_FONT_SIZE_PX, MIN_READABLE_ZOOM } from './detailLevel'
@@ -234,6 +236,38 @@ describe('where the camera goes', () => {
       focus: { x: 40, y: 40, width: 228, height: 96 },
     })
     expect(withFocus).toEqual(without)
+  })
+
+  it('moves an explicit focus by the minimum pan and preserves zoom', () => {
+    const current = { x: 0, y: 0, zoom: 0.77 }
+    const focused = viewportForFocus(
+      current,
+      { x: 1500, y: 100, width: 228, height: 96 },
+      SURFACE,
+    )
+
+    expect(focused.zoom).toBe(current.zoom)
+    expect(focused.x).toBeLessThan(current.x)
+    expect(focused.y).toBe(current.y)
+
+    // Once visible, the same explicit action is a no-op rather than a recenter.
+    const repeated = viewportForFocus(
+      focused,
+      { x: 1500, y: 100, width: 228, height: 96 },
+      SURFACE,
+    )
+    expect(repeated.zoom).toBe(focused.zoom)
+    expect(repeated.x).toBeCloseTo(focused.x, 10)
+    expect(repeated.y).toBeCloseTo(focused.y, 10)
+  })
+
+  it('only marks a selection for jumping when it crosses the real viewport edge', () => {
+    const current = { x: 0, y: 0, zoom: 1 }
+    const nearRightEdge = { x: 800, y: 100, width: 228, height: 96 }
+    const justOffscreen = { x: 809, y: 100, width: 228, height: 96 }
+
+    expect(isBoundsFullyVisible(current, nearRightEdge, SURFACE)).toBe(true)
+    expect(isBoundsFullyVisible(current, justOffscreen, SURFACE)).toBe(false)
   })
 
   it('shows where an oversized focus begins rather than where it ends', () => {

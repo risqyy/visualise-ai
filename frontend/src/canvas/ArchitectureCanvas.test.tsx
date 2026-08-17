@@ -1,11 +1,11 @@
-import { act, screen, waitFor, within } from '@testing-library/react'
+import { act, cleanup, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it } from 'vitest'
 
 import { queryKeys } from '@/api/queryKeys'
 import type { ArchitectureResponse } from '@/api/types'
 import { applyLiveEvent } from '@/api/useLiveStream'
-import { DEFAULT_CAMERA, useUiStore } from '@/state/uiStore'
+import { DEFAULT_CAMERA, resetUiStore, useUiStore } from '@/state/uiStore'
 import {
   BUNDLED_TOPIC_CHANNELS,
   NESTED_COMPONENTS,
@@ -54,11 +54,18 @@ function architectureFetch(initial: ArchitectureResponse) {
  * with "Gesamtes Modell einpassen" — a real, reachable state, and the one these
  * tests have always described.
  */
-function renderCanvas(url = WORKSPACE_URL, initial = nestedArchitectureResponse) {
+function renderCanvas(
+  url = WORKSPACE_URL,
+  initial = nestedArchitectureResponse,
+  collapsedComponentIds?: string[],
+) {
   const architecture = architectureFetch(initial)
+  if (collapsedComponentIds !== undefined) {
+    useUiStore.getState().setCollapsedComponentIds(collapsedComponentIds)
+  }
   const app = renderApp(url, {
     fetchImpl: architecture.fetchImpl,
-    expandAllComponents: true,
+    expandAllComponents: collapsedComponentIds === undefined,
   })
   return { ...app, ...architecture }
 }
@@ -452,6 +459,131 @@ describe('architecture canvas — edge bundling stays resolvable', () => {
 
 describe('architecture canvas — selection', () => {
   it(
+    'searches name, kind, technology, tags and id, then selects the result',
+    async () => {
+      const user = userEvent.setup()
+      const { router } = renderCanvas()
+      await waitForCanvas()
+
+      await user.click(screen.getByTestId('canvas-component-search'))
+      const input = screen.getByTestId('canvas-component-search-input')
+      expect(
+        screen.getByText('Nach Name, Art, Technologie, Tag oder Komponenten-ID suchen.'),
+      ).toBeVisible()
+
+      input.focus()
+      await user.keyboard('routing')
+      const result = screen.getByTestId('canvas-component-search-result')
+      expect(result).toHaveAttribute('data-component-id', 'platform.api.http.router')
+      expect(result).toHaveTextContent('Router')
+      expect(result).toHaveTextContent('Modul')
+      expect(result).toHaveTextContent('Shop Platform / API Gateway / HTTP Layer')
+
+      await user.click(result)
+      await waitFor(() =>
+        expect(router.state.location.search).toEqual({
+          component: 'platform.api.http.router',
+        }),
+      )
+      expect(screen.getByTestId('inspector-context')).toHaveAttribute(
+        'data-component-id',
+        'platform.api.http.router',
+      )
+    },
+    CANVAS_TIMEOUT,
+  )
+
+  it(
+    'opens search with the command shortcut and reports an empty result state',
+    async () => {
+      const user = userEvent.setup()
+      renderCanvas()
+      await waitForCanvas()
+
+      const trigger = screen.getByTestId('canvas-component-search')
+      trigger.focus()
+      await user.keyboard('{Control>}k{/Control}')
+      const input = screen.getByTestId('canvas-component-search-input')
+      input.focus()
+      await user.keyboard('does-not-exist')
+
+      expect(screen.getByText('Keine passende Komponente gefunden.')).toBeVisible()
+      await user.keyboard('{Escape}')
+      expect(screen.queryByTestId('canvas-component-search-input')).not.toBeInTheDocument()
+    },
+    CANVAS_TIMEOUT,
+  )
+
+  it(
+    'announces the active search result while navigating with the arrow keys',
+    async () => {
+      const user = userEvent.setup()
+      renderCanvas()
+      await waitForCanvas()
+
+      await user.click(screen.getByTestId('canvas-component-search'))
+      const input = screen.getByTestId('canvas-component-search-input')
+      input.focus()
+      await user.keyboard('service')
+
+      const results = screen.getAllByTestId('canvas-component-search-result')
+      expect(input).toHaveAttribute('role', 'combobox')
+      expect(input).toHaveAttribute('aria-controls', 'canvas-component-search-results')
+      expect(input).toHaveAttribute('aria-expanded', 'true')
+      expect(input).toHaveAttribute(
+        'aria-activedescendant',
+        results[0]?.getAttribute('id') ?? '',
+      )
+      expect(results[0]).toHaveAttribute('aria-selected', 'true')
+      expect(results[1]).toHaveAttribute('aria-selected', 'false')
+
+      await user.keyboard('{ArrowDown}')
+      expect(input).toHaveAttribute(
+        'aria-activedescendant',
+        results[1]?.getAttribute('id') ?? '',
+      )
+      expect(results[0]).toHaveAttribute('aria-selected', 'false')
+      expect(results[1]).toHaveAttribute('aria-selected', 'true')
+    },
+    CANVAS_TIMEOUT,
+  )
+
+  it(
+    'opens only target ancestors and keeps independent nested collapse state',
+    async () => {
+      const user = userEvent.setup()
+      const { router } = renderCanvas(WORKSPACE_URL, nestedArchitectureResponse, [
+        'platform.api',
+        'platform.api.http',
+        'platform.core',
+      ])
+      await waitForCanvas()
+
+      await user.click(screen.getByTestId('canvas-component-search'))
+      const input = screen.getByTestId('canvas-component-search-input')
+      input.focus()
+      await user.keyboard('gRPC Layer')
+      await user.click(screen.getByTestId('canvas-component-search-result'))
+
+      await waitFor(() =>
+        expect(router.state.location.search).toEqual({ component: 'platform.api.grpc' }),
+      )
+      await waitForCanvas()
+
+      expect(screen.getByTestId('canvas-node-platform.api.grpc')).toBeVisible()
+      expect(screen.getByTestId('node-disclosure-platform.api.http')).toHaveAttribute(
+        'aria-expanded',
+        'false',
+      )
+      expect(screen.getByTestId('node-disclosure-platform.core')).toHaveAttribute(
+        'aria-expanded',
+        'false',
+      )
+    },
+    CANVAS_TIMEOUT,
+  )
+
+  it(
     'writes the clicked component into the `component` search parameter',
     async () => {
       const user = userEvent.setup()
@@ -525,6 +657,109 @@ describe('architecture canvas — selection', () => {
 })
 
 describe('architecture canvas — live updates never move the camera', () => {
+  it(
+    'drops pending search focus when orientation changes during the relayout',
+    async () => {
+      const user = userEvent.setup()
+      const collapsed = ['platform.api', 'platform.api.http', 'platform.core']
+
+      // Establish the camera produced by the explicit orientation fit without
+      // any pending search action to compare against below.
+      renderCanvas(
+        `${WORKSPACE_URL}?component=platform.api.grpc`,
+        nestedArchitectureResponse,
+        collapsed,
+      )
+      await waitForCanvas()
+      await user.click(screen.getByTestId('canvas-layout-left-right'))
+      await waitFor(() =>
+        expect(screen.getByTestId('architecture-canvas')).toHaveAttribute(
+          'data-layouting',
+          'false',
+        ),
+      )
+      const cameraAfterOrientation = useUiStore.getState().camera
+
+      cleanup()
+      resetUiStore()
+
+      const rendered = renderCanvas(WORKSPACE_URL, nestedArchitectureResponse, collapsed)
+      await waitForCanvas()
+      await user.click(screen.getByTestId('canvas-component-search'))
+      const input = screen.getByTestId('canvas-component-search-input')
+      input.focus()
+      await user.keyboard('gRPC Layer')
+      await user.click(screen.getByTestId('canvas-component-search-result'))
+
+      // The search has opened a collapsed ancestor, so ELK is still solving the
+      // graph when this explicit camera action arrives.
+      expect(rendered.router.state.location.search).toEqual({
+        component: 'platform.api.grpc',
+      })
+      await user.click(screen.getByTestId('canvas-layout-left-right'))
+      await waitFor(() =>
+        expect(screen.getByTestId('architecture-canvas')).toHaveAttribute(
+          'data-layouting',
+          'false',
+        ),
+      )
+
+      // Orientation owns the resulting camera. A stale search focus would add
+      // another pan after this fit and produce a different viewport.
+      expect(useUiStore.getState().camera).toEqual(cameraAfterOrientation)
+    },
+    CANVAS_TIMEOUT,
+  )
+
+  it(
+    'does not replay a completed no-relayout search focus after a live re-layout',
+    async () => {
+      const user = userEvent.setup()
+      const { queryClient, publish } = renderCanvas()
+      const canvas = await waitForCanvas()
+
+      await user.click(screen.getByTestId('canvas-component-search'))
+      const input = screen.getByTestId('canvas-component-search-input')
+      input.focus()
+      await user.keyboard('platform.db')
+      await user.click(screen.getByTestId('canvas-component-search-result'))
+      await waitFor(() => expect(canvas).toHaveAttribute('data-layouting', 'false'))
+
+      const cameraAfterSearch = useUiStore.getState().camera
+      const transformAfterSearch = viewportTransform()
+      expect(canvas).toHaveAttribute('data-fit-view-count', '1')
+
+      // An equal refetch is deliberately quiet too; the pending search ref must
+      // not turn a data refresh into a second focus request.
+      await act(async () => {
+        await queryClient.refetchQueries({ queryKey: queryKeys.architecture(PROJECT_ID) })
+      })
+      expect(viewportTransform()).toBe(transformAfterSearch)
+      expect(useUiStore.getState().camera).toEqual(cameraAfterSearch)
+
+      publish(grownArchitectureResponse)
+      await act(async () => {
+        applyLiveEvent(
+          queryClient,
+          streamedEvent('architecture.snapshot_published', {
+            snapshotId: 'snapshot-after-search',
+            components: grownArchitectureResponse.components,
+            relationships: grownArchitectureResponse.relationships,
+          }),
+        )
+      })
+      await waitFor(
+        () => expect(canvas).toHaveAttribute('data-layouting', 'false'),
+        { timeout: CANVAS_TIMEOUT },
+      )
+
+      expect(viewportTransform()).toBe(transformAfterSearch)
+      expect(useUiStore.getState().camera).toEqual(cameraAfterSearch)
+      expect(canvas).toHaveAttribute('data-fit-view-count', '1')
+    },
+    CANVAS_TIMEOUT,
+  )
+
   it(
     'keeps zoom, pan and selection when the architecture is replaced live',
     async () => {
