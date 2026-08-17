@@ -161,13 +161,8 @@ for (const language of ['de', 'en'] as const) {
       await expect(page.getByTestId('pane-rail-left')).toBeVisible()
       await expect(page.getByTestId('pane-rail-right')).toBeVisible()
       await expect(focus).toHaveAttribute('aria-pressed', 'true')
-      await expect
-        .poll(async () =>
-          Number(
-            await page.getByTestId('architecture-canvas').getAttribute('data-fit-view-count'),
-          ),
-        )
-        .toBe(fitBefore + 1)
+      // Observe the surface resize first so a fit from the old geometry cannot
+      // satisfy the transition assertion.
       await expect
         .poll(async () =>
           Number(
@@ -175,6 +170,13 @@ for (const language of ['de', 'en'] as const) {
           ),
         )
         .not.toBe(surfaceBefore)
+      await expect
+        .poll(async () =>
+          Number(
+            await page.getByTestId('architecture-canvas').getAttribute('data-fit-view-count'),
+          ),
+        )
+        .toBe(fitBefore + 1)
 
       const focusedGeometry = await page.evaluate(() => {
         const canvas = document.querySelector<HTMLElement>('[data-testid="architecture-canvas"]')
