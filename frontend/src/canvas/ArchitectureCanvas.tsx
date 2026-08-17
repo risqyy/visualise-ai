@@ -15,7 +15,15 @@ import {
   type OnNodeDrag,
   type Viewport,
 } from '@xyflow/react'
-import { Layers2, Map, MapPinOff, Maximize2, RotateCcw, TriangleAlert } from 'lucide-react'
+import {
+  Layers2,
+  Map,
+  MapPinOff,
+  Maximize2,
+  RotateCcw,
+  Search,
+  TriangleAlert,
+} from 'lucide-react'
 import type { TFunction } from 'i18next'
 import {
   useCallback,
@@ -35,6 +43,7 @@ import type { ComponentId, Identifier, ProjectId } from '@/api/types'
 import { Button } from '@/components/ui/button'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { useUiStore } from '@/state/uiStore'
+import { ReportedText } from '@/i18n'
 
 import { EdgeMarkerDefs } from './RelationshipEdge'
 import {
@@ -42,6 +51,7 @@ import {
   onLayoutReady,
   onProjectChanged,
   onUserFitRequest,
+  viewportForFocus,
   viewportForBounds,
   type CameraPolicyState,
 } from './cameraPolicy'
@@ -51,6 +61,8 @@ import {
   withEdgeAccessibility,
   withNodeAccessibility,
 } from './canvasAccessibility'
+import { componentKindLabel } from './componentKinds'
+import { componentSearchEntries, searchComponentEntries } from './componentSearch'
 import {
   DETAIL_LEVEL_DESCRIPTION_KEYS,
   DETAIL_LEVEL_LABEL_KEYS,
@@ -200,6 +212,35 @@ function ArchitectureCanvasInner({
     orientation,
     revealComponentIds: relationshipRevealIds,
   })
+  const searchEntries = useMemo(
+    () =>
+      componentSearchEntries(
+        model.components,
+        model.overlay?.extraComponents.map((entry) => entry.component) ?? [],
+      ),
+    [model.components, model.overlay?.extraComponents],
+  )
+  const [searchOpen, setSearchOpen] = useState(false)
+  const [searchQuery, setSearchQuery] = useState('')
+  const [activeSearchIndex, setActiveSearchIndex] = useState(0)
+  const searchInputRef = useRef<HTMLInputElement | null>(null)
+  const searchTriggerRef = useRef<HTMLButtonElement | null>(null)
+  const wasSearchOpenRef = useRef(false)
+  const pendingFocusRef = useRef<ComponentId | null>(null)
+  const searchResults = useMemo(
+    () => searchComponentEntries(searchEntries, searchQuery),
+    [searchEntries, searchQuery],
+  )
+  const effectiveActiveSearchIndex =
+    searchResults.length === 0 ? 0 : Math.min(activeSearchIndex, searchResults.length - 1)
+  useEffect(() => {
+    if (searchOpen) {
+      searchInputRef.current?.focus()
+    } else if (wasSearchOpenRef.current) {
+      searchTriggerRef.current?.focus()
+    }
+    wasSearchOpenRef.current = searchOpen
+  }, [searchOpen])
   const flow = useReactFlow()
   const storeApi = useStoreApi()
 
@@ -375,6 +416,45 @@ function ArchitectureCanvasInner({
     [flow, storeApi, setCamera, publishZoom],
   )
 
+  /** Explicitly reveals one laid-out component without changing the zoom. */
+  const focusComponentInView = useCallback(
+    (componentId: ComponentId) => {
+      const { width, height, nodeLookup } = storeApi.getState()
+      const node = nodeLookup.get(componentId)
+      if (!node || width <= 0 || height <= 0) return
+      const focus = getNodesBounds([node], { nodeLookup })
+      const current = flow.getViewport()
+      const viewport = viewportForFocus(current, focus, { width, height })
+      userMovedCameraRef.current = true
+      if (viewport.x === current.x && viewport.y === current.y) return
+      void flow.setViewport(viewport)
+      setCamera(viewport)
+      setDetailLevel(detailLevelForZoom(viewport.zoom))
+      publishZoom(viewport.zoom)
+    },
+    [flow, publishZoom, setCamera, storeApi],
+  )
+
+  // React Flow's node lookup is an external mutable store. Read it during
+  // render so layout and temporary drag updates are reflected immediately;
+  // React already re-renders this component for both kinds of change.
+  const selectionFocusBounds = (() => {
+    if (!selectedComponentId) return null
+    const { nodeLookup } = storeApi.getState()
+    const node = nodeLookup.get(selectedComponentId)
+    return node ? getNodesBounds([node], { nodeLookup }) : null
+  })()
+  const selectionNeedsJump = useMemo(() => {
+    if (!selectionFocusBounds || surfaceWidth <= 0 || surfaceHeight <= 0) return false
+    const current = camera
+    const next = viewportForFocus(
+      current,
+      selectionFocusBounds,
+      { width: surfaceWidth, height: surfaceHeight },
+    )
+    return Math.abs(next.x - current.x) > 0.1 || Math.abs(next.y - current.y) > 0.1
+  }, [camera, selectionFocusBounds, surfaceHeight, surfaceWidth])
+
   /**
    * A fit the user asked for, held until the layout it is about exists.
    *
@@ -488,6 +568,16 @@ function ArchitectureCanvasInner({
     fitView(pending.mode, pending.focusComponentId)
   }, [graph.isRelayouting, graph.nodes.length, graph.signature, fitView])
 
+  // A search result may have opened one or more collapsed ancestors. Wait for
+  // that exact layout before panning; unrelated containers stay collapsed and
+  // no camera movement happens while ELK is still solving the new graph.
+  useEffect(() => {
+    const componentId = pendingFocusRef.current
+    if (componentId === null || graph.isRelayouting || graph.nodes.length === 0) return
+    pendingFocusRef.current = null
+    focusComponentInView(componentId)
+  }, [focusComponentInView, graph.isRelayouting, graph.nodes.length, graph.signature])
+
   // Endpoint names for the edge labels. Derived from the laid-out graph rather
   // than from `nodes`, so a selection — which changes nothing an edge says —
   // does not rebuild every edge. `collapse.ts` lifts a hidden endpoint onto its
@@ -536,6 +626,85 @@ function ArchitectureCanvasInner({
       onSelectComponent(node.id === selectedComponentId ? null : node.id)
     },
     [onSelectComponent, selectedComponentId],
+  )
+
+  const openSearch = useCallback(() => {
+    setSearchQuery('')
+    setActiveSearchIndex(0)
+    setSearchOpen(true)
+  }, [])
+  const closeSearch = useCallback(() => setSearchOpen(false), [])
+
+  // The command is scoped to the mounted architecture workspace, but it also
+  // works when focus is in a neighbouring pane or on the document body. The
+  // editable guard keeps `/` from stealing an input's normal text entry.
+  useEffect(() => {
+    const onWindowKeyDown = (event: KeyboardEvent) => {
+      const target = event.target
+      const editable =
+        target instanceof Element
+          ? target.closest('input, textarea, select, [contenteditable="true"]')
+          : null
+      const commandSearch =
+        (event.key === '/' && editable === null) ||
+        ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'k')
+      if (!commandSearch || event.defaultPrevented) return
+      event.preventDefault()
+      openSearch()
+    }
+    window.addEventListener('keydown', onWindowKeyDown)
+    return () => window.removeEventListener('keydown', onWindowKeyDown)
+  }, [openSearch])
+
+  const onJumpToSelection = useCallback(() => {
+    if (selectedComponentId) focusComponentInView(selectedComponentId)
+  }, [focusComponentInView, selectedComponentId])
+
+  const selectSearchResult = useCallback(
+    (componentId: ComponentId) => {
+      const ancestors = new Set(graph.ancestorsOf(componentId))
+      const nextCollapsed = graph.collapsedIds.filter((id) => !ancestors.has(id))
+      const willRelayout =
+        nextCollapsed.length !== graph.collapsedIds.length ||
+        nextCollapsed.some((id, index) => id !== graph.collapsedIds[index])
+
+      pendingFocusRef.current = componentId
+      if (willRelayout) setCollapsedComponentIds(nextCollapsed)
+      // Search is an explicit selection, not the click-toggle interaction of a
+      // canvas node. The URL, selected node and inspector therefore converge on
+      // this exact id even when it was already selected.
+      onSelectComponent(componentId)
+      closeSearch()
+      if (!willRelayout) focusComponentInView(componentId)
+    },
+    [closeSearch, focusComponentInView, graph, onSelectComponent, setCollapsedComponentIds],
+  )
+
+  const onSearchKeyDown = useCallback(
+    (event: ReactKeyboardEvent<HTMLInputElement>) => {
+      if (event.key === 'ArrowDown') {
+        event.preventDefault()
+        setActiveSearchIndex((index) =>
+          searchResults.length === 0 ? 0 : (index + 1) % searchResults.length,
+        )
+      } else if (event.key === 'ArrowUp') {
+        event.preventDefault()
+        setActiveSearchIndex((index) =>
+          searchResults.length === 0
+            ? 0
+            : (index - 1 + searchResults.length) % searchResults.length,
+        )
+      } else if (event.key === 'Enter') {
+        const result = searchResults[effectiveActiveSearchIndex]
+        if (!result) return
+        event.preventDefault()
+        selectSearchResult(result.component.componentId)
+      } else if (event.key === 'Escape') {
+        event.preventDefault()
+        closeSearch()
+      }
+    },
+    [closeSearch, effectiveActiveSearchIndex, searchResults, selectSearchResult],
   )
 
   /**
@@ -621,6 +790,17 @@ function ArchitectureCanvasInner({
       const target = event.target
       if (!(target instanceof Element)) return
 
+      const editable = target.closest('input, textarea, select, [contenteditable="true"]')
+      const commandSearch =
+        (event.key === '/' && editable === null) ||
+        ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'k')
+      if (commandSearch) {
+        event.preventDefault()
+        event.stopPropagation()
+        openSearch()
+        return
+      }
+
       const nodeElement = target.closest('.react-flow__node')
       if (nodeElement) {
         const control = target.closest('button, a[href], input, select, textarea')
@@ -681,6 +861,7 @@ function ArchitectureCanvasInner({
       activeSelectedRelationshipId,
       onSelectRelationship,
       setStoredSelectedRelationshipId,
+      openSearch,
       toggleEdgeExpanded,
     ],
   )
@@ -867,6 +1048,41 @@ function ArchitectureCanvasInner({
                 to a few hundred pixels, and a toolbar that runs past its edge
                 takes its own controls out of reach. */}
             <div className="border-border bg-card/90 flex max-w-[min(100%,44rem)] flex-wrap items-center gap-1 rounded-md border px-1 py-1 backdrop-blur-sm">
+              <Button
+                ref={searchTriggerRef}
+                variant="ghost"
+                size="sm"
+                className="h-7 gap-1.5 px-2 text-xs"
+                aria-haspopup="dialog"
+                aria-expanded={searchOpen}
+                aria-keyshortcuts="/ Control+K Meta+K"
+                onClick={openSearch}
+                data-testid="canvas-component-search"
+              >
+                <Search aria-hidden="true" />
+                {t('search.trigger')}
+              </Button>
+
+              {selectionNeedsJump && selectedComponentId && (
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="h-7 gap-1.5 px-2 text-xs"
+                      onClick={onJumpToSelection}
+                      data-testid="canvas-jump-to-selection"
+                    >
+                      <MapPinOff aria-hidden="true" />
+                      {t('search.jumpToSelection')}
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent className="max-w-80">
+                    {t('search.jumpToSelectionHint')}
+                  </TooltipContent>
+                </Tooltip>
+              )}
+
               <Tooltip>
                 <TooltipTrigger asChild>
                   <Button
@@ -1035,6 +1251,106 @@ function ArchitectureCanvasInner({
                 </Tooltip>
               )}
             </div>
+            {searchOpen && (
+              <div
+                className="border-border bg-card text-card-foreground nokey nopan absolute top-full left-0 z-50 mt-1 w-[min(34rem,calc(100vw-2rem))] overflow-hidden rounded-md border shadow-lg"
+                role="dialog"
+                aria-label={t('search.trigger')}
+                data-testid="canvas-component-search-dialog"
+              >
+                <div className="border-border flex items-center gap-2 border-b p-2">
+                  <Search className="text-muted-foreground size-4 shrink-0" aria-hidden="true" />
+                  <label htmlFor="canvas-component-search-input" className="sr-only">
+                    {t('search.hint')}
+                  </label>
+                  <input
+                    ref={searchInputRef}
+                    id="canvas-component-search-input"
+                    type="search"
+                    role="searchbox"
+                    value={searchQuery}
+                    onChange={(event) => {
+                      setSearchQuery(event.target.value)
+                      setActiveSearchIndex(0)
+                    }}
+                    onKeyDown={(event) => {
+                      // React Flow owns the surrounding keyboard surface; keep
+                      // ordinary text entry from reaching its pane handler.
+                      event.stopPropagation()
+                      onSearchKeyDown(event)
+                    }}
+                    onPointerDown={(event) => event.stopPropagation()}
+                    placeholder={t('search.hint')}
+                    aria-describedby="canvas-component-search-status"
+                    className="min-w-0 flex-1 bg-transparent text-sm outline-none placeholder:text-muted-foreground"
+                    data-testid="canvas-component-search-input"
+                  />
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon-xs"
+                    aria-label={t('search.close')}
+                    onClick={closeSearch}
+                    data-testid="canvas-component-search-close"
+                  >
+                    <span aria-hidden="true">×</span>
+                  </Button>
+                </div>
+
+                <p
+                  id="canvas-component-search-status"
+                  data-testid="canvas-component-search-status"
+                  className="text-muted-foreground px-3 py-2 text-xs"
+                  role="status"
+                  aria-live="polite"
+                >
+                  {searchQuery.trim() === ''
+                    ? t('search.empty')
+                    : searchResults.length === 0
+                      ? t('search.noResults')
+                      : t('search.resultCount', { count: searchResults.length })}
+                </p>
+
+                {searchQuery.trim() !== '' && searchResults.length > 0 && (
+                  <div
+                    className="border-border max-h-72 overflow-y-auto border-t p-1"
+                    role="listbox"
+                    aria-label={t('search.trigger')}
+                    data-testid="canvas-component-search-results"
+                  >
+                    {searchResults.map((entry, index) => (
+                      <button
+                        key={entry.component.componentId}
+                        type="button"
+                        role="option"
+                        aria-selected={index === effectiveActiveSearchIndex}
+                        className={`hover:bg-accent focus-visible:bg-accent flex w-full min-w-0 flex-col items-start gap-0.5 rounded-sm px-2 py-1.5 text-left text-sm outline-none ${index === effectiveActiveSearchIndex ? 'bg-accent' : ''}`}
+                        onMouseEnter={() => setActiveSearchIndex(index)}
+                        onClick={() => selectSearchResult(entry.component.componentId)}
+                        data-testid="canvas-component-search-result"
+                        data-component-id={entry.component.componentId}
+                      >
+                        <span className="flex w-full min-w-0 items-center gap-2">
+                          <span className="min-w-0 flex-1 truncate font-medium">
+                            <ReportedText value={entry.component.name} />
+                          </span>
+                          <span className="text-muted-foreground shrink-0 text-xs">
+                            {componentKindLabel(entry.component.kind, t)}
+                          </span>
+                        </span>
+                        <span className="text-muted-foreground w-full truncate text-xs">
+                          {entry.containerPath.length > 0 ? (
+                            <ReportedText value={entry.containerPath.join(' / ')} />
+                          ) : (
+                            t('search.root')
+                          )}
+                        </span>
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
           </Panel>
 
           {graph.isRelayouting && (

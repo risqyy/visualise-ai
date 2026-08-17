@@ -114,6 +114,18 @@
     "renderedConnections_other": "{{count, number}} Verbindungen dargestellt",
     "title": "Architektur"
   },
+  "search": {
+    "close": "Komponentensuche schließen",
+    "empty": "Nach Name, Art, Technologie, Tag oder Komponenten-ID suchen.",
+    "hint": "Name, Art, Technologie, Tags oder Komponenten-ID suchen",
+    "noResults": "Keine passende Komponente gefunden.",
+    "resultCount_one": "{{count, number}} Komponente gefunden",
+    "resultCount_other": "{{count, number}} Komponenten gefunden",
+    "root": "Wurzelebene",
+    "trigger": "Komponenten suchen",
+    "jumpToSelection": "Zur Auswahl springen",
+    "jumpToSelectionHint": "Die Kamera schwenkt nur so weit, bis die ausgewählte Komponente sichtbar ist."
+  },
   "relationshipKind": {
     "async": {
       "description": "Asynchroner Nachrichtenfluss ohne unmittelbare Antwort.",

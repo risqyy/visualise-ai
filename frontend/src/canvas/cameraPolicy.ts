@@ -220,6 +220,26 @@ export function viewportForBounds(
   }
 }
 
+/**
+ * Keeps the current zoom and moves only as far as needed to reveal one box.
+ *
+ * This is the explicit counterpart to the initial fit: search and "jump to
+ * selection" are user requests, so they may pan the camera, but they must not
+ * zoom or recenter a component that is already visible.
+ */
+export function viewportForFocus(
+  viewport: CameraViewport,
+  focus: LayoutBounds,
+  surface: ViewportSize,
+  padding = FIT_VIEW_PADDING,
+): CameraViewport {
+  return {
+    zoom: viewport.zoom,
+    x: panIntoView(viewport.x, focus.x, focus.width, surface.width, viewport.zoom, padding),
+    y: panIntoView(viewport.y, focus.y, focus.height, surface.height, viewport.zoom, padding),
+  }
+}
+
 function axisOffset(
   surfaceSize: number,
   boundsStart: number,

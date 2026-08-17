@@ -452,6 +452,62 @@ describe('architecture canvas — edge bundling stays resolvable', () => {
 
 describe('architecture canvas — selection', () => {
   it(
+    'searches name, kind, technology, tags and id, then selects the result',
+    async () => {
+      const user = userEvent.setup()
+      const { router } = renderCanvas()
+      await waitForCanvas()
+
+      await user.click(screen.getByTestId('canvas-component-search'))
+      const input = screen.getByTestId('canvas-component-search-input')
+      expect(
+        screen.getByText('Nach Name, Art, Technologie, Tag oder Komponenten-ID suchen.'),
+      ).toBeVisible()
+
+      input.focus()
+      await user.keyboard('routing')
+      const result = screen.getByTestId('canvas-component-search-result')
+      expect(result).toHaveAttribute('data-component-id', 'platform.api.http.router')
+      expect(result).toHaveTextContent('Router')
+      expect(result).toHaveTextContent('Modul')
+      expect(result).toHaveTextContent('Shop Platform / API Gateway / HTTP Layer')
+
+      await user.click(result)
+      await waitFor(() =>
+        expect(router.state.location.search).toEqual({
+          component: 'platform.api.http.router',
+        }),
+      )
+      expect(screen.getByTestId('inspector-context')).toHaveAttribute(
+        'data-component-id',
+        'platform.api.http.router',
+      )
+    },
+    CANVAS_TIMEOUT,
+  )
+
+  it(
+    'opens search with the command shortcut and reports an empty result state',
+    async () => {
+      const user = userEvent.setup()
+      renderCanvas()
+      await waitForCanvas()
+
+      const trigger = screen.getByTestId('canvas-component-search')
+      trigger.focus()
+      await user.keyboard('{Control>}k{/Control}')
+      const input = screen.getByTestId('canvas-component-search-input')
+      input.focus()
+      await user.keyboard('does-not-exist')
+
+      expect(screen.getByText('Keine passende Komponente gefunden.')).toBeVisible()
+      await user.keyboard('{Escape}')
+      expect(screen.queryByTestId('canvas-component-search-input')).not.toBeInTheDocument()
+    },
+    CANVAS_TIMEOUT,
+  )
+
+  it(
     'writes the clicked component into the `component` search parameter',
     async () => {
       const user = userEvent.setup()
