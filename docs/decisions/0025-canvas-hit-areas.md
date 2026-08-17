@@ -16,6 +16,9 @@ container disclosure, relationship actions, the minimap toggle and toolbar and
 zoom controls. Independent targets keep at least 8 px of spacing where their
 layout allows it. Fanned relationship bundles use 48 model px between labels
 so the 32/44 px screen-space targets do not collide at the readable zoom floor.
+Independent edges that share a source or target use deterministic route-relative
+label lanes between 35% and 65%; this separates wide relationship pills without
+changing the ELK route or either endpoint.
 
 Nodes and edge labels are rendered below React Flow's camera transform. Their
 outer hit-area element therefore uses the reciprocal live zoom so its browser

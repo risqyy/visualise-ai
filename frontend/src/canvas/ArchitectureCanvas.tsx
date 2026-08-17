@@ -73,6 +73,7 @@ import {
   MIN_READABLE_ZOOM,
   detailLevelForZoom,
 } from './detailLevel'
+import { staggeredLabelRatios } from './edgeGeometry'
 import { ARCHITECTURE_EDGE_TYPES, ARCHITECTURE_NODE_TYPES } from './flowRegistry'
 import {
   COMPOUND_NODE_TYPE,
@@ -819,10 +820,29 @@ function ArchitectureCanvasInner({
     const routed = graph.edges.map((edge) => {
       const route = invalidated.has(edge.id) ? undefined : graph.routes[edge.id]
       if (!edge.data) return edge
-      return { ...edge, data: { ...edge.data, ...(route ? { route } : {}) } }
+      return {
+        ...edge,
+        data: {
+          ...edge.data,
+          ...(route ? { route } : {}),
+        },
+      }
+    })
+    const labelRatios = staggeredLabelRatios(
+      routed.map((edge) => ({
+        id: edge.id,
+        source: edge.source,
+        target: edge.target,
+        ...(edge.data?.route ? { route: edge.data.route } : {}),
+      })),
+    )
+    const positioned = routed.map((edge) => {
+      const labelRatio = labelRatios.get(edge.id)
+      if (!edge.data || labelRatio === undefined) return edge
+      return { ...edge, data: { ...edge.data, labelRatio } }
     })
     return withEdgeAccessibility(
-      routed,
+      positioned,
       nodeNames,
       voice,
       visualSelectedRelationshipId,
