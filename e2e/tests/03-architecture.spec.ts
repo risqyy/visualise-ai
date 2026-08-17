@@ -503,6 +503,8 @@ test('2 · arrow navigation exposes the active result and deep links keep jump e
   })
   expect(pan).not.toBeNull()
   const viewportBeforePan = await page.locator('.react-flow__viewport').getAttribute('style')
+  const jump = page.getByTestId('canvas-jump-to-selection')
+  await expect(jump).not.toBeVisible()
   await page.mouse.move(pan!.start.x, pan!.start.y)
   await page.mouse.down()
   await page.mouse.move(pan!.end.x, pan!.end.y, { steps: 8 })
@@ -511,7 +513,6 @@ test('2 · arrow navigation exposes the active result and deep links keep jump e
     .poll(() => page.locator('.react-flow__viewport').getAttribute('style'))
     .not.toBe(viewportBeforePan)
 
-  const jump = page.getByTestId('canvas-jump-to-selection')
   await expect(jump).toBeVisible()
   const before = await page.locator('.react-flow__viewport').getAttribute('style')
   await jump.click()
