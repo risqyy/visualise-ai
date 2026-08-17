@@ -91,41 +91,6 @@ const TEXTS: TextProbe[] = [
   { name: 'language switch', selector: '[data-testid="language-switcher"]' },
 ]
 
-/**
- * The one clipped text this check found and does **not** fail on, with the
- * reason it does not.
- *
- * Below 1920 the architecture pane's heading is the only element in its header
- * that can give way. The header carries the four-state change counter and the
- * two count badges — together about 550 px, and `shrink-0` — while the pane
- * itself is 690 px at 1280. Measured against the acceptance deployment:
- *
- * | rendering | 1920      | 1440      | 1280           |
- * | --------- | --------- | --------- | -------------- |
- * | German    | 88 / 88   | 88 / 88   | 88 / **78**    |
- * | English   | 96 / 96   | 96 / 96   | 96 / **92**    |
- * | pseudo    | 122 / 122 | 122 / **87** | 122 / **0** |
- *
- * (needed / available, in pixels.)
- *
- * The first row is the important one: **German is already clipped at 1280**, so
- * this is not a defect translation introduced. It is a layout defect of the
- * architecture header at narrow widths (the subject of ADR 0015 / #41), which
- * English makes marginally worse and a long translation makes severe.
- *
- * It is reported rather than fixed here. The remedy is a decision about what
- * that header shows when it runs out of room — condense the change counter,
- * drop the badges, wrap the title — and that is a design decision belonging to
- * whoever owns the header, not a side effect of a test issue.
- *
- * The exception is bounded in two directions so it cannot rot into a blanket
- * permission: it applies to one named probe, and only below 1920, where the
- * assertion below stays strict for every rendering.
- */
-function isReportedHeaderDefect(name: string, width: number): boolean {
-  return name === 'pane title · architecture' && width < 1920
-}
-
 /** The primary controls, again with language-independent selectors. */
 const CONTROLS: ControlProbe[] = [
   { name: 'run selection (current run)', selector: `[data-testid="run-option-${MAIN_RUN}"]` },
@@ -191,21 +156,10 @@ async function assertLayoutHolds(page: Page, width: number, label: string): Prom
   const clipped = texts.filter(
     (report) => report.clippedHorizontally || report.clippedVertically,
   )
-  const cut = clipped.filter((report) => !isReportedHeaderDefect(report.name, width))
   expect(
-    cut.length === 0,
-    `${label}: text is cut off\n${formatTextReports(cut)}`,
+    clipped.length === 0,
+    `${label}: text is cut off\n${formatTextReports(clipped)}`,
   ).toBe(true)
-
-  // The tolerated one is written into the report rather than swallowed: a known
-  // defect that leaves no trace in the run that found it stops being known.
-  const tolerated = clipped.filter((report) => isReportedHeaderDefect(report.name, width))
-  if (tolerated.length > 0) {
-    test.info().annotations.push({
-      type: 'known clipped text (#37 finding)',
-      description: `${label}\n${formatTextReports(tolerated)}`,
-    })
-  }
 
   const controls = await probeControls(page, CONTROLS)
   const broken = controls.filter(

@@ -359,7 +359,7 @@ describe('canvas accessibility — edges are named from what they carry', () => 
     const edge = model.edges[0]
     expect(edge).toBeDefined()
     expect(edgeAccessibleName(edge!, names, voice)).toBe(
-      'Beziehung von Orders zu Orders DB, Datenzugriff SELECT/INSERT, kein Änderungsstatus gemeldet',
+      'Gemeldete Beziehung von Orders zu Orders DB, Datenzugriff SELECT/INSERT, kein Änderungsstatus gemeldet',
     )
   })
 

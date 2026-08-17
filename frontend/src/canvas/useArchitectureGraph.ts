@@ -48,8 +48,12 @@ export interface ArchitectureGraph {
   initialCollapsedIds: ComponentId[]
   /** Components hidden inside a collapsed container. */
   hiddenComponentIds: Set<ComponentId>
-  /** Components of the model that are drawn right now. */
+  /** Applied-model and overlay elements drawn right now. */
   visibleNodeCount: number
+  /** Rendered connections after collapse and relationship bundling. */
+  visibleEdgeCount: number
+  /** Relationships the applied model reported, before rendering decisions. */
+  reportedRelationshipCount: number
   /** The containers that have to be opened for a component to be on screen. */
   ancestorsOf: (componentId: ComponentId) => ComponentId[]
 }
@@ -91,6 +95,7 @@ export function useArchitectureGraph(
   options: ArchitectureGraphOptions = { collapsedComponentIds: [] },
 ): ArchitectureGraph {
   const { collapsedComponentIds, revealComponentId } = options
+  const reportedRelationshipCount = model?.relationships.length ?? 0
 
   const projection = useMemo(
     () => projectArchitecture(model ?? EMPTY_MODEL),
@@ -189,9 +194,11 @@ export function useArchitectureGraph(
       initialCollapsedIds: initialCollapsedIds(projection.nodes),
       hiddenComponentIds: visible.hiddenComponentIds,
       visibleNodeCount: visible.nodes.length,
+      visibleEdgeCount: visible.edges.length,
+      reportedRelationshipCount,
       ancestorsOf: (componentId) => ancestorIds(projection.nodes, componentId),
     }
-  }, [laidOut, projection, visible, signature, error])
+  }, [laidOut, projection, visible, signature, error, reportedRelationshipCount])
 }
 
 /**

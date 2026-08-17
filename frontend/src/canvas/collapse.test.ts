@@ -19,6 +19,7 @@ import {
 import { INITIAL_EXPANDED_DEPTH } from './detailLevel'
 import {
   LEAF_NODE_SIZE,
+  countRelationships,
   projectArchitecture,
   projectionSignature,
   resolveEdgeBundle,
@@ -144,6 +145,11 @@ describe('collapsing the graph', () => {
       'lr-1a1',
       'lr-1b1',
     ])
+    // The pane's rendered-connection count is the number of visible edge
+    // objects after lifting and bundling; the carried relationship count stays
+    // equal to what the applied model reported.
+    expect(visible.edges).toHaveLength(9)
+    expect(countRelationships(visible.edges)).toBe(LARGE_RELATIONSHIPS.length)
   })
 
   it('does not draw a relationship whose two ends collapsed into the same box', () => {
