@@ -1,4 +1,4 @@
-import { EdgeLabelRenderer, type EdgeProps } from '@xyflow/react'
+import { EdgeLabelRenderer, useStore, type EdgeProps } from '@xyflow/react'
 import type { TFunction } from 'i18next'
 import { memo, useState, type ReactNode } from 'react'
 import { useTranslation } from 'react-i18next'
@@ -145,6 +145,7 @@ function EdgeRoute({
 function EdgeBadge({
   point,
   children,
+  zIndex,
   onClick,
   title,
   testId,
@@ -156,6 +157,8 @@ function EdgeBadge({
 }: {
   point: LayoutPoint
   children: ReactNode
+  /** Keep this label above the SVG edge that owns it, including sub-flows. */
+  zIndex: number
   onClick?: () => void
   title?: string
   testId?: string
@@ -180,6 +183,7 @@ function EdgeBadge({
   )
   const style = {
     position: 'absolute' as const,
+    zIndex,
     transform: `translate(-50%, -50%) translate(${point.x}px, ${point.y}px)`,
   }
 
@@ -236,19 +240,23 @@ function EdgeBadge({
 function EdgeOverlayMark({
   point,
   overlay,
+  zIndex,
   dimmed = false,
 }: {
   point: LayoutPoint
   overlay: ChangeOverlay
+  /** Keep the visual mark above its edge without intercepting edge input. */
+  zIndex: number
   dimmed?: boolean
 }) {
   return (
     <span
       style={{
         position: 'absolute',
+        zIndex,
         transform: `translate(-50%, -50%) translate(${point.x}px, ${point.y}px)`,
       }}
-      className={cn('pointer-events-auto', dimmed && 'opacity-25')}
+      className={cn('pointer-events-none', dimmed && 'opacity-25')}
     >
       <ChangeOverlayMark overlay={overlay} />
     </span>
@@ -258,12 +266,45 @@ function EdgeOverlayMark({
 export const RelationshipEdge = memo(function RelationshipEdge({
   id,
   data,
+  selected,
+  source,
+  target,
   sourceX,
   sourceY,
   targetX,
   targetY,
 }: EdgeProps<ArchitectureEdge>) {
   const { t } = useTranslation('canvas')
+  /**
+   * React Flow puts all HTML edge labels in one portal, while each edge SVG
+   * receives a z-index derived from its parent-node nesting. Give each label
+   * the same contextual z-index plus one so a deep sub-flow cannot cover its
+   * own interactive label. Keeping this on the label itself leaves the portal
+   * unstacked, so nodes and React Flow controls retain their normal layering.
+   */
+  const edgeLabelZIndex = useStore((state) => {
+    const edge = state.edgeLookup.get(id)
+    const sourceNode = state.nodeLookup.get(source)
+    const targetNode = state.nodeLookup.get(target)
+
+    if (!sourceNode || !targetNode) return 1
+    if (state.zIndexMode === 'manual') return (edge?.zIndex ?? 0) + 1
+
+    const edgeZ =
+      (state.elevateEdgesOnSelect && (edge?.selected ?? selected)
+        ? (edge?.zIndex ?? 0) + 1000
+        : edge?.zIndex ?? 0)
+    const sourceZ =
+      sourceNode.parentId || (state.elevateEdgesOnSelect && sourceNode.selected)
+        ? sourceNode.internals.z
+        : 0
+    const targetZ =
+      targetNode.parentId || (state.elevateEdgesOnSelect && targetNode.selected)
+        ? targetNode.internals.z
+        : 0
+
+    return edgeZ + Math.max(sourceZ, targetZ) + 1
+  })
   const level = useDetailLevel()
   const expandedEdgeIds = useUiStore((state) => state.expandedEdgeIds)
   const toggleEdgeExpanded = useUiStore((state) => state.toggleEdgeExpanded)
@@ -346,12 +387,14 @@ export const RelationshipEdge = memo(function RelationshipEdge({
             <EdgeOverlayMark
               point={pointAtRatio(route, 0.74)}
               overlay={edgeOverlay}
+              zIndex={edgeLabelZIndex}
               dimmed={dimmed}
             />
           )}
           {bundled ? (
             <EdgeBadge
               point={badgePoint}
+              zIndex={edgeLabelZIndex}
               onClick={() => toggleEdgeExpanded(id)}
               // The display names are built from reported values; they are
               // interpolated into our sentence, never rewritten.
@@ -369,6 +412,7 @@ export const RelationshipEdge = memo(function RelationshipEdge({
             single && (
               <EdgeBadge
                 point={badgePoint}
+                zIndex={edgeLabelZIndex}
                 onClick={() =>
                   selectRelationship(
                     emphasised ? null : single.relationship.relationshipId,
@@ -434,6 +478,7 @@ export const RelationshipEdge = memo(function RelationshipEdge({
               key={`state-${entry.relationship.relationshipId}`}
               point={pointAtRatio(fanned, 0.74)}
               overlay={overlay}
+              zIndex={edgeLabelZIndex}
               dimmed={hasSelection && entry.relationship.relationshipId !== selectedRelationshipId}
             />
           )
@@ -453,6 +498,7 @@ export const RelationshipEdge = memo(function RelationshipEdge({
             <EdgeBadge
               key={entry.relationship.relationshipId}
               point={pointAtRatio(fanned, 0.5)}
+              zIndex={edgeLabelZIndex}
               onClick={() =>
                 selectRelationship(
                   emphasised ? null : entry.relationship.relationshipId,
@@ -474,6 +520,7 @@ export const RelationshipEdge = memo(function RelationshipEdge({
         })}
         <EdgeBadge
           point={pointAtRatio(route, 0.12)}
+          zIndex={edgeLabelZIndex}
           onClick={() => toggleEdgeExpanded(id)}
           title={t('edge.bundleCollapse')}
           testId={`edge-collapse-${id}`}

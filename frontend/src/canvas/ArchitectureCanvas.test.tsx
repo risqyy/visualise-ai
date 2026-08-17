@@ -161,6 +161,34 @@ describe('architecture canvas — rendering', () => {
     },
     CANVAS_TIMEOUT,
   )
+
+  it(
+    'keeps a nested edge label above its own SVG hit path',
+    async () => {
+      renderCanvas()
+      await waitForCanvas()
+
+      const label = await screen.findByTestId(`edge-bundle-${BUNDLE_EDGE_ID}`)
+      const edgeGroup = document.querySelector<SVGGElement>(
+        `.react-flow__edge[data-id="${BUNDLE_EDGE_ID}"]`,
+      )
+      const edgeSvg = edgeGroup?.closest('svg')
+      const renderer = document.querySelector<HTMLElement>(
+        '.react-flow__edgelabel-renderer',
+      )
+
+      expect(edgeSvg).not.toBeNull()
+      expect(renderer).not.toBeNull()
+      // The portal stays unstacked. The label itself carries the contextual
+      // z-index, so a deeper parent chain cannot put its transparent SVG hit
+      // path in front of the button.
+      expect(renderer).not.toHaveStyle({ zIndex: '1' })
+      expect(Number(label.style.zIndex)).toBeGreaterThan(
+        Number(edgeSvg?.style.zIndex ?? 0),
+      )
+    },
+    CANVAS_TIMEOUT,
+  )
 })
 
 describe('architecture canvas — colour-independent relationship kinds', () => {

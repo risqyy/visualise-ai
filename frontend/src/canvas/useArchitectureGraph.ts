@@ -200,13 +200,17 @@ export function useArchitectureGraph(
   return useMemo<ArchitectureGraph>(() => {
     const isEmpty = visible.nodes.length === 0
     const isCurrent = laidOut !== null && laidOut.signature === layoutSignature
+    // Keep the last layout's positions while ELK solves the new structure, but
+    // do not keep its data. A removal can turn an applied node into a ghost
+    // without changing its id, and the overlay state must be visible in that
+    // first render (the metrics below are already derived from `visible`).
+    // `withCurrentData` intentionally matches only ids that are still drawn;
+    // genuinely new proposal nodes wait for their first valid layout.
+    const nodesWithCurrentData =
+      laidOut === null ? [] : withCurrentData(laidOut.nodes, visible.nodes)
 
     return {
-      nodes: isEmpty
-        ? []
-        : isCurrent
-          ? withCurrentData(laidOut.nodes, visible.nodes)
-          : (laidOut?.nodes ?? []),
+      nodes: isEmpty ? [] : nodesWithCurrentData,
       edges: visible.edges,
       routes: isCurrent ? laidOut.routes : {},
       diagnostics: projection.diagnostics ?? EMPTY_DIAGNOSTICS,
