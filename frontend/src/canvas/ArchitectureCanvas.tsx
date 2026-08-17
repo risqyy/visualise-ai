@@ -554,8 +554,13 @@ function ArchitectureCanvasInner({
   // changes no picture and triggers no re-layout.
   useEffect(() => {
     if (collapsedComponentIds !== null || graph.nodes.length === 0) return
-    setCollapsedComponentIds(graph.collapsedIds)
-  }, [collapsedComponentIds, graph.nodes.length, graph.collapsedIds, setCollapsedComponentIds])
+    setCollapsedComponentIds(graph.requestedCollapsedIds)
+  }, [
+    collapsedComponentIds,
+    graph.nodes.length,
+    graph.requestedCollapsedIds,
+    setCollapsedComponentIds,
+  ])
 
   // Redeems a parked fit once the layout it was asked about has landed. It goes
   // through `onUserFitRequest`, so it stays an explicit movement and never
@@ -663,13 +668,27 @@ function ArchitectureCanvasInner({
   const selectSearchResult = useCallback(
     (componentId: ComponentId) => {
       const ancestors = new Set(graph.ancestorsOf(componentId))
-      const nextCollapsed = graph.collapsedIds.filter((id) => !ancestors.has(id))
+      const nextCollapsed = graph.requestedCollapsedIds.filter((id) => !ancestors.has(id))
+      // Compare the effective sets, not the requested arrays: a nested collapse
+      // below an already closed parent is still part of the full state, but it
+      // does not change the picture until that parent is opened. This also
+      // catches a deep-link reveal being closed when the search moves elsewhere.
+      const nextVisibleCollapsed = nextCollapsed.filter(
+        (id) => !graph.ancestorsOf(id).some((ancestor) => nextCollapsed.includes(ancestor)),
+      )
       const willRelayout =
-        nextCollapsed.length !== graph.collapsedIds.length ||
-        nextCollapsed.some((id, index) => id !== graph.collapsedIds[index])
+        nextVisibleCollapsed.length !== graph.collapsedIds.length ||
+        nextVisibleCollapsed.some((id, index) => id !== graph.collapsedIds[index])
 
-      pendingFocusRef.current = componentId
-      if (willRelayout) setCollapsedComponentIds(nextCollapsed)
+      if (willRelayout) {
+        pendingFocusRef.current = componentId
+        setCollapsedComponentIds(nextCollapsed)
+      } else {
+        // A no-relayout search is complete in this user action. Never leave a
+        // ref behind that a later model update could interpret as a new camera
+        // request.
+        pendingFocusRef.current = null
+      }
       // Search is an explicit selection, not the click-toggle interaction of a
       // canvas node. The URL, selected node and inspector therefore converge on
       // this exact id even when it was already selected.
@@ -1267,7 +1286,7 @@ function ArchitectureCanvasInner({
                     ref={searchInputRef}
                     id="canvas-component-search-input"
                     type="search"
-                    role="searchbox"
+                    role="combobox"
                     value={searchQuery}
                     onChange={(event) => {
                       setSearchQuery(event.target.value)
@@ -1282,6 +1301,14 @@ function ArchitectureCanvasInner({
                     onPointerDown={(event) => event.stopPropagation()}
                     placeholder={t('search.hint')}
                     aria-describedby="canvas-component-search-status"
+                    aria-controls="canvas-component-search-results"
+                    aria-expanded={searchQuery.trim() !== '' && searchResults.length > 0}
+                    aria-autocomplete="list"
+                    aria-activedescendant={
+                      searchQuery.trim() !== '' && searchResults.length > 0
+                        ? `canvas-component-search-result-${effectiveActiveSearchIndex}`
+                        : undefined
+                    }
                     className="min-w-0 flex-1 bg-transparent text-sm outline-none placeholder:text-muted-foreground"
                     data-testid="canvas-component-search-input"
                   />
@@ -1314,6 +1341,7 @@ function ArchitectureCanvasInner({
                 {searchQuery.trim() !== '' && searchResults.length > 0 && (
                   <div
                     className="border-border max-h-72 overflow-y-auto border-t p-1"
+                    id="canvas-component-search-results"
                     role="listbox"
                     aria-label={t('search.trigger')}
                     data-testid="canvas-component-search-results"
@@ -1322,6 +1350,7 @@ function ArchitectureCanvasInner({
                       <button
                         key={entry.component.componentId}
                         type="button"
+                        id={`canvas-component-search-result-${index}`}
                         role="option"
                         aria-selected={index === effectiveActiveSearchIndex}
                         className={`hover:bg-accent focus-visible:bg-accent flex w-full min-w-0 flex-col items-start gap-0.5 rounded-sm px-2 py-1.5 text-left text-sm outline-none ${index === effectiveActiveSearchIndex ? 'bg-accent' : ''}`}

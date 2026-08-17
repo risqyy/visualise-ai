@@ -379,6 +379,97 @@ test('2 · selecting one relationship is a reproducible URL and inspector contex
   await expect(page).not.toHaveURL(/relationship=/)
 })
 
+test('2 · component search exposes an accessible result, opens its ancestors and syncs selection', async ({
+  page,
+}) => {
+  await openWorkspace(page)
+
+  await page.getByTestId('canvas-component-search').click()
+  const input = page.getByTestId('canvas-component-search-input')
+  await input.fill('pricing')
+
+  const result = page.getByTestId('canvas-component-search-result').first()
+  const resultId = await result.getAttribute('id')
+  expect(resultId).not.toBeNull()
+  await expect(result).toContainText('Pricing')
+  await expect(result).toContainText('Modul')
+  await expect(result).toContainText('Shop Platform / Orders Service / Orders Domain Layer')
+  await expect(input).toHaveAttribute('role', 'combobox')
+  await expect(input).toHaveAttribute('aria-expanded', 'true')
+  await expect(input).toHaveAttribute('aria-activedescendant', resultId!)
+
+  await result.click()
+  await expect(page).toHaveURL(/component=shop-platform.orders.domain.pricing/)
+  await expect(page.getByTestId('inspector-context')).toHaveAttribute(
+    'data-component-id',
+    'shop-platform.orders.domain.pricing',
+  )
+  await expect(page.getByTestId('canvas-node-shop-platform.orders.domain.pricing')).toBeVisible()
+  await expect(page.getByTestId('node-disclosure-shop-platform.orders.domain')).toHaveAttribute(
+    'aria-expanded',
+    'true',
+  )
+  // Opening a search path is a disclosure change plus an explicit pan, never a
+  // second automatic fit.
+  await expect(page.getByTestId('architecture-canvas')).toHaveAttribute(
+    'data-fit-view-count',
+    '1',
+  )
+})
+
+test('2 · arrow navigation exposes the active result and deep links keep jump explicit', async ({
+  page,
+}) => {
+  await openWorkspace(page)
+
+  await page.getByTestId('canvas-component-search').click()
+  const input = page.getByTestId('canvas-component-search-input')
+  await input.fill('service')
+  const results = page.getByTestId('canvas-component-search-result')
+  await expect(results).toHaveCount(4)
+  const firstResultId = await results.nth(0).getAttribute('id')
+  const secondResultId = await results.nth(1).getAttribute('id')
+  expect(firstResultId).not.toBeNull()
+  expect(secondResultId).not.toBeNull()
+  await expect(input).toHaveAttribute('aria-activedescendant', firstResultId!)
+
+  await input.press('ArrowDown')
+  await expect(input).toHaveAttribute('aria-activedescendant', secondResultId!)
+  await expect(results.nth(1)).toHaveAttribute('aria-selected', 'true')
+  await expect(results.nth(0)).toHaveAttribute('aria-selected', 'false')
+
+  // A deep link restores selection and disclosure but leaves camera movement to
+  // the explicit jump control when the selected node is offscreen.
+  await page.goto(
+    `/projects/${MAIN_PROJECT}/runs/${MAIN_RUN}?component=${encodeURIComponent(
+      'shop-platform.orders.domain.pricing',
+    )}`,
+  )
+  const canvas = page.getByTestId('architecture-canvas')
+  await expect(canvas).toHaveAttribute('data-layouting', 'false')
+  await expect(page.getByTestId('inspector-context')).toHaveAttribute(
+    'data-component-id',
+    'shop-platform.orders.domain.pricing',
+  )
+  const fitCount = await canvas.getAttribute('data-fit-view-count')
+  const pane = page.locator('.react-flow__pane')
+  const paneBox = await pane.boundingBox()
+  expect(paneBox).not.toBeNull()
+  await page.mouse.move(paneBox!.x + paneBox!.width / 2, paneBox!.y + paneBox!.height / 2)
+  await page.mouse.down()
+  await page.mouse.move(paneBox!.x + paneBox!.width / 2 + 700, paneBox!.y + paneBox!.height / 2)
+  await page.mouse.up()
+
+  const jump = page.getByTestId('canvas-jump-to-selection')
+  await expect(jump).toBeVisible()
+  const before = await page.locator('.react-flow__viewport').getAttribute('style')
+  await jump.click()
+  await expect(canvas).toHaveAttribute('data-fit-view-count', fitCount ?? '1')
+  await expect
+    .poll(() => page.locator('.react-flow__viewport').getAttribute('style'))
+    .not.toBe(before)
+})
+
 test('2 · the self run keeps 28 model components apart from its open proposal at initial depth', async ({
   page,
 }) => {
