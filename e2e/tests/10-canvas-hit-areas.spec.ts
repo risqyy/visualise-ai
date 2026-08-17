@@ -59,6 +59,54 @@ async function assertTarget(
   expect(box!.height, `${label}: height`).toBeGreaterThanOrEqual(minimum)
 }
 
+/**
+ * At map zoom, single relationships intentionally have no HTML label: the
+ * transparent SVG interaction path is the relationship action instead. Its
+ * browser box is route-shaped, so the effective radial target is measured from
+ * its computed stroke width after applying the live canvas zoom.
+ */
+async function assertRelationshipAction(
+  page: Page,
+  minimum: number,
+  label: string,
+): Promise<void> {
+  const button = page
+    .locator(
+      '[data-testid^="edge-bundle-"], [data-testid^="edge-label-"], [data-testid^="edge-collapse-"]',
+    )
+    .first()
+  if ((await button.count()) > 0) {
+    await assertTarget(
+      page,
+      '[data-testid^="edge-bundle-"], [data-testid^="edge-label-"], [data-testid^="edge-collapse-"]',
+      minimum,
+      label,
+    )
+    return
+  }
+
+  const interactionPath = page.locator('.react-flow__edge-interaction').first()
+  await expect(interactionPath, `${label}: no interactive edge path`).toBeAttached()
+  const measurement = await interactionPath.evaluate((element) => {
+    const canvas = document.querySelector('[data-testid="architecture-canvas"]')
+    const zoom = Number(canvas?.getAttribute('data-canvas-zoom') ?? '1')
+    const strokeWidth = Number.parseFloat(window.getComputedStyle(element).strokeWidth)
+    const rect = element.getBoundingClientRect()
+    return {
+      width: rect.width,
+      height: rect.height,
+      effectiveStrokeWidth: strokeWidth * zoom,
+    }
+  })
+  expect(measurement.effectiveStrokeWidth, `${label}: effective edge hit width`).toBeGreaterThanOrEqual(
+    minimum,
+  )
+  expect(
+    Math.max(measurement.width, measurement.height),
+    `${label}: edge path has no measurable browser box`,
+  ).toBeGreaterThan(0)
+}
+
 async function assertCanvasTargets(page: Page, minimum: number, zoomLabel: string) {
   for (const selector of TOOLBAR_ACTIONS) {
     await assertTarget(page, selector, minimum, `${zoomLabel} toolbar ${selector}`)
@@ -81,9 +129,8 @@ async function assertCanvasTargets(page: Page, minimum: number, zoomLabel: strin
     minimum,
     `${zoomLabel} disclosure`,
   )
-  await assertTarget(
+  await assertRelationshipAction(
     page,
-    '[data-testid^="edge-bundle-"], [data-testid^="edge-label-"], [data-testid^="edge-collapse-"]',
     minimum,
     `${zoomLabel} relationship action`,
   )
