@@ -229,6 +229,11 @@ for (const language of ['de', 'en'] as const) {
         )
         .toBe(fitAfterFocus + 1)
       expect(await paneSnapshot(page)).toEqual(before)
+      // The restored arrangement intentionally keeps the inspector folded, so
+      // its content is not mounted while the rail is visible. Re-open it to
+      // verify that the URL-backed inspector context survived the transition.
+      await page.getByTestId('pane-rail-right').getByRole('button').click()
+      await expect(page.getByTestId('pane-inspector')).toBeVisible()
       await expect(page.getByTestId('inspector-context')).toHaveAttribute(
         'data-component-id',
         'shop-platform.orders.domain.tax',

@@ -70,8 +70,11 @@ export function WorkspaceLayout({ left, center, right }: WorkspaceLayoutProps) {
   const [initialLayout] = useState<PaneLayout>(() => useUiStore.getState().layout)
 
   useApplyLayout(groupRef, layout)
-  useApplyCollapse(leftPanelRef, leftCollapsed)
-  useApplyCollapse(rightPanelRef, rightCollapsed)
+  // Re-apply both collapse commands when either side changes. Expanding one
+  // panel can make the resizable group recompute the other panel's size; a
+  // pre-collapsed sibling must stay collapsed through that recalculation.
+  useApplyCollapse(leftPanelRef, leftCollapsed, rightCollapsed)
+  useApplyCollapse(rightPanelRef, rightCollapsed, leftCollapsed)
 
   return (
     <ResizablePanelGroup
@@ -202,13 +205,14 @@ function useApplyLayout(
 function useApplyCollapse(
   panelRef: React.RefObject<PanelImperativeHandle | null>,
   collapsed: boolean,
+  siblingCollapsed: boolean,
 ) {
   useEffect(() => {
     const panel = panelRef.current
     if (!panel) return
     if (collapsed && !panel.isCollapsed()) panel.collapse()
     if (!collapsed && panel.isCollapsed()) panel.expand()
-  }, [panelRef, collapsed])
+  }, [panelRef, collapsed, siblingCollapsed])
 }
 
 /** Mirrors a drag-induced collapse back into the store. */
