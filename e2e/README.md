@@ -94,6 +94,7 @@ created`, gegen eine gefüllte Datenbank bricht der Lauf also laut ab.
 | `08-viewport.spec.ts` | Keine horizontale Seitenscrollbar, keine verdeckte Primärsteuerung |
 | `09-i18n-layout.spec.ts` | Layout in Deutsch, Englisch und Pseudo-Locale bei 1920, 1440 und 1280 |
 | `10-architecture-focus.spec.ts` | Architektur-Fokus, exakte Pane-Wiederherstellung und Overlay-Geometrie in Deutsch und Englisch |
+| `11-canvas-hit-areas.spec.ts` | Screen-space Hit-Areas bei mehreren Zoomstufen und Fine/Coarse Pointer |
 
 `01`–`08` sind die verbindlichen Prüfungen des v0-Epics (#14) und bleiben
 unverändert: dieselben Assertions, dieselben 1920 × 1080, dieselbe Sprache.

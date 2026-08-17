@@ -99,7 +99,10 @@ function EdgeRoute({
           d={path}
           fill="none"
           stroke="transparent"
-          strokeWidth={14}
+          style={{
+            strokeWidth:
+              'calc(var(--vai-hit-area-size) * var(--vai-canvas-zoom-inverse, 1))',
+          }}
           className="react-flow__edge-interaction"
           opacity={dimmed ? 0.25 : 1}
         />
@@ -192,18 +195,26 @@ function EdgeBadge({
     onClick && 'hover:border-muted-foreground cursor-pointer',
     dimmed && 'opacity-25',
   )
+  const hitClassName = cn('canvas-flow-hit-area', className)
   const style = {
     position: 'absolute' as const,
     zIndex,
     transform: `translate(-50%, -50%) translate(${point.x}px, ${point.y}px)`,
+  }
+  const interactiveStyle = {
+    ...style,
+    // Edge labels live in React Flow's transformed viewport. Scaling the
+    // target by the reciprocal zoom keeps its pointer box in screen pixels;
+    // the nested visual span is scaled back to the graph's normal detail.
+    transform: `${style.transform} scale(var(--vai-canvas-zoom-inverse, 1))`,
   }
 
   if (onClick) {
     return (
       <button
         type="button"
-        style={style}
-        className={className}
+        style={interactiveStyle}
+        className={hitClassName}
         onPointerDown={(event) => event.stopPropagation()}
         onClick={(event) => {
           event.stopPropagation()
@@ -229,9 +240,11 @@ function EdgeBadge({
         }
         data-testid={testId}
       >
-        {children}
-        {detail &&
-          (focused || emphasised ? ` · ${detail}` : shortDetail ? ` · ${shortDetail}` : '')}
+        <span className="canvas-flow-hit-area-visual">
+          {children}
+          {detail &&
+            (focused || emphasised ? ` · ${detail}` : shortDetail ? ` · ${shortDetail}` : '')}
+        </span>
       </button>
     )
   }

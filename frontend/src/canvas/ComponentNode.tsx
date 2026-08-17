@@ -129,7 +129,7 @@ function DisclosureToggle({
   return (
     <button
       type="button"
-      className="nodrag nopan text-muted-foreground hover:text-foreground hover:bg-secondary/70 focus-visible:ring-ring -m-0.5 flex shrink-0 items-center gap-0.5 rounded-sm p-0.5 focus-visible:ring-2 focus-visible:outline-none"
+      className="canvas-flow-hit-area nodrag nopan text-muted-foreground hover:text-foreground hover:bg-secondary/70 focus-visible:ring-ring -m-0.5 flex shrink-0 items-center justify-center gap-0.5 rounded-sm p-0.5 focus-visible:ring-2 focus-visible:outline-none"
       title={title}
       aria-label={label}
       aria-expanded={!collapsed}
@@ -140,7 +140,9 @@ function DisclosureToggle({
         toggleCollapsed(componentId, !collapsed)
       }}
     >
-      <Icon className="size-3.5" aria-hidden="true" />
+      <span className="canvas-flow-hit-area-visual">
+        <Icon className="size-3.5" aria-hidden="true" />
+      </span>
     </button>
   )
 }

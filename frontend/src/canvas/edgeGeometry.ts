@@ -24,8 +24,16 @@ const lerp = (from: LayoutPoint, to: LayoutPoint, ratio: number): LayoutPoint =>
 /** Default corner radius of a routed edge. */
 export const EDGE_CORNER_RADIUS = 10
 
-/** Perpendicular distance between two lines of a fanned-out bundle. */
-export const BUNDLE_FAN_SPACING = 13
+/**
+ * Perpendicular distance between two lines of a fanned-out bundle.
+ *
+ * Relationship labels are independent keyboard/pointer actions. Their
+ * screen-space hit areas are 32 px for fine pointers and 44 px for coarse
+ * pointers (issue #59), so the model-space fan must leave at least that much
+ * room at the readable zoom floor (0.93) instead of relying on the old 13 px
+ * visual-only separation.
+ */
+export const BUNDLE_FAN_SPACING = 48
 
 /**
  * Turns a polyline into an SVG path with rounded corners.
