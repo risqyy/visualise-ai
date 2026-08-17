@@ -131,6 +131,16 @@ const APPLIED_RELATIONSHIP = appliedRelationship({
   operation: 'GET',
   label: 'Read orders',
 })
+const BUNDLED_APPLIED_RELATIONSHIP = appliedRelationship({
+  relationshipId: 'relationship-applied-sibling',
+  sourceComponentId: RELATIONSHIP_SOURCE_ID,
+  targetComponentId: RELATIONSHIP_TARGET_ID,
+  kind: 'nats_topic',
+  protocol: 'NATS',
+  operation: 'subscribe',
+  channel: 'orders.cancelled',
+  label: 'Read cancellations',
+})
 const RELATIONSHIP_ARCHITECTURE: ArchitectureResponse = {
   projectPosition: 42,
   components: [
@@ -281,6 +291,25 @@ describe('inspector — component selection', () => {
 })
 
 describe('inspector — relationship selection', () => {
+  it('shows the applied bundle members for parallel relationships', async () => {
+    const server = inspectorServer({
+      architecture: {
+        ...RELATIONSHIP_ARCHITECTURE,
+        relationships: [APPLIED_RELATIONSHIP, BUNDLED_APPLIED_RELATIONSHIP],
+      },
+    })
+    renderApp(
+      `${WORKSPACE_URL}?relationship=${APPLIED_RELATIONSHIP.relationshipId}`,
+      { fetchImpl: server.fetchImpl },
+    )
+
+    const bundle = await screen.findByTestId('inspector-relationship-bundle')
+    expect(bundle.querySelectorAll('li')).toHaveLength(2)
+    expect(bundle).toHaveTextContent('HTTP · GET')
+    expect(bundle).toHaveTextContent('NATS · orders.cancelled')
+    expect(bundle.querySelector('[data-selected="true"]')).toHaveTextContent('HTTP · GET')
+  })
+
   it('keeps applied and proposed edges separate when their endpoints match', async () => {
     const server = inspectorServer({ architecture: RELATIONSHIP_ARCHITECTURE })
     renderApp(

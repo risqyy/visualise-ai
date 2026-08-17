@@ -291,6 +291,9 @@ describe('architecture canvas — edge bundling stays resolvable', () => {
 
       // Unfolding it is an interaction on the canvas, available at any zoom.
       await user.click(bundle)
+      // Opening a bundle is a disclosure action, not an implicit selection of
+      // whichever relationship happens to be first in its list.
+      expect(useUiStore.getState().selectedRelationshipId).toBeNull()
 
       // Every single topic is now individually addressable, labelled with its
       // own channel — the bundle was a rendering, never a merge.

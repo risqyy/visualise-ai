@@ -364,7 +364,14 @@ test('2 · selecting one relationship is a reproducible URL and inspector contex
   const inspector = page.getByTestId('inspector-relationship-context')
   await expect(inspector).toBeVisible()
   await expect(inspector).toContainText('rel-orders-publishes-order-created')
-  await expect(page.getByTestId('inspector-relationship-bundle')).toBeVisible()
+  // This is the single publisher -> topic relationship. The other two
+  // `orders.order.created` relationships terminate at different consumers, so
+  // the ordered-endpoint bundling rule does not make them inspector siblings.
+  await expect(inspector).toContainText('NATS · orders.order.created')
+  await expect(inspector).toContainText('Orders Service')
+  await expect(inspector).toContainText('publishes')
+  await expect(inspector).toContainText('NATS')
+  await expect(page.getByTestId('inspector-relationship-bundle')).not.toBeAttached()
 
   // Escape clears the typed selection while the canvas remains the focused
   // interaction surface, so the next keyboard action has a stable target.
