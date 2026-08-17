@@ -1,11 +1,11 @@
-import { act, screen, waitFor, within } from '@testing-library/react'
+import { act, cleanup, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it } from 'vitest'
 
 import { queryKeys } from '@/api/queryKeys'
 import type { ArchitectureResponse } from '@/api/types'
 import { applyLiveEvent } from '@/api/useLiveStream'
-import { DEFAULT_CAMERA, useUiStore } from '@/state/uiStore'
+import { DEFAULT_CAMERA, resetUiStore, useUiStore } from '@/state/uiStore'
 import {
   BUNDLED_TOPIC_CHANNELS,
   NESTED_COMPONENTS,
@@ -657,6 +657,60 @@ describe('architecture canvas — selection', () => {
 })
 
 describe('architecture canvas — live updates never move the camera', () => {
+  it(
+    'drops pending search focus when orientation changes during the relayout',
+    async () => {
+      const user = userEvent.setup()
+      const collapsed = ['platform.api', 'platform.api.http', 'platform.core']
+
+      // Establish the camera produced by the explicit orientation fit without
+      // any pending search action to compare against below.
+      renderCanvas(
+        `${WORKSPACE_URL}?component=platform.api.grpc`,
+        nestedArchitectureResponse,
+        collapsed,
+      )
+      await waitForCanvas()
+      await user.click(screen.getByTestId('canvas-layout-left-right'))
+      await waitFor(() =>
+        expect(screen.getByTestId('architecture-canvas')).toHaveAttribute(
+          'data-layouting',
+          'false',
+        ),
+      )
+      const cameraAfterOrientation = useUiStore.getState().camera
+
+      cleanup()
+      resetUiStore()
+
+      const rendered = renderCanvas(WORKSPACE_URL, nestedArchitectureResponse, collapsed)
+      await waitForCanvas()
+      await user.click(screen.getByTestId('canvas-component-search'))
+      const input = screen.getByTestId('canvas-component-search-input')
+      input.focus()
+      await user.keyboard('gRPC Layer')
+      await user.click(screen.getByTestId('canvas-component-search-result'))
+
+      // The search has opened a collapsed ancestor, so ELK is still solving the
+      // graph when this explicit camera action arrives.
+      expect(rendered.router.state.location.search).toEqual({
+        component: 'platform.api.grpc',
+      })
+      await user.click(screen.getByTestId('canvas-layout-left-right'))
+      await waitFor(() =>
+        expect(screen.getByTestId('architecture-canvas')).toHaveAttribute(
+          'data-layouting',
+          'false',
+        ),
+      )
+
+      // Orientation owns the resulting camera. A stale search focus would add
+      // another pan after this fit and produce a different viewport.
+      expect(useUiStore.getState().camera).toEqual(cameraAfterOrientation)
+    },
+    CANVAS_TIMEOUT,
+  )
+
   it(
     'does not replay a completed no-relayout search focus after a live re-layout',
     async () => {

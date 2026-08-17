@@ -240,6 +240,26 @@ export function viewportForFocus(
   }
 }
 
+/**
+ * Whether a layout box is fully inside the actual visible surface.
+ *
+ * This deliberately has no comfort padding. The caller can still use
+ * `viewportForFocus` to make a visible component more comfortably placed, but
+ * a jump affordance must only appear when part of the component is truly off
+ * the viewport.
+ */
+export function isBoundsFullyVisible(
+  viewport: CameraViewport,
+  focus: LayoutBounds,
+  surface: ViewportSize,
+): boolean {
+  const left = focus.x * viewport.zoom + viewport.x
+  const top = focus.y * viewport.zoom + viewport.y
+  const right = left + focus.width * viewport.zoom
+  const bottom = top + focus.height * viewport.zoom
+  return left >= 0 && top >= 0 && right <= surface.width && bottom <= surface.height
+}
+
 function axisOffset(
   surfaceSize: number,
   boundsStart: number,

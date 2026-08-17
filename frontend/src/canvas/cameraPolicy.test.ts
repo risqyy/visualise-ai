@@ -4,6 +4,7 @@ import {
   FIT_VIEW_PADDING,
   INITIAL_CAMERA_POLICY,
   MIN_FIT_VIEWPORT,
+  isBoundsFullyVisible,
   onLayoutReady,
   onProjectChanged,
   onUserFitRequest,
@@ -258,6 +259,15 @@ describe('where the camera goes', () => {
     expect(repeated.zoom).toBe(focused.zoom)
     expect(repeated.x).toBeCloseTo(focused.x, 10)
     expect(repeated.y).toBeCloseTo(focused.y, 10)
+  })
+
+  it('only marks a selection for jumping when it crosses the real viewport edge', () => {
+    const current = { x: 0, y: 0, zoom: 1 }
+    const nearRightEdge = { x: 800, y: 100, width: 228, height: 96 }
+    const justOffscreen = { x: 809, y: 100, width: 228, height: 96 }
+
+    expect(isBoundsFullyVisible(current, nearRightEdge, SURFACE)).toBe(true)
+    expect(isBoundsFullyVisible(current, justOffscreen, SURFACE)).toBe(false)
   })
 
   it('shows where an oversized focus begins rather than where it ends', () => {

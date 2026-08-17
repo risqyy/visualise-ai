@@ -1,5 +1,7 @@
 import type { Component, ComponentId } from '@/api/types'
 
+import { componentKindSearchLabels } from './componentKinds'
+
 /** One component that can be found from the canvas command search. */
 export interface ComponentSearchEntry {
   component: Component
@@ -40,6 +42,7 @@ export function componentSearchEntries(
         component.componentId,
         component.name,
         component.kind,
+        ...componentKindSearchLabels(component.kind),
         ...technology,
         ...tags,
         ...containerPath,

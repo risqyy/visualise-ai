@@ -48,6 +48,7 @@ import { ReportedText } from '@/i18n'
 import { EdgeMarkerDefs } from './RelationshipEdge'
 import {
   INITIAL_CAMERA_POLICY,
+  isBoundsFullyVisible,
   onLayoutReady,
   onProjectChanged,
   onUserFitRequest,
@@ -227,6 +228,9 @@ function ArchitectureCanvasInner({
   const searchTriggerRef = useRef<HTMLButtonElement | null>(null)
   const wasSearchOpenRef = useRef(false)
   const pendingFocusRef = useRef<ComponentId | null>(null)
+  const invalidatePendingSearchFocus = useCallback(() => {
+    pendingFocusRef.current = null
+  }, [])
   const searchResults = useMemo(
     () => searchComponentEntries(searchEntries, searchQuery),
     [searchEntries, searchQuery],
@@ -419,6 +423,7 @@ function ArchitectureCanvasInner({
   /** Explicitly reveals one laid-out component without changing the zoom. */
   const focusComponentInView = useCallback(
     (componentId: ComponentId) => {
+      invalidatePendingSearchFocus()
       const { width, height, nodeLookup } = storeApi.getState()
       const node = nodeLookup.get(componentId)
       if (!node || width <= 0 || height <= 0) return
@@ -432,7 +437,7 @@ function ArchitectureCanvasInner({
       setDetailLevel(detailLevelForZoom(viewport.zoom))
       publishZoom(viewport.zoom)
     },
-    [flow, publishZoom, setCamera, storeApi],
+    [flow, invalidatePendingSearchFocus, publishZoom, setCamera, storeApi],
   )
 
   // React Flow's node lookup is an external mutable store. Read it during
@@ -446,13 +451,11 @@ function ArchitectureCanvasInner({
   })()
   const selectionNeedsJump = useMemo(() => {
     if (!selectionFocusBounds || surfaceWidth <= 0 || surfaceHeight <= 0) return false
-    const current = camera
-    const next = viewportForFocus(
-      current,
+    return !isBoundsFullyVisible(
+      camera,
       selectionFocusBounds,
       { width: surfaceWidth, height: surfaceHeight },
     )
-    return Math.abs(next.x - current.x) > 0.1 || Math.abs(next.y - current.y) > 0.1
   }, [camera, selectionFocusBounds, surfaceHeight, surfaceWidth])
 
   /**
@@ -474,16 +477,18 @@ function ArchitectureCanvasInner({
     // not a second explicit camera movement.
     if (previous === null || previous === orientation) return
 
+    invalidatePendingSearchFocus()
     // Positions are meaningful only in the coordinate system that produced
     // them. Resetting them here keeps one transient set instead of persisting
     // two direction-specific sets, while selection and disclosure stay intact.
     clearNodePositions()
     pendingFitRef.current = { mode: 'user', focusComponentId: null }
-  }, [clearNodePositions, orientation])
+  }, [clearNodePositions, invalidatePendingSearchFocus, orientation])
 
   /** Fits now if the graph is already the right one, otherwise after re-layout. */
   const requestFit = useCallback(
     (mode: FitMode, afterRelayout: boolean) => {
+      invalidatePendingSearchFocus()
       // "Systemebene" reproduces the entry picture, and the entry picture keeps
       // the selected component on screen. The whole-model overview does not: it
       // is about the model, not about one component of it.
@@ -496,7 +501,7 @@ function ArchitectureCanvasInner({
       policyRef.current = onUserFitRequest(policyRef.current).state
       fitView(mode, focusComponentId)
     },
-    [fitView, selectedComponentId],
+    [fitView, invalidatePendingSearchFocus, selectedComponentId],
   )
 
   // Switching projects makes the next model an initial one again — including
@@ -763,24 +768,29 @@ function ArchitectureCanvasInner({
   // React Flow passes `null` for a programmatic move and the real input event
   // for a user one — which is exactly the distinction the camera policy needs.
   const onMoveStart = useCallback((event: unknown) => {
-    if (event !== null && event !== undefined) userMovedCameraRef.current = true
-  }, [])
+    if (event !== null && event !== undefined) {
+      userMovedCameraRef.current = true
+      invalidatePendingSearchFocus()
+    }
+  }, [invalidatePendingSearchFocus])
 
   const onMove = useCallback(
-    (_event: unknown, viewport: Viewport) => {
+    (event: unknown, viewport: Viewport) => {
+      if (event !== null && event !== undefined) invalidatePendingSearchFocus()
       setDetailLevel(detailLevelForZoom(viewport.zoom))
       publishZoom(viewport.zoom)
     },
-    [publishZoom],
+    [invalidatePendingSearchFocus, publishZoom],
   )
 
   const onMoveEnd = useCallback(
-    (_event: unknown, viewport: Viewport) => {
+    (event: unknown, viewport: Viewport) => {
+      if (event !== null && event !== undefined) invalidatePendingSearchFocus()
       setCamera(viewport)
       setDetailLevel(detailLevelForZoom(viewport.zoom))
       publishZoom(viewport.zoom)
     },
-    [setCamera, publishZoom],
+    [invalidatePendingSearchFocus, setCamera, publishZoom],
   )
 
   /**

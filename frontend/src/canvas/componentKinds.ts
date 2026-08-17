@@ -15,6 +15,7 @@ import type { TFunction } from 'i18next'
 
 import type { Component, ComponentKind, Technology } from '@/api/types'
 import type { CanvasKey } from '@/i18n'
+import { resources } from '@/i18n/resources'
 
 import { reported } from './relationshipKinds'
 
@@ -37,6 +38,8 @@ export interface ComponentKindStyle {
   icon: LucideIcon
 }
 
+type ComponentKindCatalogueKey = keyof typeof resources.de.canvas.componentKind
+
 export const COMPONENT_KIND_STYLES: Record<ComponentKind, ComponentKindStyle> = {
   system: { id: 'system', labelKey: 'componentKind.system', icon: Boxes },
   service: { id: 'service', labelKey: 'componentKind.service', icon: Server },
@@ -57,6 +60,21 @@ export function componentKindStyle(kind: ComponentKind): ComponentKindStyle {
 export function componentKindLabel(kind: ComponentKind, t: TFunction<'canvas'>): string {
   const key = componentKindStyle(kind).labelKey
   return key === null ? kind : t(key)
+}
+
+/**
+ * The visible kind labels are searchable in both supported languages. Keeping
+ * these values sourced from the catalogues means a localized badge and its
+ * command-search index cannot drift apart.
+ */
+export function componentKindSearchLabels(kind: ComponentKind): string[] {
+  const key = componentKindStyle(kind).labelKey
+  if (key === null || !key.startsWith('componentKind.')) return []
+  const catalogueKey = key.slice('componentKind.'.length) as ComponentKindCatalogueKey
+  return [
+    resources.de.canvas.componentKind[catalogueKey],
+    resources.en.canvas.componentKind[catalogueKey],
+  ].filter((label, index, labels): label is string => labels.indexOf(label) === index)
 }
 
 /**

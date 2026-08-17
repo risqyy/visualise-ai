@@ -43,6 +43,21 @@ describe('component search inventory', () => {
     expect(searchComponentEntries(entries, 'service')).toHaveLength(2)
   })
 
+  it('searches the localized component kind labels', () => {
+    const entries = componentSearchEntries([
+      { ...components[0]!, kind: 'module' },
+      { ...components[1]!, kind: 'datastore' },
+    ])
+
+    expect(searchComponentEntries(entries, 'Modul').map((entry) => entry.component.kind)).toEqual([
+      'module',
+    ])
+    expect(
+      searchComponentEntries(entries, 'Datenspeicher').map((entry) => entry.component.kind),
+    ).toEqual(['datastore'])
+    expect(searchComponentEntries(entries, 'Data store')).toHaveLength(1)
+  })
+
   it('includes overlay-only components while preferring applied rows for duplicate ids', () => {
     const entries = componentSearchEntries(components.slice(0, 1), [
       components[1]!,
