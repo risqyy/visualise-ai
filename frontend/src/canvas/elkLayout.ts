@@ -9,13 +9,18 @@ import {
   type ArchitectureEdge,
   type ArchitectureNode,
 } from './graphProjection'
+import {
+  orientationForElkDirection,
+  type ElkDirection,
+} from './graphOrientation'
 
 /**
  * Automatic layout with ELK's `layered` algorithm.
  *
  * `layered` (a Sugiyama-style algorithm) is the right fit because an
- * architecture model *is* a directed, mostly acyclic graph: callers on the
- * left, callees on the right, with a readable layer per hop. Force-directed
+ * architecture model *is* a directed, mostly acyclic graph: callers precede
+ * callees, with a readable layer per hop. The default is top-down; an explicit
+ * left-to-right mode keeps the original horizontal reading. Force-directed
  * alternatives give a pretty but arbitrary picture that changes every time, and
  * a tree layout cannot express the cross-links an architecture is full of.
  *
@@ -54,8 +59,8 @@ export interface ArchitectureLayout {
 }
 
 export interface LayoutOptionsInput {
-  /** Layout direction. `RIGHT` reads as "calls flow to the right". */
-  direction?: 'RIGHT' | 'DOWN'
+  /** ELK layout direction. `DOWN` is the top-down default. */
+  direction?: ElkDirection
 }
 
 /**
@@ -67,7 +72,7 @@ export interface LayoutOptionsInput {
  */
 export const ROOT_LAYOUT_OPTIONS: LayoutOptions = {
   'elk.algorithm': 'layered',
-  'elk.direction': 'RIGHT',
+  'elk.direction': 'DOWN',
   'elk.edgeRouting': 'ORTHOGONAL',
   'elk.hierarchyHandling': 'INCLUDE_CHILDREN',
   // Pinned seed: `layered` uses randomised tie-breaking in its heuristics.
@@ -149,6 +154,9 @@ export function buildElkGraph(
   edges: readonly ArchitectureEdge[],
   options: LayoutOptionsInput = {},
 ): ElkNode {
+  const direction = options.direction ?? 'DOWN'
+  const orientation = orientationForElkDirection(direction)
+  const topDown = orientation === 'top-down'
   const sorted = [...nodes].sort((a, b) => compareIds(a.id, b.id))
   const childrenOf = new Map<string, ArchitectureNode[]>()
   const roots: ArchitectureNode[] = []
@@ -180,19 +188,25 @@ export function buildElkGraph(
       ports: [
         {
           id: targetPortId(node.id),
-          x: 0,
-          y: height / 2,
+          x: topDown ? width / 2 : 0,
+          y: topDown ? 0 : height / 2,
           width: 1,
           height: 1,
-          layoutOptions: { 'elk.port.side': 'WEST', 'elk.port.index': '0' },
+          layoutOptions: {
+            'elk.port.side': topDown ? 'NORTH' : 'WEST',
+            'elk.port.index': '0',
+          },
         },
         {
           id: sourcePortId(node.id),
-          x: width,
-          y: height / 2,
+          x: topDown ? width / 2 : width,
+          y: topDown ? height : height / 2,
           width: 1,
           height: 1,
-          layoutOptions: { 'elk.port.side': 'EAST', 'elk.port.index': '1' },
+          layoutOptions: {
+            'elk.port.side': topDown ? 'SOUTH' : 'EAST',
+            'elk.port.index': '1',
+          },
         },
       ],
     }
@@ -245,6 +259,7 @@ export async function layoutArchitecture(
 
   const elk = await getElk()
   const graph = buildElkGraph(nodes, edges, options)
+  const orientation = orientationForElkDirection(options.direction ?? 'DOWN')
   const laidOut = await elk.layout(graph)
 
   const positions = new Map<string, { x: number; y: number; width: number; height: number }>()
@@ -326,7 +341,8 @@ export async function layoutArchitecture(
       measured: { width, height },
       // Re-declared for the size ELK settled on — a container grows around its
       // children, and its handles have to follow.
-      handles: nodeHandles(width, height),
+      handles: nodeHandles(width, height, orientation),
+      data: { ...node.data, orientation },
       style: { ...node.style, width, height },
     }
   })

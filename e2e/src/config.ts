@@ -90,6 +90,12 @@ export const VALIDATION_AGENT = 'e2e-validation-orchestrator'
 export const RETRY_PROJECT = 'visualise-ai-retry'
 export const CONFLICT_PROJECT = 'visualise-ai-conflict'
 
+/** Self-reporting run: the repository's 28-component model and open proposal. */
+export const SELF_PROJECT = 'visualise-ai-self'
+export const SELF_RUN = 'run-v0-epic-1'
+export const SELF_BOOTSTRAP_RUN = 'run-e2e-self-bootstrap'
+export const SELF_BOOTSTRAP_AGENT = 'e2e-self-bootstrap-orchestrator'
+
 /**
  * Forced-disconnect replay probe. A project of its own so the cut, the reconnect
  * and the position arithmetic cannot be disturbed by, or disturb, the browser

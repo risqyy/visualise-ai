@@ -5,8 +5,8 @@ import { expect, type Page } from '@playwright/test'
  *
  * A project opens on its system and container level with deeper containers
  * collapsed, so that a model of thirty-odd components is readable at the
- * resolution this suite accepts at (issue #34, ADR 0017). "Gesamtes Modell
- * einpassen" is the explicit overview action that undoes it — the same button a
+ * resolution this suite accepts at (issue #34, ADR 0017). "Gesamtkarte" is the
+ * explicit spatial action that undoes it — the same button a
  * user presses — so assertions about components three and four levels down go
  * through it rather than around it.
  *

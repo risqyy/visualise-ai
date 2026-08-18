@@ -107,6 +107,21 @@
     "emptyTitle": "Keine Probleme gemeldet",
     "label": "Probleme"
   },
+  "relationship": {
+    "agents": "{{count, number}} meldende Agents",
+    "bundleLabel": "Gebündelte Beziehungen",
+    "changeLabel": "Änderungsstatus",
+    "channel": "Kanal",
+    "label": "Beziehungskontext",
+    "noChange": "Kein Änderungsstatus gemeldet.",
+    "notFound": "Diese Beziehung ist nicht im aktuellen Architektur-Snapshot enthalten.",
+    "operation": "Operation",
+    "protocol": "Protokoll",
+    "reportedBy": "Gemeldet von Agent",
+    "reportedLabel": "Gemeldetes Label",
+    "source": "Quelle",
+    "target": "Ziel"
+  },
   "risk": {
     "emptyDescription": "Für diese Komponente wurde in diesem Run kein risk.reported gemeldet.",
     "emptyTitle": "Keine Risiken gemeldet",

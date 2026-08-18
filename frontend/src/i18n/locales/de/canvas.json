@@ -1,21 +1,21 @@
 {
   "a11y": {
     "agentsReporting": "{{agents}} melden dazu",
-    "bundleOf": "Sammelkante mit {{relationships}}",
+    "bundleOf": "Sammelkante mit {{relationships}}, dargestellte Verbindung",
     "collapsedNote": "eingeklappt, {{components}} verborgen",
     "componentRole": "Architekturkomponente",
     "containerRole": "Architekturcontainer",
     "contains": "Container mit {{components}}",
     "fitView": "Ansicht einpassen",
-    "fromTo": "Beziehung von {{source}} zu {{target}}",
+    "fromTo": "Gemeldete Beziehung von {{source}} zu {{target}}",
     "furtherRelationships": "und {{relationships}} weitere",
-    "ghostNote": "nicht mehr Teil des angewandten Architekturmodells",
+    "ghostNote": "nicht mehr Teil des angewandten Architekturmodells, nur noch als Beleg dargestellt",
     "handle": "Verbindungspunkt",
     "identifiedBy": "Komponenten-ID {{componentId}}",
     "inContainer": "in {{container}}",
     "noWorkState": "kein Änderungsstatus gemeldet",
     "proposalNote": "angekündigt, noch nicht Teil des angewandten Architekturmodells",
-    "relationshipRole": "Architekturbeziehung",
+    "relationshipRole": "Architekturbeziehung, dargestellte Verbindung",
     "rolledUpNote": "gemeldet für eine eingeklappte Komponente darin",
     "toggleInteractive": "Interaktivität umschalten",
     "zoomControls": "Zoomsteuerung des Architekturgraphen",
@@ -39,10 +39,12 @@
   "detail": {
     "fullDescription": "Zusätzlich Tags. Gebündelte Beziehungen sind einzeln aufgefächert.",
     "fullLabel": "Vollständig",
-    "indicator": "Detailstufe: {{level}}",
-    "overviewDescription": "Nur Name und Art. Parallele Beziehungen sind gebündelt.",
-    "overviewLabel": "Übersicht",
-    "standardDescription": "Zusätzlich die gemeldete Technologie. Parallele Beziehungen sind gebündelt.",
+    "indicator": "Darstellungsstufe: {{level}}",
+    "minimalDescription": "Nur Form und Symbol. Texte werden ausgeblendet, bleiben aber über Auswahl und Inspector erreichbar.",
+    "minimalLabel": "Karte",
+    "overviewDescription": "Lesbare Übersicht mit primären Namen. Sekundärtexte erscheinen erst ab ausreichendem Zoom.",
+    "overviewLabel": "Lesbare Übersicht",
+    "standardDescription": "Zusätzlich Art und gemeldete Technologie. Sekundärtexte bleiben mindestens 10 px groß.",
     "standardLabel": "Standard"
   },
   "diagnostics": {
@@ -56,13 +58,14 @@
   "edge": {
     "bundleCollapse": "Sammelkante wieder zusammenklappen",
     "bundleExpand": "Sammelkante aufklappen: {{relationships}}",
+    "bundleSelect": "Eine Beziehung dieser Sammelkante im Inspector anzeigen: {{relationships}}",
     "channel": "Kanal: {{value}}",
     "operation": "Operation: {{value}}",
     "protocol": "Protokoll: {{value}}"
   },
   "graph": {
-    "edgeInstructions": "Enter oder Leertaste wählt diese Beziehung aus; bei einer Sammelkante klappt sie die enthaltenen Beziehungen auf und wieder zu. Escape hebt die Auswahl auf.",
-    "instructions": "Architekturgraph des Projekts. Mit der Tabulatortaste zwischen den Komponenten und Beziehungen wechseln. Enter oder Leertaste wählt die fokussierte Komponente aus und zeigt sie im Inspector; eine erneute Aktivierung hebt die Auswahl auf, Escape ebenfalls. Jede Komponente nennt ihren gemeldeten Namen, ihre Art, ob sie weitere Komponenten enthält, in welchem Container sie liegt und welchen Änderungsstatus ein Agent für sie gemeldet hat. Der Graph ist eine Beobachtung: das gemeldete Architekturmodell lässt sich hier nicht bearbeiten.",
+    "edgeInstructions": "Enter oder Leertaste öffnet eine Sammelkante oder wählt eine einzelne Beziehung und zeigt sie im Inspector; eine Sammelkante klappt nur ihre gemeldeten Beziehungen auf und wieder zu. Escape hebt die Auswahl auf.",
+    "instructions": "Architekturgraph des Projekts. Mit der Tabulatortaste in den Graphen und danach mit den Pfeiltasten zum räumlich nächsten sichtbaren Knoten wechseln; der Fokus bewegt keine Knoten. Enter oder Leertaste wählt den fokussierten Knoten aus und zeigt ihn im Inspector; eine erneute Aktivierung hebt die Auswahl auf, Escape ebenfalls. Wenn ein Ziel außerhalb des sichtbaren Bereichs liegt, wird dorthin geschwenkt, ohne den Zoom zu ändern. Interaktive Steuerelemente in einem Knoten, zum Beispiel Auf- und Zuklappen, bleiben eigene Bedienelemente. Jede Komponente nennt ihren gemeldeten Namen, ihre Art, ob sie weitere Komponenten enthält, in welchem Container sie liegt und welchen Änderungsstatus ein Agent für sie gemeldet hat. Gemeldete Beziehungen können als eine gebündelte Verbindung dargestellt werden. Der Graph ist eine Beobachtung: das angewandte Architekturmodell lässt sich hier nicht bearbeiten.",
     "label": "Interaktiver Architekturgraph",
     "layouting": "Layout wird berechnet…",
     "minimapLabel": "Übersichtskarte der Architektur",
@@ -98,12 +101,33 @@
     "workStepRunning": "Arbeitsschritt läuft: {{title}}"
   },
   "pane": {
-    "components": "{{count}} Komponenten",
     "emptyDescription": "Das Modell erscheint, sobald ein Agent architecture.snapshot_published sendet.",
     "emptyTitle": "Noch kein Architekturmodell gemeldet",
+    "evidenceComponents_one": "+ {{count, number}} Komponente nur als Beleg",
+    "evidenceComponents_other": "+ {{count, number}} Komponenten nur als Beleg",
     "label": "Architekturfläche",
-    "relationships": "{{count}} Beziehungen",
+    "modelComponents_one": "{{count, number}} Modellkomponente",
+    "modelComponents_other": "{{count, number}} Modellkomponenten",
+    "proposedComponents_one": "+ {{count, number}} Vorschlag",
+    "proposedComponents_other": "+ {{count, number}} Vorschläge",
+    "relationshipSummaryHint": "Beziehungen sind die gemeldeten Aussagen des angewandten Modells. Verbindungen sind die aktuell dargestellten Linien; Einklappen, Anheben und Bündeln können mehrere Beziehungen als eine Verbindung zeigen.",
+    "reportedRelationships_one": "{{count, number}} gemeldete Beziehung",
+    "reportedRelationships_other": "{{count, number}} gemeldete Beziehungen",
+    "renderedConnections_one": "{{count, number}} Verbindung dargestellt",
+    "renderedConnections_other": "{{count, number}} Verbindungen dargestellt",
     "title": "Architektur"
+  },
+  "search": {
+    "close": "Komponentensuche schließen",
+    "empty": "Nach Name, Art, Technologie, Tag oder Komponenten-ID suchen.",
+    "hint": "Name, Art, Technologie, Tags oder Komponenten-ID suchen",
+    "noResults": "Keine passende Komponente gefunden.",
+    "resultCount_one": "{{count, number}} Komponente gefunden",
+    "resultCount_other": "{{count, number}} Komponenten gefunden",
+    "root": "Wurzelebene",
+    "trigger": "Komponenten suchen",
+    "jumpToSelection": "Zur Auswahl springen",
+    "jumpToSelectionHint": "Die Kamera schwenkt nur so weit, bis die ausgewählte Komponente sichtbar ist."
   },
   "relationshipKind": {
     "async": {
@@ -132,21 +156,31 @@
     }
   },
   "tool": {
-    "backToOverview": "Systemebene",
-    "backToOverviewHint": "Zurück auf System- und Container-Ebene: tiefere Komponenten werden wieder eingeklappt und die Ansicht in lesbarer Größe eingepasst.",
+    "backToOverview": "Lesbare Systemübersicht",
+    "backToOverviewHint": "Zur lesbaren Systemübersicht: tiefere Komponenten werden wieder eingeklappt und die Ansicht wird mit mindestens 12 px Primärtext eingepasst.",
     "collapse": "Einklappen",
     "expand": "Aufklappen",
     "expandHidden": "Aufklappen ({{hidden}})",
-    "fitWholeModel": "Gesamtes Modell einpassen",
-    "fitWholeModelHint": "Klappt alle Container auf und passt das vollständige Modell in die Fläche ein. Bei vielen Komponenten wird die Darstellung dabei bewusst klein — das ist die Übersichtsaktion. Die Kamera bewegt sich sonst nur beim ersten Laden — nie durch eintreffende Ereignisse.",
+    "exitArchitectureFocus": "Architekturfokus verlassen",
+    "exitArchitectureFocusHint": "Run- und Inspector-Bereich exakt so wiederherstellen, wie sie vor dem Architekturfokus waren.",
+    "focusArchitecture": "Architektur fokussieren",
+    "focusArchitectureHint": "Beide Seitenbereiche einklappen und die sichtbare Architektur einpassen. Auswahl, Offenlegung und Inspector-Kontext bleiben erhalten.",
+    "fitWholeModel": "Gesamtkarte (gesamtes Modell)",
+    "fitWholeModelHint": "Öffnet alle Container und zeigt das vollständige Modell als räumliche Gesamtkarte. Bei vielen Komponenten wird die Darstellung bewusst klein; sie dient der Orientierung, nicht dem Lesen. Suche, Auswahl und Inspector bleiben verfügbar. Die Kamera bewegt sich sonst nur beim ersten Laden — nie durch eintreffende Ereignisse.",
     "hideMinimap": "Übersichtskarte ausblenden",
+    "layoutLeftRight": "Links nach rechts",
+    "layoutOrientation": "Graphausrichtung",
+    "layoutTopDown": "Top-down",
+    "primaryActions": "Architekturaktionen",
     "resetPositions": "Positionen zurücksetzen",
     "resetPositionsHint": "Verschobene Knoten zurück auf das berechnete Layout. Verschiebungen sind ohnehin nur lokal und ändern das Architekturmodell nicht.",
+    "secondaryInfo": "Informationen zur Architekturdarstellung",
     "showMinimap": "Übersichtskarte einblenden"
   },
   "visibility": {
-    "hint": "Tiefere Komponenten sind hinter ihrem Container eingeklappt, damit die oberen Ebenen lesbar bleiben. Aufklappen über das Dreieck am Container, über einen Deep Link oder über „Gesamtes Modell einpassen\".",
-    "summary": "{{visible}} von {{total}} Komponenten sichtbar"
+    "hint": "Tiefere Komponenten werden hinter ihrem Container eingeklappt, damit die oberen Ebenen lesbar bleiben. Verbindungen zu eingeklappten Komponenten werden auf den sichtbaren Container angehoben. Beziehungen innerhalb desselben eingeklappten Containers werden absichtlich nicht gezeichnet. Parallele gemeldete Beziehungen können als eine Sammelverbindung gebündelt werden. Aufklappen über das Dreieck am Container, über einen Deep Link oder über die räumliche Gesamtkarte.",
+    "summary_one": "{{visible, number}} von {{total, number}} Element sichtbar",
+    "summary_other": "{{visible, number}} von {{total, number}} Elementen sichtbar"
   },
   "workState": {
     "active": {

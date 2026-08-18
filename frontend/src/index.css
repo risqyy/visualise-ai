@@ -60,6 +60,13 @@
   /* Live zoom of the architecture canvas. Published by `ArchitectureCanvas`
      on the drawing surface; 1 is the honest fallback everywhere else. */
   --vai-canvas-zoom: 1;
+  /* Reciprocal of the live zoom. Flow controls use this on their own transform
+     so their pointer target stays a real screen-space size while their icon
+     remains in the graph's semantic scale. */
+  --vai-canvas-zoom-inverse: 1;
+  /* Pointer targets are larger than the visual glyphs. Desktop mouse targets
+     are 32 px; coarse pointers get the 44 px target recommended for touch. */
+  --vai-hit-area-size: 32px;
 
   /* ---- v0 work states --------------------------------------------------- */
   /* Phases of work, never a quality judgement. Always paired with a label and
@@ -186,7 +193,123 @@
   border-radius: calc(var(--radius) - 2px);
 }
 
+/*
+ * Canvas hit areas
+ * ----------------
+ * Nodes and HTML edge labels live below React Flow's zoom transform. A plain
+ * `min-width: 32px` would therefore become a 10 px target at zoom 0.3 and an
+ * enormous target at zoom 2.5. The outer control is scaled by the reciprocal
+ * zoom, while its visual child is scaled back by the live zoom. The result is
+ * a stable screen-space target with no change to ELK's fixed node dimensions
+ * and no enlarged icon or label.
+ *
+ * These rules are intentionally unlayered so React Flow's stylesheet cannot
+ * shrink the controls back to its compact defaults. State changes use colour,
+ * shadow and opacity only; no hover/pressed state changes layout bounds.
+ */
+.canvas-flow-hit-area {
+  min-width: var(--vai-hit-area-size);
+  min-height: var(--vai-hit-area-size);
+  transform: scale(var(--vai-canvas-zoom-inverse, 1));
+  transform-origin: center;
+  touch-action: manipulation;
+}
+
+.canvas-flow-hit-area-visual {
+  display: inline-flex;
+  transform: scale(var(--vai-canvas-zoom, 1));
+  transform-origin: center;
+}
+
+.canvas-flow-hit-area:not(:disabled):hover,
+.canvas-toolbar-action:not(:disabled):hover,
+.react-flow .react-flow__controls-button:not(:disabled):hover {
+  box-shadow: inset 0 0 0 1px color-mix(in oklab, var(--foreground) 35%, transparent);
+}
+
+.canvas-flow-hit-area:not(:disabled):active,
+.canvas-toolbar-action:not(:disabled):active,
+.react-flow .react-flow__controls-button:not(:disabled):active {
+  background-color: color-mix(in oklab, var(--accent) 85%, var(--foreground));
+  color: var(--accent-foreground);
+  box-shadow: inset 0 0 0 2px color-mix(in oklab, var(--foreground) 45%, transparent);
+}
+
+.canvas-flow-hit-area:disabled,
+.canvas-toolbar-action:disabled,
+.react-flow .react-flow__controls-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+.canvas-toolbar {
+  gap: 0.5rem;
+}
+
+.canvas-toolbar-action {
+  min-width: var(--vai-hit-area-size);
+  min-height: var(--vai-hit-area-size);
+  touch-action: manipulation;
+}
+
+.canvas-toolbar-action[aria-pressed='true'] {
+  background-color: color-mix(in oklab, var(--accent) 85%, transparent);
+  color: var(--accent-foreground);
+}
+
+.react-flow .react-flow__controls {
+  gap: 0.5rem;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.react-flow .react-flow__controls-button {
+  width: var(--vai-hit-area-size);
+  height: var(--vai-hit-area-size);
+  min-width: var(--vai-hit-area-size);
+  min-height: var(--vai-hit-area-size);
+  margin: 0;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--card);
+  color: var(--foreground);
+  touch-action: manipulation;
+}
+
+@media (pointer: coarse) {
+  :root {
+    --vai-hit-area-size: 44px;
+  }
+}
+
+/* Semantic detail changes are content changes, not motion. Respect the
+   platform preference when a node state or relationship highlight transitions
+   between them, and when React Flow animates a camera operation. */
+@media (prefers-reduced-motion: reduce) {
+  .react-flow,
+  .react-flow *,
+  .react-flow *::before,
+  .react-flow *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    scroll-behavior: auto !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
 @layer components {
+  /* Keep the top-left action cluster out of the minimap's fixed top-right
+     footprint. The toolbar wraps inside this gutter at the supported desktop
+     widths, so every button remains reachable without covering the map. */
+  .architecture-toolbar {
+    max-width: calc(100% - 12rem);
+  }
+
+  .architecture-toolbar-full {
+    max-width: 100%;
+  }
+
   /* Shared surface for the three panes. */
   .pane-surface {
     @apply bg-card text-card-foreground flex h-full min-h-0 min-w-0 flex-col;

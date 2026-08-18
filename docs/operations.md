@@ -164,6 +164,10 @@ Checkout funktionieren.
 `docker-compose.yml` fest gesetzt und ist bewusst nicht in `.env.example`: der
 Container-Port ist Teil der Topologie, nicht der Konfiguration.
 
+`DOCKERHUB_NAMESPACE` und `IMAGE_TAG` werden nur vom optionalen Compose-Override
+für veröffentlichte Images verwendet; der normale lokale Start baut weiterhin
+aus `./backend` und `./frontend`.
+
 > **`MAX_EVENT_BYTES` anzuheben genügt allein nicht.** Nginx steht davor und
 > begrenzt den Request-Body auf `MAX_REQUEST_BODY_SIZE` (Default `4m`). Ein
 > Event darüber wird schon am Einstiegspunkt abgelehnt und erreicht das Backend
@@ -173,6 +177,58 @@ Container-Port ist Teil der Topologie, nicht der Konfiguration.
 > Nginx antwortet in diesem Fall ebenfalls mit `application/problem+json` und
 > `code: event_too_large`, damit ein Agent die Ablehnung genauso auswerten kann
 > wie die des Backends.
+
+## Veröffentlichte Docker-Hub-Images
+
+Der Release-Workflow
+([`.github/workflows/release-dockerhub.yml`](../.github/workflows/release-dockerhub.yml))
+reagiert ausschließlich auf Tags der Form `v<major>.<minor>.<patch>` mit
+optionalem Prerelease, beispielsweise `v1.2.3` oder `v1.2.3-rc.1`. Branch- und
+Pull-Request-Ereignisse veröffentlichen nichts.
+
+Vor der Veröffentlichung laufen die bestehenden CI- und E2E-Workflows als
+gemeinsames Gate: API-Vertrag, Backend-Build/Vet/Tests, Frontend-Locale-Checks,
+Lint, Typecheck, Tests und Build, Simulator-Checks, Playwright-E2E sowie der
+Build beider Dockerfiles müssen erfolgreich sein. Fehlt die Konfiguration,
+bricht der Workflow mit den fehlenden Namen ab, ohne Secret-Werte auszugeben.
+
+In den Repository-Einstellungen sind folgende Werte erforderlich:
+
+| Einstellung | Inhalt |
+| --- | --- |
+| Variable `DOCKERHUB_NAMESPACE` | Docker-Hub-Namespace, ohne Image-Namen |
+| Secret `DOCKERHUB_USERNAME` | Docker-Hub-Benutzername oder Maschinenkonto |
+| Secret `DOCKERHUB_TOKEN` | Persönlicher Zugriffstoken mit Push-Rechten |
+
+Der Workflow verwendet ausschließlich diese getrennten Repositories:
+`${DOCKERHUB_NAMESPACE}/visualise-ai-backend` und
+`${DOCKERHUB_NAMESPACE}/visualise-ai-frontend`. Ein stabiles `v1.2.3` erzeugt
+die Tags `1.2.3`, `1.2`, `1` und `latest`. Ein Prerelease wie `v1.2.3-rc.1`
+erzeugt nur `1.2.3-rc.1`; es überschreibt keine stabilen Versionen und nicht
+`latest`. Beide Images tragen OCI-Labels für Source, Revision, Version und
+Erstellungszeitpunkt; beim Backend wird die Version ohne führendes `v` als
+Build-Argument gesetzt.
+
+Ein Image lässt sich direkt prüfen oder ziehen:
+
+```bash
+docker pull "$DOCKERHUB_NAMESPACE/visualise-ai-backend:1.2.3"
+docker pull "$DOCKERHUB_NAMESPACE/visualise-ai-frontend:1.2.3"
+```
+
+Der optionale
+[`docker-compose.images.yml`](../docker-compose.images.yml)-Override nutzt
+die gezogenen Images. `IMAGE_TAG` ist standardmäßig `latest`:
+
+```bash
+DOCKERHUB_NAMESPACE=example IMAGE_TAG=1.2.3 \
+  docker compose -f docker-compose.yml -f docker-compose.images.yml pull
+DOCKERHUB_NAMESPACE=example IMAGE_TAG=1.2.3 \
+  docker compose -f docker-compose.yml -f docker-compose.images.yml up -d --no-build
+```
+
+Der Override ersetzt nur Backend und Frontend. PostgreSQL bleibt der interne
+`postgres:17-alpine`-Service; dafür wird kein Visualise-AI-Image veröffentlicht.
 
 Alle Werte werden beim Start geprüft. Ein nicht parsbarer oder nicht positiver
 Wert lässt das Backend scheitern, statt still auf den Default zurückzufallen —

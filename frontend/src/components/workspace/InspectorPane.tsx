@@ -2,11 +2,14 @@ import { Maximize2, Minimize2 } from 'lucide-react'
 import { useMemo, type ReactNode } from 'react'
 import { useTranslation } from 'react-i18next'
 
-import { useComponentHistory, useComponentInspector } from '@/api/queries'
-import type { ComponentId, ProjectId, RunId } from '@/api/types'
+import { useArchitecture, useComponentHistory, useComponentInspector } from '@/api/queries'
+import type { AppliedRelationship, ComponentId, Identifier, ProjectId, Relationship, RunId } from '@/api/types'
+import { bundleEdgeId, overlayEdgeId } from '@/canvas/graphProjection'
+import { useChangeOverlays } from '@/canvas/useChangeOverlays'
 import { AsyncState, EmptyState } from '@/components/AsyncState'
 import { PaneHeader } from '@/components/workspace/PaneHeader'
 import { ComponentContextCard } from '@/components/workspace/inspector/ComponentContextCard'
+import { RelationshipContextCard } from '@/components/workspace/inspector/RelationshipContextCard'
 import { ComponentHistoryList } from '@/components/workspace/inspector/ComponentHistoryList'
 import { DiffGroupList } from '@/components/workspace/inspector/DiffGroupList'
 import { FeedbackList } from '@/components/workspace/inspector/FeedbackList'
@@ -27,6 +30,7 @@ export interface InspectorPaneProps {
   projectId: ProjectId
   runId: RunId
   componentId: ComponentId | undefined
+  relationshipId: Identifier | undefined
   focus: DeepFocusTarget | undefined
   historyMode: boolean
   onSetFocus: (target: DeepFocusTarget | undefined) => void
@@ -62,6 +66,7 @@ export function InspectorPane({
   projectId,
   runId,
   componentId,
+  relationshipId,
   focus,
   historyMode,
   onSetFocus,
@@ -70,8 +75,58 @@ export function InspectorPane({
   const { t } = useTranslation('inspector')
   const { t: tWorkspace } = useTranslation('workspace')
   const { t: tCommon } = useTranslation('common')
-  const inspector = useComponentInspector(projectId, componentId, runId)
-  const history = useComponentHistory(projectId, componentId, { enabled: historyMode })
+  const architecture = useArchitecture(projectId)
+  const overlay = useChangeOverlays(projectId, architecture.data)
+  const inspector = useComponentInspector(
+    projectId,
+    relationshipId ? undefined : componentId,
+    runId,
+  )
+  const history = useComponentHistory(projectId, relationshipId ? undefined : componentId, {
+    enabled: historyMode,
+  })
+
+  const selectedRelationship = useMemo<AppliedRelationship | Relationship | null>(() => {
+    if (!relationshipId) return null
+    const applied = architecture.data?.relationships.find(
+      (entry) => entry.relationshipId === relationshipId,
+    )
+    if (applied) return applied
+    return overlay.extraRelationships.find(
+      (entry) => entry.relationship.relationshipId === relationshipId,
+    )?.relationship ?? null
+  }, [architecture.data?.relationships, overlay.extraRelationships, relationshipId])
+  const relationshipBundle = useMemo(() => {
+    if (!selectedRelationship) return []
+    const appliedRelationshipIds = new Set(
+      architecture.data?.relationships.map((entry) => entry.relationshipId) ?? [],
+    )
+    const all = [
+      ...(architecture.data?.relationships ?? []),
+      ...overlay.extraRelationships.map((entry) => entry.relationship),
+    ]
+    const edgeIdOf = (entry: AppliedRelationship | Relationship) =>
+      appliedRelationshipIds.has(entry.relationshipId)
+        ? bundleEdgeId(entry.sourceComponentId, entry.targetComponentId)
+        : overlayEdgeId(entry.sourceComponentId, entry.targetComponentId)
+    const selectedEdgeId = edgeIdOf(selectedRelationship)
+    return all.filter(
+      (entry) => edgeIdOf(entry) === selectedEdgeId,
+    )
+  }, [architecture.data?.relationships, overlay.extraRelationships, selectedRelationship])
+  const componentNames = useMemo(
+    () =>
+      new Map([
+        ...(architecture.data?.components ?? []).map((entry) => [entry.componentId, entry.name] as const),
+        ...overlay.extraComponents.map((entry) => [entry.component.componentId, entry.component.name] as const),
+      ]),
+    [architecture.data?.components, overlay.extraComponents],
+  )
+  const selectedRelationshipOverlay = relationshipId
+    ? overlay.relationships.get(relationshipId) ??
+      overlay.extraRelationships.find((entry) => entry.relationship.relationshipId === relationshipId)
+        ?.overlay
+    : undefined
 
   const pages = useMemo(() => inspector.data?.pages ?? [], [inspector.data])
   // Every page repeats the complete, non-paged collections; only `diffs`
@@ -109,7 +164,9 @@ export function InspectorPane({
         subtitle={
           // The component's reported name — or, failing that, its reported id.
           // Only the "nothing is selected" case is the cockpit's own sentence.
-          head?.component?.name !== undefined ? (
+          relationshipId && selectedRelationship ? (
+            <ReportedText value={relationshipId} />
+          ) : head?.component?.name !== undefined ? (
             <ReportedText value={head.component.name} />
           ) : componentId !== undefined ? (
             <ReportedText value={componentId} />
@@ -142,7 +199,7 @@ export function InspectorPane({
         </div>
       )}
 
-      {componentId && (
+      {componentId && !relationshipId && (
         <div
           role="tablist"
           aria-label={t('source.label')}
@@ -174,7 +231,28 @@ export function InspectorPane({
         data-testid="inspector-scroll"
       >
         <div className="space-y-4 p-3">
-          {!componentId ? (
+          {relationshipId ? (
+            <RelationshipContextCard
+              relationshipId={relationshipId}
+              relationship={selectedRelationship}
+              sourceName={
+                selectedRelationship
+                  ? componentNames.get(selectedRelationship.sourceComponentId) ??
+                    selectedRelationship.sourceComponentId
+                  : ''
+              }
+              targetName={
+                selectedRelationship
+                  ? componentNames.get(selectedRelationship.targetComponentId) ??
+                    selectedRelationship.targetComponentId
+                  : ''
+              }
+              {...(selectedRelationshipOverlay
+                ? { overlay: selectedRelationshipOverlay }
+                : {})}
+              bundle={relationshipBundle}
+            />
+          ) : !componentId ? (
             <EmptyState title={t('empty.title')} description={t('empty.description')} />
           ) : (
             <AsyncState
