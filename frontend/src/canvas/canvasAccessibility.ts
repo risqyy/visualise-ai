@@ -12,13 +12,15 @@ import { RELATIONSHIP_KIND_STYLE_BY_ID, relationshipDiscriminator } from './rela
 /**
  * The accessible surface of the architecture canvas.
  *
- * React Flow makes every node and every edge a tab stop, but it names neither:
- * a node arrives in the accessibility tree as an unnamed `group` with the
- * roledescription `node`, and an edge as `Edge from <id> to <id>`. What the
- * canvas draws — the component's name, its kind, whether it contains other
- * components, and the work state an agent reported for it — is invisible to a
- * screen reader. This module is the counterpart of the drawing code: it turns
- * exactly the same facts into an accessible name.
+ * React Flow makes every node and every edge a tab stop by default, but it
+ * names neither: a node arrives in the accessibility tree as an unnamed
+ * `group` with the roledescription `node`, and an edge as `Edge from <id> to
+ * <id>`. The canvas applies a roving tab index to the visible nodes and keeps
+ * relationships programmatically focusable only. What the canvas draws — the
+ * component's name, its kind, whether it contains other components, and the
+ * work state an agent reported for it — is invisible to a screen reader. This
+ * module is the counterpart of the drawing code: it turns exactly the same
+ * facts into an accessible name.
  *
  * Four rules hold here and are covered by tests:
  *
@@ -362,7 +364,7 @@ export function nodeDisclosureLabel(
 }
 
 /**
- * Puts role, name and state on every node.
+ * Puts role, name, state and (when requested) the roving tab index on every node.
  *
  * `role="group"` is what React Flow already gives a focusable node, and it is
  * kept on purpose. A node is not a leaf widget: a container renders a real
@@ -381,6 +383,8 @@ export function nodeDisclosureLabel(
 export function withNodeAccessibility(
   nodes: readonly ArchitectureNode[],
   voice: CanvasVoice,
+  /** The one node that is the graph's Tab entry, when roving focus is active. */
+  rovingNodeId?: ComponentId | null,
 ): ArchitectureNode[] {
   const identities = identifyingNames(nodes, voice)
   return nodes.map((node) => ({
@@ -393,6 +397,9 @@ export function withNodeAccessibility(
         : voice.t(CANVAS_A11Y_KEYS.componentRoleDescription),
       ...(node.selected === true || node.data.relationshipSelected === true
         ? { 'aria-current': true as const }
+        : {}),
+      ...(rovingNodeId !== undefined
+        ? { tabIndex: node.id === rovingNodeId ? 0 : -1 }
         : {}),
     },
   }))
@@ -467,10 +474,10 @@ export function edgeAccessibleName(
  *
  * React Flow makes edges focusable and labels them `Edge from <id> to <id>` —
  * English, built from ids rather than from the reported names, and identical
- * for a single call and for a bundle of three NATS topics. A tab stop that
- * announces neither what it connects nor what it carries is the same defect as
- * an unnamed node, so the edges are named from the same reported data the line
- * is drawn from.
+ * for a single call and for a bundle of three NATS topics. Although the
+ * composite keeps them out of the Tab sequence, programmatic edge activation
+ * still needs a meaningful name, so the edges are named from the same reported
+ * data the line is drawn from.
  */
 export function withEdgeAccessibility(
   edges: readonly ArchitectureEdge[],
@@ -483,6 +490,10 @@ export function withEdgeAccessibility(
     ariaLabel: edgeAccessibleName(edge, names, voice),
     domAttributes: {
       'aria-roledescription': voice.t(CANVAS_A11Y_KEYS.relationshipRoleDescription),
+      // Relationships remain programmatically focusable for the existing
+      // relationship keyboard actions, but they are not another Tab entry in
+      // the composite component graph.
+      tabIndex: -1,
       ...(selectedRelationshipId !== null &&
       edge.data?.relationships.some(
         (relationship) => relationship.relationshipId === selectedRelationshipId,
