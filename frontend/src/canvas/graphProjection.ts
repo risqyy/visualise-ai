@@ -155,6 +155,12 @@ export interface RelationshipEdgeData extends Record<string, unknown> {
   /** Direction used by the orthogonal fallback after a node drag. */
   fallbackOrientation?: GraphOrientation
   /**
+   * Route-relative lane for this edge's HTML relationship label. Assigned by
+   * the canvas when independent edges share an endpoint; absent means the
+   * route midpoint remains the preferred anchor.
+   */
+  labelRatio?: number
+  /**
    * Absolute polyline computed by ELK, attached by the canvas after the layout.
    * Absent while no layout exists or after one of the endpoints was dragged;
    * the edge then falls back to a plain orthogonal connection.

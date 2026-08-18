@@ -24,8 +24,145 @@ const lerp = (from: LayoutPoint, to: LayoutPoint, ratio: number): LayoutPoint =>
 /** Default corner radius of a routed edge. */
 export const EDGE_CORNER_RADIUS = 10
 
-/** Perpendicular distance between two lines of a fanned-out bundle. */
-export const BUNDLE_FAN_SPACING = 13
+/**
+ * Perpendicular distance between two lines of a fanned-out bundle.
+ *
+ * Relationship labels are independent keyboard/pointer actions. Their
+ * screen-space hit areas are 32 px for fine pointers and 44 px for coarse
+ * pointers (issue #59), so the model-space fan must leave at least that much
+ * room at the readable zoom floor (0.93) instead of relying on the old 13 px
+ * visual-only separation.
+ */
+export const BUNDLE_FAN_SPACING = 48
+
+/**
+ * Route-relative lanes for labels on independent edges that share an
+ * endpoint. Keeping the lanes away from both handles leaves the label on its
+ * own relationship while giving wide channel pills room to clear one another.
+ */
+export const EDGE_LABEL_STAGGER_START = 0.35
+export const EDGE_LABEL_STAGGER_END = 0.65
+const EDGE_LABEL_COLLISION_ZOOM = 0.93
+const EDGE_LABEL_COLLISION_WIDTH = 220
+const EDGE_LABEL_COLLISION_HEIGHT = 44
+const EDGE_LABEL_COLLISION_GAP = 8
+
+interface LabelCollisionBox {
+  left: number
+  right: number
+  top: number
+  bottom: number
+}
+
+function labelCollisionBox(point: LayoutPoint): LabelCollisionBox {
+  const centerX = point.x * EDGE_LABEL_COLLISION_ZOOM
+  const centerY = point.y * EDGE_LABEL_COLLISION_ZOOM
+  return {
+    left: centerX - (EDGE_LABEL_COLLISION_WIDTH + EDGE_LABEL_COLLISION_GAP) / 2,
+    right: centerX + (EDGE_LABEL_COLLISION_WIDTH + EDGE_LABEL_COLLISION_GAP) / 2,
+    top: centerY - (EDGE_LABEL_COLLISION_HEIGHT + EDGE_LABEL_COLLISION_GAP) / 2,
+    bottom: centerY + (EDGE_LABEL_COLLISION_HEIGHT + EDGE_LABEL_COLLISION_GAP) / 2,
+  }
+}
+
+export interface LabelPlacementEdge {
+  id: string
+  source: string
+  target: string
+  route?: readonly LayoutPoint[]
+}
+
+/**
+ * Assigns deterministic label lanes to crowded endpoint groups. ELK already
+ * separates the routes, but their visual labels can be much wider than the
+ * route-to-route gap. The returned ratios move only the HTML label anchor;
+ * edge routes, handles and node dimensions remain untouched.
+ */
+export function staggeredLabelRatios(
+  edges: readonly LabelPlacementEdge[],
+): ReadonlyMap<string, number> {
+  const ratios = new Map<string, number>()
+
+  const assignGroups = (endpoint: 'source' | 'target') => {
+    const groups = new Map<string, LabelPlacementEdge[]>()
+    for (const edge of edges) {
+      const key = edge[endpoint]
+      const group = groups.get(key)
+      if (group) group.push(edge)
+      else groups.set(key, [edge])
+    }
+
+    for (const group of groups.values()) {
+      if (group.length < 2) continue
+      group.sort((first, second) =>
+        first.id < second.id ? -1 : first.id > second.id ? 1 : 0,
+      )
+      const denominator = Math.max(group.length - 1, 1)
+      for (const [index, edge] of group.entries()) {
+        if (ratios.has(edge.id)) continue
+        const fraction = index / denominator
+        ratios.set(
+          edge.id,
+          EDGE_LABEL_STAGGER_START +
+            fraction * (EDGE_LABEL_STAGGER_END - EDGE_LABEL_STAGGER_START),
+        )
+      }
+    }
+  }
+
+  // Incoming edges are the common collision case, while the second pass also
+  // protects fan-out labels when several edges leave one source.
+  assignGroups('target')
+  assignGroups('source')
+
+  // Resolve labels whose routes are close even when their endpoints differ.
+  // The collision box deliberately uses the coarse-pointer height and a
+  // conservative width for the longest bounded canvas pill at the lowest
+  // readable zoom, plus the documented 8 px independent-target gap. At higher
+  // zooms the same model-space separation only grows on screen. Edges without
+  // a route keep their endpoint lane and are handled again when a layout
+  // becomes available.
+  const placed: { left: number; right: number; top: number; bottom: number }[] = []
+  const ordered = [...edges].sort((first, second) =>
+    first.id < second.id ? -1 : first.id > second.id ? 1 : 0,
+  )
+  for (const edge of ordered) {
+    const route = edge.route
+    if (!route) continue
+    const preferred = ratios.get(edge.id) ?? 0.5
+    const hadPreferred = ratios.has(edge.id)
+    const candidates = [
+      preferred,
+      EDGE_LABEL_STAGGER_START,
+      0.5,
+      EDGE_LABEL_STAGGER_END,
+    ].filter((candidate, index, all) => all.indexOf(candidate) === index)
+    let bestRatio = preferred
+    let bestCollisions = Number.POSITIVE_INFINITY
+    let bestDistance = Number.POSITIVE_INFINITY
+    for (const candidate of candidates) {
+      const point = pointAtRatio(route, candidate)
+      const box = labelCollisionBox(point)
+      const collisions = placed.filter(
+        (other) =>
+          Math.min(box.right, other.right) > Math.max(box.left, other.left) &&
+          Math.min(box.bottom, other.bottom) > Math.max(box.top, other.top),
+      ).length
+      const distanceFromPreferred = Math.abs(candidate - preferred)
+      if (
+        collisions < bestCollisions ||
+        (collisions === bestCollisions && distanceFromPreferred < bestDistance)
+      ) {
+        bestRatio = candidate
+        bestCollisions = collisions
+        bestDistance = distanceFromPreferred
+      }
+    }
+    if (hadPreferred || bestRatio !== 0.5) ratios.set(edge.id, bestRatio)
+    placed.push(labelCollisionBox(pointAtRatio(route, bestRatio)))
+  }
+  return ratios
+}
 
 /**
  * Turns a polyline into an SVG path with rounded corners.

@@ -73,6 +73,7 @@ import {
   MIN_READABLE_ZOOM,
   detailLevelForZoom,
 } from './detailLevel'
+import { staggeredLabelRatios } from './edgeGeometry'
 import { ARCHITECTURE_EDGE_TYPES, ARCHITECTURE_NODE_TYPES } from './flowRegistry'
 import {
   COMPOUND_NODE_TYPE,
@@ -372,6 +373,7 @@ function ArchitectureCanvasInner({
     if (!surface) return
     const safe = Number.isFinite(zoom) && zoom > 0 ? zoom : 1
     surface.style.setProperty('--vai-canvas-zoom', String(safe))
+    surface.style.setProperty('--vai-canvas-zoom-inverse', String(1 / safe))
     surface.setAttribute('data-canvas-zoom', safe.toFixed(4))
   }, [])
 
@@ -818,10 +820,29 @@ function ArchitectureCanvasInner({
     const routed = graph.edges.map((edge) => {
       const route = invalidated.has(edge.id) ? undefined : graph.routes[edge.id]
       if (!edge.data) return edge
-      return { ...edge, data: { ...edge.data, ...(route ? { route } : {}) } }
+      return {
+        ...edge,
+        data: {
+          ...edge.data,
+          ...(route ? { route } : {}),
+        },
+      }
+    })
+    const labelRatios = staggeredLabelRatios(
+      routed.map((edge) => ({
+        id: edge.id,
+        source: edge.source,
+        target: edge.target,
+        ...(edge.data?.route ? { route: edge.data.route } : {}),
+      })),
+    )
+    const positioned = routed.map((edge) => {
+      const labelRatio = labelRatios.get(edge.id)
+      if (!edge.data || labelRatio === undefined) return edge
+      return { ...edge, data: { ...edge.data, labelRatio } }
     })
     return withEdgeAccessibility(
-      routed,
+      positioned,
       nodeNames,
       voice,
       visualSelectedRelationshipId,
@@ -1321,7 +1342,7 @@ function ArchitectureCanvasInner({
                 to a few hundred pixels, and a toolbar that runs past its edge
                 takes its own controls out of reach. */}
             <div
-              className={`architecture-toolbar ${minimapVisible ? '' : 'architecture-toolbar-full'} border-border bg-card/90 flex min-w-0 flex-wrap items-center gap-1 rounded-md border px-1 py-1 backdrop-blur-sm`}
+              className={`canvas-toolbar architecture-toolbar ${minimapVisible ? '' : 'architecture-toolbar-full'} border-border bg-card/90 nopan nodrag flex min-w-0 flex-wrap items-center gap-1 rounded-md border px-1 py-1 backdrop-blur-sm`}
             >
               <div
                 className="flex min-w-0 flex-wrap items-center gap-1"
@@ -1333,7 +1354,7 @@ function ArchitectureCanvasInner({
                 ref={searchTriggerRef}
                 variant="ghost"
                 size="sm"
-                className="h-7 gap-1.5 px-2 text-xs"
+                className="canvas-toolbar-action h-7 gap-1.5 px-2 text-xs"
                 aria-haspopup="dialog"
                 aria-expanded={searchOpen}
                 aria-keyshortcuts="/ Control+K Meta+K"
@@ -1350,7 +1371,7 @@ function ArchitectureCanvasInner({
                     <Button
                       variant="outline"
                       size="sm"
-                      className="h-7 gap-1.5 px-2 text-xs"
+                      className="canvas-toolbar-action h-7 gap-1.5 px-2 text-xs"
                       onClick={onJumpToSelection}
                       data-testid="canvas-jump-to-selection"
                     >
@@ -1369,7 +1390,7 @@ function ArchitectureCanvasInner({
                   <Button
                     variant="ghost"
                     size="sm"
-                    className="h-7 gap-1.5 px-2 text-xs"
+                    className="canvas-toolbar-action h-7 gap-1.5 px-2 text-xs"
                     onClick={onShowWholeModel}
                     data-testid="canvas-fit-view"
                   >
@@ -1388,7 +1409,7 @@ function ArchitectureCanvasInner({
                     <Button
                       variant="ghost"
                       size="sm"
-                      className="h-7 gap-1.5 px-2 text-xs"
+                      className="canvas-toolbar-action h-7 gap-1.5 px-2 text-xs"
                       onClick={onBackToOverview}
                       data-testid="canvas-back-to-overview"
                     >
@@ -1408,7 +1429,7 @@ function ArchitectureCanvasInner({
                     <Button
                       variant="ghost"
                       size="sm"
-                      className="h-7 gap-1.5 px-2 text-xs"
+                      className="canvas-toolbar-action h-7 gap-1.5 px-2 text-xs"
                       onClick={clearNodePositions}
                       data-testid="canvas-reset-positions"
                     >
@@ -1461,7 +1482,7 @@ function ArchitectureCanvasInner({
                 <Button
                   variant="ghost"
                   size="sm"
-                  className="h-7 gap-1 px-2 text-xs"
+                  className="canvas-toolbar-action h-7 gap-1 px-2 text-xs"
                   aria-pressed={orientation === 'top-down'}
                   onClick={() => onOrientationChange('top-down')}
                   data-testid="canvas-layout-top-down"
@@ -1472,7 +1493,7 @@ function ArchitectureCanvasInner({
                 <Button
                   variant="ghost"
                   size="sm"
-                  className="h-7 gap-1 px-2 text-xs"
+                  className="canvas-toolbar-action h-7 gap-1 px-2 text-xs"
                   aria-pressed={orientation === 'left-right'}
                   onClick={() => onOrientationChange('left-right')}
                   data-testid="canvas-layout-left-right"
@@ -1487,7 +1508,7 @@ function ArchitectureCanvasInner({
                   <Button
                     variant="ghost"
                     size="icon"
-                    className="size-7"
+                    className="canvas-toolbar-action size-7"
                     onClick={() => setMinimapVisible(!minimapVisible)}
                     aria-pressed={minimapVisible}
                     data-testid="canvas-toggle-minimap"
