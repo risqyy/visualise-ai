@@ -1,0 +1,10 @@
+# Optional override for running the images published by the release workflow.
+# The base compose file remains the source-build path for local development.
+services:
+  backend:
+    build: !reset null
+    image: "${DOCKERHUB_NAMESPACE:?set DOCKERHUB_NAMESPACE}/visualise-ai-backend:${IMAGE_TAG:-latest}"
+
+  frontend:
+    build: !reset null
+    image: "${DOCKERHUB_NAMESPACE:?set DOCKERHUB_NAMESPACE}/visualise-ai-frontend:${IMAGE_TAG:-latest}"
