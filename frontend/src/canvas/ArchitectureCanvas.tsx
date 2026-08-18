@@ -16,6 +16,7 @@ import {
   type Viewport,
 } from '@xyflow/react'
 import {
+  Focus,
   Layers2,
   Map,
   MapPinOff,
@@ -49,6 +50,7 @@ import { EdgeMarkerDefs } from './RelationshipEdge'
 import {
   INITIAL_CAMERA_POLICY,
   isBoundsFullyVisible,
+  MIN_FIT_VIEWPORT,
   onLayoutReady,
   onProjectChanged,
   onUserFitRequest,
@@ -255,6 +257,8 @@ function ArchitectureCanvasInner({
   const clearNodePositions = useUiStore((state) => state.clearNodePositions)
   const minimapVisible = useUiStore((state) => state.minimapVisible)
   const setMinimapVisible = useUiStore((state) => state.setMinimapVisible)
+  const architectureFocus = useUiStore((state) => state.architectureFocus)
+  const toggleArchitectureFocus = useUiStore((state) => state.toggleArchitectureFocus)
   const clearExpandedEdges = useUiStore((state) => state.clearExpandedEdges)
   const toggleEdgeExpanded = useUiStore((state) => state.toggleEdgeExpanded)
   const storedSelectedRelationshipId = useUiStore((state) => state.selectedRelationshipId)
@@ -391,13 +395,21 @@ function ArchitectureCanvasInner({
    */
   const fitView = useCallback(
     (mode: FitMode, focusComponentId: ComponentId | null = null) => {
-      setFitViewCount((count) => count + 1)
-
       const { width, height, nodeLookup } = storeApi.getState()
-      if (nodeLookup.size === 0) return
+      if (nodeLookup.size === 0) return false
 
       const bounds = getNodesBounds([...nodeLookup.values()], { nodeLookup })
-      if (width <= 0 || height <= 0 || bounds.width <= 0 || bounds.height <= 0) return
+      // React Flow reports zero (and briefly undersized) surfaces while a
+      // pane is mounting or changing size. Do not consume an explicit request
+      // against that surface: callers can safely retry after measurement.
+      if (
+        width < MIN_FIT_VIEWPORT ||
+        height < MIN_FIT_VIEWPORT ||
+        bounds.width <= 0 ||
+        bounds.height <= 0
+      ) {
+        return false
+      }
 
       // The absolute box of the node the URL points at. `getNodesBounds` is what
       // resolves a nested node's parent-relative position for us, so the focus
@@ -416,8 +428,210 @@ function ArchitectureCanvasInner({
       setCamera(viewport)
       setDetailLevel(detailLevelForZoom(viewport.zoom))
       publishZoom(viewport.zoom)
+      setFitViewCount((count) => count + 1)
+      return true
     },
     [flow, storeApi, setCamera, publishZoom],
+  )
+
+  /**
+   * Folding both side panes changes the drawing surface asynchronously. The
+   * focus action therefore parks one explicit fit on entry and on return until
+   * the browser has applied the new surface size, then clears the request
+   * permanently. The effect intentionally depends only on focus and surface
+   * size: a later live model update must never be mistaken for another camera
+   * command.
+  */
+  type SurfaceSize = { width: number; height: number }
+  type ArchitectureFocusFitPending = {
+    mode: 'enter' | 'exit'
+    before: SurfaceSize
+    last: SurfaceSize | null
+    stableFrames: number
+    observedSize: SurfaceSize | null
+  }
+  const architectureFocusFitRafRef = useRef<number | null>(null)
+  const architectureFocusFitUsesRafRef = useRef(false)
+  const architectureFocusFitPendingRef = useRef<ArchitectureFocusFitPending | null>(null)
+  const previousArchitectureFocusRef = useRef(false)
+  const architectureFocusFitContextRef = useRef({
+    architectureFocus,
+    graphIsRelayouting: graph.isRelayouting,
+    nodeCount: graph.nodes.length,
+    projectId,
+  })
+  const fitViewRef = useRef(fitView)
+  const scheduleArchitectureFocusFitCheckRef = useRef<(() => void) | null>(null)
+
+  useEffect(() => {
+    architectureFocusFitContextRef.current = {
+      architectureFocus,
+      graphIsRelayouting: graph.isRelayouting,
+      nodeCount: graph.nodes.length,
+      projectId,
+    }
+    fitViewRef.current = fitView
+  }, [architectureFocus, fitView, graph.isRelayouting, graph.nodes.length, projectId])
+
+  const scheduleArchitectureFocusFitCheck = useCallback(() => {
+    if (
+      architectureFocusFitPendingRef.current === null ||
+      architectureFocusFitRafRef.current !== null
+    ) {
+      return
+    }
+
+    const check = () => {
+      architectureFocusFitRafRef.current = null
+      const pending = architectureFocusFitPendingRef.current
+      if (pending === null) return
+
+      const context = architectureFocusFitContextRef.current
+      const expectedFocus = pending.mode === 'enter'
+      if (context.architectureFocus !== expectedFocus) {
+        architectureFocusFitPendingRef.current = null
+        return
+      }
+
+      const { width, height, nodeLookup } = storeApi.getState()
+      const size = { width, height }
+      const sizeChanged = width !== pending.before.width || height !== pending.before.height
+      const measuredByReactFlow =
+        width >= MIN_FIT_VIEWPORT && height >= MIN_FIT_VIEWPORT
+      const domRect = surfaceRef.current?.getBoundingClientRect()
+      const hasBrowserLayout = Boolean(domRect && domRect.width > 0 && domRect.height > 0)
+      const canWaitForBrowserResize =
+        typeof window.requestAnimationFrame === 'function' && hasBrowserLayout
+
+      if (
+        context.graphIsRelayouting ||
+        context.nodeCount === 0 ||
+        nodeLookup.size === 0 ||
+        !measuredByReactFlow ||
+        (!sizeChanged && canWaitForBrowserResize) ||
+        (pending.observedSize !== null &&
+          (Math.round(pending.observedSize.width) !== width ||
+            Math.round(pending.observedSize.height) !== height))
+      ) {
+        pending.last = null
+        pending.stableFrames = 0
+        scheduleArchitectureFocusFitCheckRef.current?.()
+        return
+      }
+
+      // In a real browser, React Flow's ResizeObserver and the two animation
+      // frames below make this wait for the *new* pane size, not the valid old
+      // size that is still in the store during the collapse. jsdom has no
+      // animation frames or layout engine; its fixed React Flow fallback size
+      // is the only measurable surface there, so allow it after one retry.
+      if (
+        pending.last === null ||
+        pending.last.width !== width ||
+        pending.last.height !== height
+      ) {
+        pending.last = size
+        pending.stableFrames = 1
+        scheduleArchitectureFocusFitCheckRef.current?.()
+        return
+      }
+      pending.stableFrames += 1
+      if (canWaitForBrowserResize && pending.stableFrames < 2) {
+        scheduleArchitectureFocusFitCheckRef.current?.()
+        return
+      }
+
+      if (!fitViewRef.current('user')) {
+        pending.last = null
+        pending.stableFrames = 0
+        scheduleArchitectureFocusFitCheckRef.current?.()
+        return
+      }
+
+      architectureFocusFitPendingRef.current = null
+      // A focus fit can be the first usable picture of a project. Record that
+      // fact so the policy does not replay an automatic initial fit after this
+      // explicit request completes.
+      policyRef.current = {
+        fittedProjectId: context.projectId,
+        fittedSize: size,
+      }
+    }
+
+    if (typeof window.requestAnimationFrame === 'function') {
+      architectureFocusFitUsesRafRef.current = true
+      architectureFocusFitRafRef.current = window.requestAnimationFrame(check)
+    } else {
+      architectureFocusFitUsesRafRef.current = false
+      architectureFocusFitRafRef.current = window.setTimeout(check, 16)
+    }
+  }, [storeApi])
+
+  useEffect(() => {
+    scheduleArchitectureFocusFitCheckRef.current = scheduleArchitectureFocusFitCheck
+  }, [scheduleArchitectureFocusFitCheck])
+
+  // Observe the same surface React Flow measures. The observer wakes the
+  // settling loop as soon as either panel collapse has produced a new box;
+  // the loop still compares/equalises the store dimensions before fitting.
+  useEffect(() => {
+    const target = surfaceRef.current?.querySelector('.react-flow') ?? surfaceRef.current
+    if (!target || typeof ResizeObserver === 'undefined') return
+
+    const observer = new ResizeObserver((entries) => {
+      const pending = architectureFocusFitPendingRef.current
+      if (pending === null) return
+      const rect = entries[0]?.contentRect
+      if (rect && rect.width > 0 && rect.height > 0) {
+        pending.observedSize = { width: rect.width, height: rect.height }
+      }
+      scheduleArchitectureFocusFitCheck()
+    })
+    observer.observe(target)
+    return () => observer.disconnect()
+  }, [scheduleArchitectureFocusFitCheck])
+
+  // A transition creates exactly one parked request. It is redeemed by the
+  // observer/rAF loop above once the new dimensions are visible, and cannot be
+  // replayed by later graph or live-data updates.
+  useEffect(() => {
+    const entering = architectureFocus && !previousArchitectureFocusRef.current
+    const leaving = !architectureFocus && previousArchitectureFocusRef.current
+    previousArchitectureFocusRef.current = architectureFocus
+
+    if (!entering && !leaving) return
+
+    architectureFocusFitPendingRef.current = {
+      mode: entering ? 'enter' : 'exit',
+      before: { width: surfaceWidth, height: surfaceHeight },
+      last: null,
+      stableFrames: 0,
+      observedSize: null,
+    }
+    // Claim the camera before React Flow reports the new size so the settling
+    // policy cannot win a race with this explicit fit.
+    userMovedCameraRef.current = true
+    scheduleArchitectureFocusFitCheck()
+  }, [
+    architectureFocus,
+    scheduleArchitectureFocusFitCheck,
+    surfaceHeight,
+    surfaceWidth,
+  ])
+
+  useEffect(
+    () => () => {
+      const pendingFrame = architectureFocusFitRafRef.current
+      if (pendingFrame !== null) {
+        if (architectureFocusFitUsesRafRef.current) {
+          window.cancelAnimationFrame(pendingFrame)
+        } else {
+          window.clearTimeout(pendingFrame)
+        }
+      }
+      architectureFocusFitRafRef.current = null
+      architectureFocusFitPendingRef.current = null
+    },
+    [],
   )
 
   /** Explicitly reveals one laid-out component without changing the zoom. */
@@ -531,6 +745,10 @@ function ArchitectureCanvasInner({
   // selection change must run the policy again and be told `null` — which is
   // exactly the assertion that a click never moves the camera.
   useEffect(() => {
+    // An architecture-focus transition owns the next camera movement. Leave
+    // the automatic initial/resize policy untouched until that explicit fit
+    // has a valid measured surface.
+    if (architectureFocusFitPendingRef.current !== null) return
     const decision = onLayoutReady(policyRef.current, {
       projectId,
       hasLayout: graph.nodes.length > 0,
@@ -1102,7 +1320,15 @@ function ArchitectureCanvasInner({
             {/* Wraps rather than overflows: the centre pane can be resized down
                 to a few hundred pixels, and a toolbar that runs past its edge
                 takes its own controls out of reach. */}
-            <div className="border-border bg-card/90 flex max-w-[min(100%,44rem)] flex-wrap items-center gap-1 rounded-md border px-1 py-1 backdrop-blur-sm">
+            <div
+              className={`architecture-toolbar ${minimapVisible ? '' : 'architecture-toolbar-full'} border-border bg-card/90 flex min-w-0 flex-wrap items-center gap-1 rounded-md border px-1 py-1 backdrop-blur-sm`}
+            >
+              <div
+                className="flex min-w-0 flex-wrap items-center gap-1"
+                role="group"
+                aria-label={t('tool.primaryActions')}
+                data-testid="canvas-primary-actions"
+              >
               <Button
                 ref={searchTriggerRef}
                 variant="ghost"
@@ -1194,14 +1420,44 @@ function ArchitectureCanvasInner({
                 </Tooltip>
               )}
 
-              <span className="bg-border mx-0.5 h-4 w-px" aria-hidden="true" />
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant={architectureFocus ? 'secondary' : 'ghost'}
+                    size="sm"
+                    className="h-7 gap-1.5 px-2 text-xs"
+                    onClick={toggleArchitectureFocus}
+                    aria-pressed={architectureFocus}
+                    data-testid="canvas-toggle-architecture-focus"
+                  >
+                    <Focus aria-hidden="true" />
+                    {t(architectureFocus ? 'tool.exitArchitectureFocus' : 'tool.focusArchitecture')}
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent className="max-w-80">
+                  {t(
+                    architectureFocus
+                      ? 'tool.exitArchitectureFocusHint'
+                      : 'tool.focusArchitectureHint',
+                  )}
+                </TooltipContent>
+              </Tooltip>
+              </div>
 
               <div
-                className="border-border/70 flex items-center rounded-sm border"
+                className="flex min-w-0 flex-wrap items-center gap-1"
                 role="group"
-                aria-label={t('tool.layoutOrientation')}
-                data-testid="canvas-layout-orientation"
+                aria-label={t('tool.secondaryInfo')}
+                data-testid="canvas-secondary-info"
               >
+                <span className="bg-border mx-0.5 h-4 w-px" aria-hidden="true" />
+
+                <div
+                  className="border-border/70 flex min-w-0 flex-wrap items-center rounded-sm border"
+                  role="group"
+                  aria-label={t('tool.layoutOrientation')}
+                  data-testid="canvas-layout-orientation"
+                >
                 <Button
                   variant="ghost"
                   size="sm"
@@ -1224,7 +1480,7 @@ function ArchitectureCanvasInner({
                   <span aria-hidden="true">→ </span>
                   {t('tool.layoutLeftRight')}
                 </Button>
-              </div>
+                </div>
 
               <Tooltip>
                 <TooltipTrigger asChild>
@@ -1305,6 +1561,7 @@ function ArchitectureCanvasInner({
                   </TooltipContent>
                 </Tooltip>
               )}
+              </div>
             </div>
             {searchOpen && (
               <div
