@@ -1,0 +1,253 @@
+name: Release Docker Hub images
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: read
+
+# A release tag must never have two concurrent publishers. A failed run is
+# intentionally not cancelled: it must finish with a clear status for the tag.
+concurrency:
+  group: dockerhub-release-${{ github.ref_name }}
+  cancel-in-progress: false
+
+jobs:
+  validate:
+    name: validate release tag
+    runs-on: ubuntu-latest
+    outputs:
+      tag: ${{ steps.semver.outputs.tag }}
+      version: ${{ steps.semver.outputs.version }}
+      prerelease: ${{ steps.semver.outputs.prerelease }}
+      ref: ${{ steps.semver.outputs.ref }}
+    steps:
+      - id: semver
+        name: Validate SemVer tag
+        env:
+          RELEASE_TAG: ${{ github.ref_name }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          semver_re='^v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)(-((0|[1-9][0-9]*)|([0-9A-Za-z-]*[A-Za-z-][0-9A-Za-z-]*))(\.((0|[1-9][0-9]*)|([0-9A-Za-z-]*[A-Za-z-][0-9A-Za-z-]*)))*)?$'
+          if [[ ! "${RELEASE_TAG}" =~ ${semver_re} ]]; then
+            echo "::error::Release ref '${RELEASE_TAG}' is not a supported SemVer tag. Expected v<major>.<minor>.<patch> with an optional prerelease suffix."
+            exit 1
+          fi
+
+          version="${RELEASE_TAG#v}"
+          prerelease=false
+          if [[ "${version}" == *-* ]]; then
+            prerelease=true
+          fi
+
+          echo "tag=${RELEASE_TAG}" >> "${GITHUB_OUTPUT}"
+          echo "version=${version}" >> "${GITHUB_OUTPUT}"
+          echo "prerelease=${prerelease}" >> "${GITHUB_OUTPUT}"
+          echo "ref=${GITHUB_REF}" >> "${GITHUB_OUTPUT}"
+
+  dockerhub-config:
+    name: validate Docker Hub configuration
+    needs: validate
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check required repository configuration
+        env:
+          DOCKERHUB_NAMESPACE: ${{ vars.DOCKERHUB_NAMESPACE }}
+          DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
+          DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          missing=()
+          [[ -n "${DOCKERHUB_NAMESPACE}" ]] || missing+=(DOCKERHUB_NAMESPACE)
+          [[ -n "${DOCKERHUB_USERNAME}" ]] || missing+=(DOCKERHUB_USERNAME)
+          [[ -n "${DOCKERHUB_TOKEN}" ]] || missing+=(DOCKERHUB_TOKEN)
+          if (( ${#missing[@]} > 0 )); then
+            echo "::error::Missing required Docker Hub repository configuration: ${missing[*]}"
+            exit 1
+          fi
+
+  ci:
+    name: CI gates
+    needs: [validate, dockerhub-config]
+    uses: ./.github/workflows/ci.yml
+    with:
+      ref: ${{ needs.validate.outputs.ref }}
+    permissions:
+      contents: read
+
+  e2e:
+    name: E2E gate
+    needs: [validate, dockerhub-config]
+    uses: ./.github/workflows/e2e.yml
+    with:
+      ref: ${{ needs.validate.outputs.ref }}
+    permissions:
+      contents: read
+
+  image-build:
+    name: build release images (no push)
+    needs: [validate, dockerhub-config, ci, e2e]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: ${{ needs.validate.outputs.ref }}
+
+      - uses: docker/setup-qemu-action@v3
+      - uses: docker/setup-buildx-action@v3
+
+      - name: Prepare backend image metadata
+        id: backend-meta
+        uses: docker/metadata-action@v5
+        with:
+          images: example.invalid/visualise-ai-backend
+          flavor: |
+            latest=false
+          tags: |
+            type=semver,pattern={{version}},value=${{ needs.validate.outputs.tag }}
+            type=semver,pattern={{major}}.{{minor}},value=${{ needs.validate.outputs.tag }},enable=${{ needs.validate.outputs.prerelease == 'false' }}
+            type=semver,pattern={{major}},value=${{ needs.validate.outputs.tag }},enable=${{ needs.validate.outputs.prerelease == 'false' }}
+            type=raw,value=latest,enable=${{ needs.validate.outputs.prerelease == 'false' }}
+          labels: |
+            org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
+            org.opencontainers.image.revision=${{ github.sha }}
+            org.opencontainers.image.version=${{ needs.validate.outputs.version }}
+            org.opencontainers.image.created=${{ github.run_started_at }}
+
+      - name: Prepare frontend image metadata
+        id: frontend-meta
+        uses: docker/metadata-action@v5
+        with:
+          images: example.invalid/visualise-ai-frontend
+          flavor: |
+            latest=false
+          tags: |
+            type=semver,pattern={{version}},value=${{ needs.validate.outputs.tag }}
+            type=semver,pattern={{major}}.{{minor}},value=${{ needs.validate.outputs.tag }},enable=${{ needs.validate.outputs.prerelease == 'false' }}
+            type=semver,pattern={{major}},value=${{ needs.validate.outputs.tag }},enable=${{ needs.validate.outputs.prerelease == 'false' }}
+            type=raw,value=latest,enable=${{ needs.validate.outputs.prerelease == 'false' }}
+          labels: |
+            org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
+            org.opencontainers.image.revision=${{ github.sha }}
+            org.opencontainers.image.version=${{ needs.validate.outputs.version }}
+            org.opencontainers.image.created=${{ github.run_started_at }}
+
+      - name: Build backend image for both release platforms
+        uses: docker/build-push-action@v6
+        with:
+          context: ./backend
+          file: ./backend/Dockerfile
+          platforms: linux/amd64,linux/arm64
+          push: false
+          tags: ${{ steps.backend-meta.outputs.tags }}
+          labels: ${{ steps.backend-meta.outputs.labels }}
+          build-args: |
+            VERSION=${{ needs.validate.outputs.version }}
+          cache-from: type=gha,scope=release-backend
+          cache-to: type=gha,mode=max,scope=release-backend
+
+      - name: Build frontend image for both release platforms
+        uses: docker/build-push-action@v6
+        with:
+          context: ./frontend
+          file: ./frontend/Dockerfile
+          platforms: linux/amd64,linux/arm64
+          push: false
+          tags: ${{ steps.frontend-meta.outputs.tags }}
+          labels: ${{ steps.frontend-meta.outputs.labels }}
+          cache-from: type=gha,scope=release-frontend
+          cache-to: type=gha,mode=max,scope=release-frontend
+
+  publish:
+    name: publish release images
+    needs: [validate, dockerhub-config, ci, e2e, image-build]
+    runs-on: ubuntu-latest
+    env:
+      DOCKERHUB_NAMESPACE: ${{ vars.DOCKERHUB_NAMESPACE }}
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: ${{ needs.validate.outputs.ref }}
+
+      - uses: docker/setup-qemu-action@v3
+      - uses: docker/setup-buildx-action@v3
+
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          registry: docker.io
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Prepare backend image metadata
+        id: backend-meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.DOCKERHUB_NAMESPACE }}/visualise-ai-backend
+          flavor: |
+            latest=false
+          tags: |
+            type=semver,pattern={{version}},value=${{ needs.validate.outputs.tag }}
+            type=semver,pattern={{major}}.{{minor}},value=${{ needs.validate.outputs.tag }},enable=${{ needs.validate.outputs.prerelease == 'false' }}
+            type=semver,pattern={{major}},value=${{ needs.validate.outputs.tag }},enable=${{ needs.validate.outputs.prerelease == 'false' }}
+            type=raw,value=latest,enable=${{ needs.validate.outputs.prerelease == 'false' }}
+          labels: |
+            org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
+            org.opencontainers.image.revision=${{ github.sha }}
+            org.opencontainers.image.version=${{ needs.validate.outputs.version }}
+            org.opencontainers.image.created=${{ github.run_started_at }}
+
+      - name: Prepare frontend image metadata
+        id: frontend-meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.DOCKERHUB_NAMESPACE }}/visualise-ai-frontend
+          flavor: |
+            latest=false
+          tags: |
+            type=semver,pattern={{version}},value=${{ needs.validate.outputs.tag }}
+            type=semver,pattern={{major}}.{{minor}},value=${{ needs.validate.outputs.tag }},enable=${{ needs.validate.outputs.prerelease == 'false' }}
+            type=semver,pattern={{major}},value=${{ needs.validate.outputs.tag }},enable=${{ needs.validate.outputs.prerelease == 'false' }}
+            type=raw,value=latest,enable=${{ needs.validate.outputs.prerelease == 'false' }}
+          labels: |
+            org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
+            org.opencontainers.image.revision=${{ github.sha }}
+            org.opencontainers.image.version=${{ needs.validate.outputs.version }}
+            org.opencontainers.image.created=${{ github.run_started_at }}
+
+      - name: Publish backend image
+        uses: docker/build-push-action@v6
+        with:
+          context: ./backend
+          file: ./backend/Dockerfile
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: ${{ steps.backend-meta.outputs.tags }}
+          labels: ${{ steps.backend-meta.outputs.labels }}
+          build-args: |
+            VERSION=${{ needs.validate.outputs.version }}
+          cache-from: type=gha,scope=release-backend
+          cache-to: type=gha,mode=max,scope=release-backend
+
+      - name: Publish frontend image
+        uses: docker/build-push-action@v6
+        with:
+          context: ./frontend
+          file: ./frontend/Dockerfile
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: ${{ steps.frontend-meta.outputs.tags }}
+          labels: ${{ steps.frontend-meta.outputs.labels }}
+          cache-from: type=gha,scope=release-frontend
+          cache-to: type=gha,mode=max,scope=release-frontend
+
+      - name: Verify backend manifest
+        run: docker buildx imagetools inspect "${DOCKERHUB_NAMESPACE}/visualise-ai-backend:${{ needs.validate.outputs.version }}"
+
+      - name: Verify frontend manifest
+        run: docker buildx imagetools inspect "${DOCKERHUB_NAMESPACE}/visualise-ai-frontend:${{ needs.validate.outputs.version }}"
