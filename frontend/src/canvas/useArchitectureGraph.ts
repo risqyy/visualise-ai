@@ -5,6 +5,11 @@ import type { ComponentId } from '@/api/types'
 import { ancestorIds, collapseGraph, initialCollapsedIds } from './collapse'
 import { layoutArchitecture, type EdgeRoutes } from './elkLayout'
 import {
+  DEFAULT_GRAPH_ORIENTATION,
+  elkDirectionForOrientation,
+  type GraphOrientation,
+} from './graphOrientation'
+import {
   EMPTY_DIAGNOSTICS,
   projectArchitecture,
   projectionSignature,
@@ -41,6 +46,12 @@ export interface ArchitectureGraph {
   /** Containers that are currently collapsed, in canonical order. */
   collapsedIds: ComponentId[]
   /**
+   * The complete collapse state requested by the user, including containers
+   * below a currently collapsed parent. `collapsedIds` cannot carry those IDs
+   * because they are not visible until that parent is opened.
+   */
+  requestedCollapsedIds: ComponentId[]
+  /**
    * The collapsed set this model opens with. Kept here rather than recomputed
    * by the canvas because it needs the *full* hierarchy, which only the
    * projection still has once containers are closed.
@@ -48,8 +59,12 @@ export interface ArchitectureGraph {
   initialCollapsedIds: ComponentId[]
   /** Components hidden inside a collapsed container. */
   hiddenComponentIds: Set<ComponentId>
-  /** Components of the model that are drawn right now. */
+  /** Applied-model and overlay elements drawn right now. */
   visibleNodeCount: number
+  /** Rendered connections after collapse and relationship bundling. */
+  visibleEdgeCount: number
+  /** Relationships the applied model reported, before rendering decisions. */
+  reportedRelationshipCount: number
   /** The containers that have to be opened for a component to be on screen. */
   ancestorsOf: (componentId: ComponentId) => ComponentId[]
 }
@@ -71,6 +86,10 @@ export interface ArchitectureGraphOptions {
    * levels down actually arrive.
    */
   revealComponentId?: ComponentId | null
+  /** Direction used for handles, ports and the ELK layered layout. */
+  orientation?: GraphOrientation
+  /** Components at both ends of a relationship deep link that must be visible. */
+  revealComponentIds?: readonly ComponentId[]
 }
 
 /**
@@ -88,13 +107,22 @@ export interface ArchitectureGraphOptions {
  */
 export function useArchitectureGraph(
   model: ArchitectureModel | undefined,
-  options: ArchitectureGraphOptions = { collapsedComponentIds: [] },
+  options: ArchitectureGraphOptions = {
+    collapsedComponentIds: [],
+    orientation: DEFAULT_GRAPH_ORIENTATION,
+  },
 ): ArchitectureGraph {
-  const { collapsedComponentIds, revealComponentId } = options
+  const {
+    collapsedComponentIds,
+    revealComponentId,
+    orientation = DEFAULT_GRAPH_ORIENTATION,
+  } = options
+  const { revealComponentIds = [] } = options
+  const reportedRelationshipCount = model?.relationships.length ?? 0
 
   const projection = useMemo(
-    () => projectArchitecture(model ?? EMPTY_MODEL),
-    [model],
+    () => projectArchitecture(model ?? EMPTY_MODEL, orientation),
+    [model, orientation],
   )
 
   /**
@@ -104,15 +132,27 @@ export function useArchitectureGraph(
    * what keeps a re-render that produced an equal set from re-running ELK — the
    * same reason `projectionSignature` exists.
    */
+  const requestedCollapsedIds = useMemo(
+    () =>
+      [...(collapsedComponentIds ?? initialCollapsedIds(projection.nodes))].sort(),
+    [collapsedComponentIds, projection.nodes],
+  )
+
   const collapsedKey = useMemo(() => {
-    const base = collapsedComponentIds ?? initialCollapsedIds(projection.nodes)
-    if (!revealComponentId) return [...base].sort().join(KEY_SEPARATOR)
-    const revealed = new Set(ancestorIds(projection.nodes, revealComponentId))
+    const base = requestedCollapsedIds
+    const revealIds = [
+      ...(revealComponentId ? [revealComponentId] : []),
+      ...revealComponentIds,
+    ]
+    if (revealIds.length === 0) return [...base].sort().join(KEY_SEPARATOR)
+    const revealed = new Set(
+      revealIds.flatMap((componentId) => ancestorIds(projection.nodes, componentId)),
+    )
     return base
       .filter((componentId) => !revealed.has(componentId))
       .sort()
       .join(KEY_SEPARATOR)
-  }, [collapsedComponentIds, revealComponentId, projection.nodes])
+  }, [requestedCollapsedIds, revealComponentId, revealComponentIds, projection.nodes])
 
   const visible = useMemo(
     () =>
@@ -120,11 +160,17 @@ export function useArchitectureGraph(
         projection.nodes,
         projection.edges,
         collapsedKey === '' ? [] : collapsedKey.split(KEY_SEPARATOR),
+        orientation,
       ),
-    [projection, collapsedKey],
+    [projection, collapsedKey, orientation],
   )
 
   const signature = useMemo(() => projectionSignature(visible), [visible])
+  // Orientation is part of what ELK solves even though it does not alter the
+  // projected component/relationship inventory. Including it in the layout
+  // signature prevents the previous direction from being treated as current
+  // while the new solve is still running.
+  const layoutSignature = `${orientation}\u0001${signature}`
 
   const [laidOut, setLaidOut] = useState<LayoutState | null>(null)
   const [error, setError] = useState<unknown>(null)
@@ -140,10 +186,12 @@ export function useArchitectureGraph(
     runIdRef.current = runId
 
     let cancelled = false
-    void layoutArchitecture(visible.nodes, visible.edges)
+    void layoutArchitecture(visible.nodes, visible.edges, {
+      direction: elkDirectionForOrientation(orientation),
+    })
       .then((layout) => {
         if (cancelled || runIdRef.current !== runId) return
-        setLaidOut({ signature, nodes: layout.nodes, routes: layout.routes })
+        setLaidOut({ signature: layoutSignature, nodes: layout.nodes, routes: layout.routes })
         setError(null)
       })
       .catch((cause: unknown) => {
@@ -156,28 +204,32 @@ export function useArchitectureGraph(
     }
     // `signature` is derived from `visible`; both are listed so a graph that is
     // structurally identical after a refetch does not re-run ELK.
-  }, [visible, signature])
+  }, [visible, layoutSignature, orientation])
 
   // The edges always come from the current projection — an incoming update must
   // show up immediately, even if its layout is still being computed. Only the
   // node positions wait for ELK.
   return useMemo<ArchitectureGraph>(() => {
     const isEmpty = visible.nodes.length === 0
-    const isCurrent = laidOut !== null && laidOut.signature === signature
+    const isCurrent = laidOut !== null && laidOut.signature === layoutSignature
+    // Keep the last layout's positions while ELK solves the new structure, but
+    // do not keep its data. A removal can turn an applied node into a ghost
+    // without changing its id, and the overlay state must be visible in that
+    // first render (the metrics below are already derived from `visible`).
+    // `withCurrentData` intentionally matches only ids that are still drawn;
+    // genuinely new proposal nodes wait for their first valid layout.
+    const nodesWithCurrentData =
+      laidOut === null ? [] : withCurrentData(laidOut.nodes, visible.nodes)
 
     return {
-      nodes: isEmpty
-        ? []
-        : isCurrent
-          ? withCurrentData(laidOut.nodes, visible.nodes)
-          : (laidOut?.nodes ?? []),
+      nodes: isEmpty ? [] : nodesWithCurrentData,
       edges: visible.edges,
       routes: isCurrent ? laidOut.routes : {},
       diagnostics: projection.diagnostics ?? EMPTY_DIAGNOSTICS,
       isInitialLayout: !isEmpty && laidOut === null,
       isRelayouting: !isEmpty && !isCurrent,
       error,
-      signature,
+      signature: layoutSignature,
       // Counted on the *reported* model, not on what is open: a collapsed
       // container hides components, it does not remove them, and the pane's
       // "28 Komponenten" must keep saying 28.
@@ -186,12 +238,15 @@ export function useArchitectureGraph(
       appliedEdgeCount: projection.appliedEdgeCount,
       overlayEdgeCount: projection.overlayEdgeCount,
       collapsedIds: [...visible.collapsedComponentIds].sort(),
+      requestedCollapsedIds,
       initialCollapsedIds: initialCollapsedIds(projection.nodes),
       hiddenComponentIds: visible.hiddenComponentIds,
       visibleNodeCount: visible.nodes.length,
+      visibleEdgeCount: visible.edges.length,
+      reportedRelationshipCount,
       ancestorsOf: (componentId) => ancestorIds(projection.nodes, componentId),
     }
-  }, [laidOut, projection, visible, signature, error])
+  }, [laidOut, projection, visible, layoutSignature, error, reportedRelationshipCount, requestedCollapsedIds])
 }
 
 /**

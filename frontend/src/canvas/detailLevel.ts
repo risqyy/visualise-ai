@@ -10,8 +10,9 @@ import type { CanvasKey } from '@/i18n'
  *
  * | level      | nodes                        | edges                                  |
  * | ---------- | ---------------------------- | -------------------------------------- |
- * | `overview` | name + kind                  | bundled, count badge only              |
- * | `standard` | + technology                 | bundled, kind badge + count            |
+ * | `minimal`  | shape and icon only         | line and icon-only inspector action    |
+ * | `overview` | primary name                | bundled, count badge only              |
+ * | `standard` | + kind and technology       | bundled, kind badge + count            |
  * | `full`     | + tags                       | bundles fanned out, one label per edge |
  *
  * Two rules keep this from becoming a source of surprise:
@@ -23,25 +24,31 @@ import type { CanvasKey } from '@/i18n'
  *    remains reachable by interaction at that same zoom level: a bundle can be
  *    unfolded by clicking it, and the inspector always has the full detail.
  */
-export type DetailLevel = 'overview' | 'standard' | 'full'
+export type DetailLevel = 'minimal' | 'overview' | 'standard' | 'full'
 
 /**
- * Zoom thresholds. Chosen so that the default `fitView` of a mid-sized model at
- * 1920 × 1080 lands in `standard`, a fitted large model in `overview`, and
- * reading a single component in `full`.
+ * Zoom thresholds derived from the type sizes rendered inside a transformed
+ * node. Primary text is 13 px at zoom 1 and must stay at least 12 px; secondary
+ * text is 10 px and must stay at least 10 px. The first readable picture is
+ * therefore `overview` (name only) and metadata starts at zoom 1. A model that
+ * is explicitly fitted below the primary floor becomes a `minimal` map rather
+ * than showing text that has become too small to read.
  */
 export const DETAIL_LEVEL_THRESHOLDS = {
-  /** At or above this zoom the technology metadata appears. */
-  standard: 0.62,
+  /** At or above this zoom the primary component name is readable. */
+  overview: 0.93,
+  /** At or above this zoom secondary 10 px metadata is readable. */
+  standard: 1,
   /** At or above this zoom tags appear and edge bundles fan out. */
   full: 1.15,
 } as const
 
 export function detailLevelForZoom(zoom: number): DetailLevel {
-  if (!Number.isFinite(zoom)) return 'standard'
+  if (!Number.isFinite(zoom)) return 'minimal'
   if (zoom >= DETAIL_LEVEL_THRESHOLDS.full) return 'full'
   if (zoom >= DETAIL_LEVEL_THRESHOLDS.standard) return 'standard'
-  return 'overview'
+  if (zoom >= DETAIL_LEVEL_THRESHOLDS.overview) return 'overview'
+  return 'minimal'
 }
 
 // ---------------------------------------------------------------------------
@@ -58,6 +65,9 @@ export function detailLevelForZoom(zoom: number): DetailLevel {
  */
 export const NODE_LABEL_FONT_SIZE_PX = 13
 
+/** Minimum effective size for primary text, such as a component name. */
+export const MIN_PRIMARY_TEXT_SIZE_PX = 12
+
 /**
  * The smallest type the design system renders at zoom 1: `text-[10px]`, used
  * for the kind badge, the technology row, the tags and the legends.
@@ -66,7 +76,13 @@ export const NODE_LABEL_FONT_SIZE_PX = 13
  * this rule — it is the size the cockpit already considers readable everywhere
  * that is *not* under a zoom transform.
  */
-export const MIN_LEGIBLE_FONT_SIZE_PX = 10
+export const SECONDARY_TEXT_FONT_SIZE_PX = 10
+
+/** Minimum effective size for visible secondary text and metadata. */
+export const MIN_SECONDARY_TEXT_SIZE_PX = 10
+
+/** Compatibility name for the former automatic-camera legibility floor. */
+export const MIN_LEGIBLE_FONT_SIZE_PX = MIN_PRIMARY_TEXT_SIZE_PX
 
 /**
  * Smallest zoom at which a node is still readable.
@@ -74,33 +90,43 @@ export const MIN_LEGIBLE_FONT_SIZE_PX = 10
  * The canvas draws its nodes inside a CSS transform, so every glyph on them is
  * scaled by the zoom: the effective size of the component name is
  * `NODE_LABEL_FONT_SIZE_PX × zoom`. Requiring that product to stay at or above
- * the product's own legibility floor gives
+ * the documented primary text floor gives
  *
  * ```
- * 13 px × zoom ≥ 10 px   ⇒   zoom ≥ 10 / 13 ≈ 0.7692
+ * 13 px × zoom ≥ 12 px   ⇒   zoom ≥ 12 / 13 ≈ 0.9231
  * ```
  *
- * rounded *up* to 0.77, so the floor is never undercut by the rounding. At that
- * zoom a leaf node measures 228 × 96 × 0.77 ≈ 176 × 74 CSS px and its name
- * renders at 10.0 px — against 46 × 20 px and 2.6 px at the zoom a 28-component
- * model used to be fitted to.
+ * rounded *up* to 0.93, so the floor is never undercut by the rounding. At that
+ * zoom a leaf node measures 228 × 96 × 0.93 ≈ 212 × 89 CSS px and its name
+ * renders at 12.1 px. Secondary 10 px text starts at zoom 1, so metadata never
+ * appears at a size below 10 px.
  *
  * The floor applies to the **automatic** camera only: the first picture of a
- * project, which the user did not ask for. An explicit "Gesamtes Modell
- * einpassen" still zooms out as far as the model needs, because the user asked
+ * project, which the user did not ask for. An explicit "Gesamtkarte" action
+ * still zooms out as far as the model needs, because the user asked
  * for the overview and knows what they traded for it.
  */
 export const MIN_READABLE_ZOOM =
-  Math.ceil((MIN_LEGIBLE_FONT_SIZE_PX / NODE_LABEL_FONT_SIZE_PX) * 100) / 100
+  Math.ceil((MIN_PRIMARY_TEXT_SIZE_PX / NODE_LABEL_FONT_SIZE_PX) * 100) / 100
 
 /** Effective size of the node label on screen at a given zoom, in CSS px. */
 export function effectiveLabelSize(zoom: number): number {
   return NODE_LABEL_FONT_SIZE_PX * zoom
 }
 
-/** `true` when a node's name is at or above the legibility floor at this zoom. */
+/** Effective size of 10 px secondary text on screen at a given zoom. */
+export function effectiveSecondaryTextSize(zoom: number): number {
+  return SECONDARY_TEXT_FONT_SIZE_PX * zoom
+}
+
+/** `true` when primary text is at or above its documented floor. */
 export function isReadableZoom(zoom: number): boolean {
-  return effectiveLabelSize(zoom) >= MIN_LEGIBLE_FONT_SIZE_PX
+  return effectiveLabelSize(zoom) >= MIN_PRIMARY_TEXT_SIZE_PX
+}
+
+/** `true` when secondary text is at or above its documented floor. */
+export function isSecondaryTextReadable(zoom: number): boolean {
+  return effectiveSecondaryTextSize(zoom) >= MIN_SECONDARY_TEXT_SIZE_PX
 }
 
 // ---------------------------------------------------------------------------
@@ -150,20 +176,32 @@ export const DISCLOSURE_LABEL_KEYS = {
 } as const satisfies Record<string, CanvasKey>
 
 export const DETAIL_LEVEL_LABEL_KEYS: Record<DetailLevel, CanvasKey> = {
+  minimal: 'detail.minimalLabel',
   overview: 'detail.overviewLabel',
   standard: 'detail.standardLabel',
   full: 'detail.fullLabel',
 }
 
 export const DETAIL_LEVEL_DESCRIPTION_KEYS: Record<DetailLevel, CanvasKey> = {
+  minimal: 'detail.minimalDescription',
   overview: 'detail.overviewDescription',
   standard: 'detail.standardDescription',
   full: 'detail.fullDescription',
 }
 
+/** `true` once the level is detailed enough to show the primary name. */
+export function showsPrimaryText(level: DetailLevel): boolean {
+  return level !== 'minimal'
+}
+
+/** `true` once the level is detailed enough to show a secondary kind label. */
+export function showsKind(level: DetailLevel): boolean {
+  return level === 'standard' || level === 'full'
+}
+
 /** `true` once the level is detailed enough to show technology metadata. */
 export function showsTechnology(level: DetailLevel): boolean {
-  return level !== 'overview'
+  return level === 'standard' || level === 'full'
 }
 
 /** `true` once the level is detailed enough to show tags. */

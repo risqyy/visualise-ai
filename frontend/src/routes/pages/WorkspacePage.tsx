@@ -10,6 +10,10 @@ import { WorkspaceHeader } from '@/components/workspace/WorkspaceHeader'
 import { WorkspaceLayout } from '@/components/workspace/WorkspaceLayout'
 import { useUiStore } from '@/state/uiStore'
 import type { DeepFocusTarget } from '@/routes/searchParams'
+import {
+  DEFAULT_GRAPH_ORIENTATION,
+  type GraphOrientation,
+} from '@/canvas/graphOrientation'
 
 const route = getRouteApi('/projects/$projectId/runs/$runId')
 
@@ -33,6 +37,7 @@ export function WorkspacePage() {
   useLiveStream(projectId)
 
   const setSelectedComponentId = useUiStore((state) => state.setSelectedComponentId)
+  const setSelectedRelationshipId = useUiStore((state) => state.setSelectedRelationshipId)
   const enterDeepFocus = useUiStore((state) => state.enterDeepFocus)
   const exitDeepFocus = useUiStore((state) => state.exitDeepFocus)
 
@@ -41,6 +46,13 @@ export function WorkspacePage() {
   useEffect(() => {
     setSelectedComponentId(search.component ?? null)
   }, [search.component, setSelectedComponentId])
+
+  // Relationship selection follows the same URL -> local mirror as component
+  // selection. The URL remains authoritative, so a reload and a click expose
+  // the same inspector and canvas state.
+  useEffect(() => {
+    setSelectedRelationshipId(search.relationship ?? null)
+  }, [search.relationship, setSelectedRelationshipId])
 
   // URL -> deep-focus layout.
   useEffect(() => {
@@ -64,7 +76,25 @@ export function WorkspacePage() {
   const setSelectedComponent = useCallback(
     (componentId: string | null) => {
       void navigate({
-        search: (previous) => ({ ...previous, component: componentId ?? undefined }),
+        search: (previous) => ({
+          ...previous,
+          component: componentId ?? undefined,
+          relationship: undefined,
+        }),
+        replace: true,
+      })
+    },
+    [navigate],
+  )
+
+  const setSelectedRelationship = useCallback(
+    (relationshipId: string | null) => {
+      void navigate({
+        search: (previous) => ({
+          ...previous,
+          relationship: relationshipId ?? undefined,
+          component: undefined,
+        }),
         replace: true,
       })
     },
@@ -75,6 +105,16 @@ export function WorkspacePage() {
     (enabled: boolean) => {
       void navigate({
         search: (previous) => ({ ...previous, history: enabled ? true : undefined }),
+        replace: true,
+      })
+    },
+    [navigate],
+  )
+
+  const setGraphOrientation = useCallback(
+    (layout: GraphOrientation) => {
+      void navigate({
+        search: (previous) => ({ ...previous, layout }),
         replace: true,
       })
     },
@@ -100,7 +140,11 @@ export function WorkspacePage() {
           <ArchitecturePane
             projectId={projectId}
             selectedComponentId={search.component}
+            selectedRelationshipId={search.relationship}
             onSelectComponent={setSelectedComponent}
+            orientation={search.layout ?? DEFAULT_GRAPH_ORIENTATION}
+            onOrientationChange={setGraphOrientation}
+            onSelectRelationship={setSelectedRelationship}
           />
         }
         right={
@@ -108,6 +152,7 @@ export function WorkspacePage() {
             projectId={projectId}
             runId={runId}
             componentId={search.component}
+            relationshipId={search.relationship}
             focus={search.focus}
             historyMode={search.history === true}
             onSetFocus={setFocus}

@@ -311,6 +311,27 @@ describe('canvas accessibility — the full node name', () => {
     ).not.toHaveProperty('aria-current')
   })
 
+  it('marks both endpoint rings as current for a relationship selection', () => {
+    const nodes = withNodeAccessibility(
+      nodesOf(NESTED_COMPONENTS).map((node) =>
+        node.id === 'platform.api.http.router' || node.id === 'platform.core.orders'
+          ? { ...node, data: { ...node.data, relationshipSelected: true } }
+          : node,
+      ),
+      voice,
+    )
+
+    expect(
+      nodes.find((node) => node.id === 'platform.api.http.router')?.domAttributes,
+    ).toHaveProperty('aria-current', true)
+    expect(
+      nodes.find((node) => node.id === 'platform.core.orders')?.domAttributes,
+    ).toHaveProperty('aria-current', true)
+    expect(nodes.find((node) => node.id === 'platform.db')?.domAttributes).not.toHaveProperty(
+      'aria-current',
+    )
+  })
+
   it('names the disclosure control after the container it opens', () => {
     expect(nodeDisclosureLabel('API Gateway', false, voice, 3)).toBe(
       'Aufklappen: API Gateway (3 Komponenten)',
@@ -359,7 +380,7 @@ describe('canvas accessibility — edges are named from what they carry', () => 
     const edge = model.edges[0]
     expect(edge).toBeDefined()
     expect(edgeAccessibleName(edge!, names, voice)).toBe(
-      'Beziehung von Orders zu Orders DB, Datenzugriff SELECT/INSERT, kein Änderungsstatus gemeldet',
+      'Gemeldete Beziehung von Orders zu Orders DB, Datenzugriff SELECT/INSERT, kein Änderungsstatus gemeldet',
     )
   })
 

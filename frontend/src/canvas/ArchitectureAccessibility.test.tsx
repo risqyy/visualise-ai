@@ -121,7 +121,7 @@ async function waitForCanvas(): Promise<HTMLElement> {
   return canvas
 }
 
-/** Every node React Flow made a tab stop, as the accessibility tree sees it. */
+/** Every visible component node, including its roving tab state. */
 function nodeElements(): HTMLElement[] {
   return [...document.querySelectorAll<HTMLElement>('.react-flow__node')]
 }
@@ -147,13 +147,17 @@ describe('accessible architecture graph — every node arrives named', () => {
 
       const nodes = nodeElements()
       expect(nodes.length).toBe(NESTED_COMPONENTS.length)
+      expect(nodes.filter((node) => node.getAttribute('tabindex') === '0')).toHaveLength(1)
+      expect(nodes.filter((node) => node.getAttribute('tabindex') === '-1')).toHaveLength(
+        nodes.length - 1,
+      )
 
       const names: string[] = []
       for (const node of nodes) {
         // Before this change every one of these was an *unnamed* group. The
         // role stays `group` — a container holds a real disclosure button, and
         // a widget role would make that child presentational.
-        expect(node).toHaveAttribute('tabindex', '0')
+        expect(node).toHaveAttribute('tabindex', expect.stringMatching(/^(0|-1)$/))
         expect(node).toHaveAttribute('role', 'group')
         const name = node.getAttribute('aria-label')
         expect(name).toBeTruthy()
@@ -222,6 +226,7 @@ describe('accessible architecture graph — every node arrives named', () => {
       const edges = [...document.querySelectorAll('.react-flow__edge')]
       expect(edges.length).toBeGreaterThan(0)
       for (const edge of edges) {
+        expect(edge).toHaveAttribute('tabindex', '-1')
         const name = edge.getAttribute('aria-label') ?? ''
         expect(name).not.toMatch(/^Edge from /)
         expect(name).toContain('Beziehung von ')
@@ -246,6 +251,69 @@ describe('accessible architecture graph — every node arrives named', () => {
 })
 
 describe('accessible architecture graph — selection by keyboard alone', () => {
+  it(
+    'selects the first relationship of a bundled edge with Enter at map level',
+    async () => {
+      const user = userEvent.setup()
+      const { router } = renderGraph()
+      const canvas = await waitForCanvas()
+
+      await user.click(screen.getByTestId('canvas-fit-view'))
+      await waitFor(() => expect(canvas).toHaveAttribute('data-detail-level', 'minimal'))
+
+      const edge = document.querySelector<HTMLElement>(
+        '.react-flow__edge[data-id="rel:platform.core.orders~>platform.bus"]',
+      )
+      expect(edge).not.toBeNull()
+      edge?.focus()
+      await user.keyboard('{Enter}')
+
+      await waitFor(() =>
+        expect(router.state.location.search).toEqual({ relationship: 'r-05' }),
+      )
+      expect(await screen.findByTestId('inspector-relationship-context')).toHaveAttribute(
+        'data-relationship-id',
+        'r-05',
+      )
+      expect(document.activeElement).toBe(edge)
+    },
+    CANVAS_TIMEOUT,
+  )
+
+  it(
+    'selects a single relationship with Enter and preserves edge focus',
+    async () => {
+      const user = userEvent.setup()
+      const { router } = renderGraph()
+      await waitForCanvas()
+
+      const edge = document.querySelector<HTMLElement>(
+        '.react-flow__edge[data-id="rel:platform.api.http.router~>platform.core.orders"]',
+      )
+      expect(edge).not.toBeNull()
+      edge?.focus()
+      await user.keyboard('{Enter}')
+
+      await waitFor(() =>
+        expect(router.state.location.search).toEqual({ relationship: 'r-01' }),
+      )
+      expect(await screen.findByTestId('inspector-relationship-context')).toHaveAttribute(
+        'data-relationship-id',
+        'r-01',
+      )
+      await waitFor(() => {
+        expect(edge).toHaveAttribute('aria-current', 'true')
+        expect(nodeElement('platform.api.http.router')).toHaveAttribute(
+          'aria-current',
+          'true',
+        )
+        expect(nodeElement('platform.core.orders')).toHaveAttribute('aria-current', 'true')
+      })
+      expect(document.activeElement).toBe(edge)
+    },
+    CANVAS_TIMEOUT,
+  )
+
   it(
     'selects with Enter, writes the URL and hands the component to the inspector',
     async () => {
@@ -354,6 +422,84 @@ describe('accessible architecture graph — selection by keyboard alone', () => 
       const live = [...document.querySelectorAll('[aria-live]')]
       expect(live.length).toBeGreaterThan(0)
       for (const region of live) expect(region.textContent).toBe('')
+    },
+    CANVAS_TIMEOUT,
+  )
+
+  it(
+    'roves one graph tab stop spatially without moving nodes',
+    async () => {
+      const user = userEvent.setup()
+      const { router } = renderGraph()
+      const canvas = await waitForCanvas()
+      const nodes = nodeElements()
+      const entry = nodes.find((node) => node.getAttribute('tabindex') === '0')
+      expect(entry).not.toBeUndefined()
+      const entryId = entry?.getAttribute('data-id')
+      const entryTransform = entry?.style.transform
+      const zoom = canvas.getAttribute('data-canvas-zoom')
+      let next: Element | null = null
+      for (const key of ['ArrowDown', 'ArrowRight', 'ArrowUp', 'ArrowLeft']) {
+        entry?.focus()
+        await user.keyboard(`{${key}}`)
+        if (document.activeElement !== entry) {
+          next = document.activeElement
+          break
+        }
+      }
+
+      expect(next).not.toBeNull()
+      expect(next).toHaveClass('react-flow__node')
+      expect(next).not.toBe(entry)
+      expect(next).toHaveAttribute('tabindex', '0')
+      expect(nodes.filter((node) => node.getAttribute('tabindex') === '0')).toHaveLength(1)
+      expect(entry).toHaveAttribute('tabindex', '-1')
+      expect(entry?.getAttribute('data-id')).toBe(entryId)
+      expect(entry?.style.transform).toBe(entryTransform)
+      expect(router.state.location.search).toEqual({})
+      expect(canvas).toHaveAttribute('data-canvas-zoom', zoom ?? '')
+    },
+    CANVAS_TIMEOUT,
+  )
+
+  it(
+    'does not capture arrow keys from an interactive disclosure control',
+    async () => {
+      const user = userEvent.setup()
+      renderGraph()
+      await waitForCanvas()
+
+      const disclosure = within(nodeElement('platform.core')).getByRole('button')
+      disclosure.focus()
+      await user.keyboard('{ArrowRight}')
+
+      expect(document.activeElement).toBe(disclosure)
+      expect(disclosure).toHaveAttribute('aria-expanded', 'true')
+    },
+    CANVAS_TIMEOUT,
+  )
+
+  it(
+    'moves focus to the nearest visible ancestor when a focused child is collapsed',
+    async () => {
+      renderGraph()
+      await waitForCanvas()
+
+      const focusedChild = nodeElement('platform.core.orders')
+      const nearestAncestor = nodeElement('platform.core')
+      const outerAncestor = nodeElement('platform')
+      focusedChild.focus()
+      expect(document.activeElement).toBe(focusedChild)
+
+      const disclosure = within(nearestAncestor).getByRole('button')
+      disclosure.click()
+
+      await waitFor(() =>
+        expect(document.querySelector('.react-flow__node[data-id="platform.core.orders"]')).toBeNull(),
+      )
+      await waitFor(() => expect(document.activeElement).toBe(nearestAncestor))
+      expect(nearestAncestor).toHaveAttribute('tabindex', '0')
+      expect(outerAncestor).toHaveAttribute('tabindex', '-1')
     },
     CANVAS_TIMEOUT,
   )
@@ -514,7 +660,7 @@ describe('accessible architecture graph — the state a screen reader hears is t
  *
  * A **pan** is a different matter. React Flow's `autoPanOnNodeFocus` brings a
  * node that lies outside the viewport into view at the same zoom, and it is
- * deliberately left on (ADR 0018): since ADR 0017 the entry zoom is 0.77 rather
+ * deliberately left on (ADR 0018): since ADR 0024 the entry zoom is 0.93 rather
  * than 0.20, so a large model no longer fits on screen and a focus ring on an
  * off-screen node would be a ring nobody can see. That pan is requested by the
  * user's own Tab press — never by arriving data.

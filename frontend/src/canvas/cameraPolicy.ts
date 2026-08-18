@@ -158,10 +158,10 @@ export interface ViewportOptions {
    * How to place a model that does not fit at `minZoom`. `center` keeps the
    * middle of the model on screen, `start` puts its top-left corner there.
    *
-   * The initial camera uses `start`: the layout runs left to right with the
-   * callers first (ADR 0008), so its top-left corner is where an architecture
-   * is read from. Landing in the geometric middle of a model that does not fit
-   * drops the reader somewhere in the middle of a sentence.
+   * The initial camera uses `start`: the active layout direction puts callers
+   * first (ADR 0023), so its top-left corner is where an architecture is read
+   * from. Landing in the geometric middle of a model that does not fit drops
+   * the reader somewhere in the middle of a sentence.
    */
   overflow?: 'center' | 'start'
   /**
@@ -218,6 +218,46 @@ export function viewportForBounds(
     x: panIntoView(viewport.x, focus.x, focus.width, surface.width, zoom, padding),
     y: panIntoView(viewport.y, focus.y, focus.height, surface.height, zoom, padding),
   }
+}
+
+/**
+ * Keeps the current zoom and moves only as far as needed to reveal one box.
+ *
+ * This is the explicit counterpart to the initial fit: search and "jump to
+ * selection" are user requests, so they may pan the camera, but they must not
+ * zoom or recenter a component that is already visible.
+ */
+export function viewportForFocus(
+  viewport: CameraViewport,
+  focus: LayoutBounds,
+  surface: ViewportSize,
+  padding = FIT_VIEW_PADDING,
+): CameraViewport {
+  return {
+    zoom: viewport.zoom,
+    x: panIntoView(viewport.x, focus.x, focus.width, surface.width, viewport.zoom, padding),
+    y: panIntoView(viewport.y, focus.y, focus.height, surface.height, viewport.zoom, padding),
+  }
+}
+
+/**
+ * Whether a layout box is fully inside the actual visible surface.
+ *
+ * This deliberately has no comfort padding. The caller can still use
+ * `viewportForFocus` to make a visible component more comfortably placed, but
+ * a jump affordance must only appear when part of the component is truly off
+ * the viewport.
+ */
+export function isBoundsFullyVisible(
+  viewport: CameraViewport,
+  focus: LayoutBounds,
+  surface: ViewportSize,
+): boolean {
+  const left = focus.x * viewport.zoom + viewport.x
+  const top = focus.y * viewport.zoom + viewport.y
+  const right = left + focus.width * viewport.zoom
+  const bottom = top + focus.height * viewport.zoom
+  return left >= 0 && top >= 0 && right <= surface.width && bottom <= surface.height
 }
 
 function axisOffset(

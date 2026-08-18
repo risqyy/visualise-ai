@@ -36,7 +36,7 @@ export interface SimulatorSummary {
 }
 
 export interface SimulatorOptions {
-  scenario?: 'full' | 'retry' | 'conflict'
+  scenario?: 'full' | 'retry' | 'conflict' | 'self'
   projectId?: string
   runId?: string
   /** Pause multiplier. `1` keeps the pauses the live checks need. */

@@ -181,6 +181,21 @@ export interface UiState {
   deepFocus: DeepFocusTarget | null
   /** Pane arrangement to restore when deep focus ends. */
   paneStateBeforeDeepFocus: PaneArrangement | null
+  /** Whether both side panes are temporarily folded around the canvas. */
+  architectureFocus: boolean
+  /** Pane arrangement to restore when architecture focus ends. */
+  paneStateBeforeArchitectureFocus: PaneArrangement | null
+  /**
+   * The user's arrangement before the first temporary focus mode was entered.
+   *
+   * Deep focus and architecture focus can be nested in either order. The
+   * individual mode snapshots are still needed to unwind the inner mode, but
+   * persistence must always use this outermost snapshot rather than a
+   * temporary arrangement from the other mode.
+   */
+  paneStateBeforeFocusModes: PaneArrangement | null
+  /** Order in which the two transient focus modes were entered. */
+  focusModeStack: ('deep' | 'architecture')[]
 
   // ---- actions -----------------------------------------------------------
   setLayout: (layout: PaneLayout) => void
@@ -210,6 +225,9 @@ export interface UiState {
 
   enterDeepFocus: (target: DeepFocusTarget) => void
   exitDeepFocus: () => void
+  enterArchitectureFocus: () => void
+  exitArchitectureFocus: () => void
+  toggleArchitectureFocus: () => void
 }
 
 const transientDefaults = {
@@ -222,6 +240,10 @@ const transientDefaults = {
   collapsedComponentIds: null,
   deepFocus: null,
   paneStateBeforeDeepFocus: null,
+  architectureFocus: false,
+  paneStateBeforeArchitectureFocus: null,
+  paneStateBeforeFocusModes: null,
+  focusModeStack: [],
 } satisfies Partial<UiState>
 
 export const useUiStore = create<UiState>()(
@@ -290,8 +312,16 @@ export const useUiStore = create<UiState>()(
       enterDeepFocus: (target) =>
         set((s) => ({
           deepFocus: target,
+          focusModeStack: s.focusModeStack.includes('deep')
+            ? s.focusModeStack
+            : [...s.focusModeStack, 'deep'],
+          paneStateBeforeFocusModes: s.paneStateBeforeFocusModes ?? {
+            layout: { ...s.layout },
+            leftCollapsed: s.leftCollapsed,
+            rightCollapsed: s.rightCollapsed,
+          },
           paneStateBeforeDeepFocus: s.paneStateBeforeDeepFocus ?? {
-            layout: s.layout,
+            layout: { ...s.layout },
             leftCollapsed: s.leftCollapsed,
             rightCollapsed: s.rightCollapsed,
           },
@@ -303,15 +333,86 @@ export const useUiStore = create<UiState>()(
       exitDeepFocus: () =>
         set((s) => {
           if (!s.deepFocus && !s.paneStateBeforeDeepFocus) return {}
-          const previous = s.paneStateBeforeDeepFocus
+          const nextStack = s.focusModeStack.filter((mode) => mode !== 'deep')
+          const remainingMode = nextStack.at(-1)
+          const removedTop = s.focusModeStack.at(-1) === 'deep'
+          const previous =
+            remainingMode === undefined
+              ? (s.paneStateBeforeFocusModes ?? s.paneStateBeforeDeepFocus)
+              : removedTop
+                ? s.paneStateBeforeDeepFocus
+                : s.paneStateBeforeArchitectureFocus
           return {
             deepFocus: null,
             paneStateBeforeDeepFocus: null,
+            paneStateBeforeFocusModes:
+              remainingMode === undefined ? null : s.paneStateBeforeFocusModes,
+            focusModeStack: nextStack,
             layout: previous?.layout ?? DEFAULT_PANE_LAYOUT,
-            leftCollapsed: previous?.leftCollapsed ?? false,
-            rightCollapsed: previous?.rightCollapsed ?? false,
+            leftCollapsed:
+              remainingMode === 'architecture' ? true : (previous?.leftCollapsed ?? false),
+            rightCollapsed:
+              remainingMode === 'architecture' ? true : (previous?.rightCollapsed ?? false),
           }
         }),
+
+      // Architecture focus changes only the two side panes. The exact
+      // arrangement is copied before folding them so a later inspector/run
+      // resize or a pre-existing collapsed rail is restored byte-for-byte.
+      enterArchitectureFocus: () =>
+        set((s) => ({
+          architectureFocus: true,
+          focusModeStack: s.focusModeStack.includes('architecture')
+            ? s.focusModeStack
+            : [...s.focusModeStack, 'architecture'],
+          paneStateBeforeFocusModes: s.paneStateBeforeFocusModes ?? {
+            layout: { ...s.layout },
+            leftCollapsed: s.leftCollapsed,
+            rightCollapsed: s.rightCollapsed,
+          },
+          paneStateBeforeArchitectureFocus:
+            s.paneStateBeforeArchitectureFocus ?? {
+              layout: { ...s.layout },
+              leftCollapsed: s.leftCollapsed,
+              rightCollapsed: s.rightCollapsed,
+            },
+          leftCollapsed: true,
+          rightCollapsed: true,
+        })),
+
+      exitArchitectureFocus: () =>
+        set((s) => {
+          if (!s.architectureFocus && !s.paneStateBeforeArchitectureFocus) return {}
+          const nextStack = s.focusModeStack.filter((mode) => mode !== 'architecture')
+          const remainingMode = nextStack.at(-1)
+          const removedTop = s.focusModeStack.at(-1) === 'architecture'
+          const previous =
+            remainingMode === undefined
+              ? (s.paneStateBeforeFocusModes ?? s.paneStateBeforeArchitectureFocus)
+              : removedTop
+                ? s.paneStateBeforeArchitectureFocus
+                : s.paneStateBeforeDeepFocus
+          return {
+            architectureFocus: false,
+            paneStateBeforeArchitectureFocus: null,
+            paneStateBeforeFocusModes:
+              remainingMode === undefined ? null : s.paneStateBeforeFocusModes,
+            focusModeStack: nextStack,
+            // Architecture focus only folds the side panes. If deep focus
+            // remains active, keep its current (possibly user-resized)
+            // arrangement instead of restoring the snapshot from before it.
+            layout: remainingMode === 'deep' ? s.layout : (previous?.layout ?? s.layout),
+            leftCollapsed:
+              remainingMode === 'deep' ? true : (previous?.leftCollapsed ?? false),
+            rightCollapsed:
+              remainingMode === 'deep' ? false : (previous?.rightCollapsed ?? false),
+          }
+        }),
+
+      toggleArchitectureFocus: () => {
+        if (get().architectureFocus) get().exitArchitectureFocus()
+        else get().enterArchitectureFocus()
+      },
     }),
     {
       name: 'visualise-ai.ui',
@@ -321,15 +422,18 @@ export const useUiStore = create<UiState>()(
       // selection are bound to a concrete architecture snapshot and would be
       // misleading after it changed.
       //
-      // Deep focus is a transient mode driven by the `focus` search parameter,
-      // so the arrangement it replaced is what gets persisted — otherwise a
-      // reload without `?focus=` would come back in a deep-focus split.
+      // Deep focus and architecture focus are transient modes. Persist the
+      // arrangement each mode replaced — otherwise a reload without the mode
+      // would come back in a temporary folded split.
       partialize: (state) => {
-        const persistedPanes = state.paneStateBeforeDeepFocus ?? {
-          layout: state.layout,
-          leftCollapsed: state.leftCollapsed,
-          rightCollapsed: state.rightCollapsed,
-        }
+        const persistedPanes =
+          state.paneStateBeforeFocusModes ??
+          state.paneStateBeforeDeepFocus ??
+          state.paneStateBeforeArchitectureFocus ?? {
+            layout: state.layout,
+            leftCollapsed: state.leftCollapsed,
+            rightCollapsed: state.rightCollapsed,
+          }
         return {
           ...persistedPanes,
           collapsedAgentIds: state.collapsedAgentIds,

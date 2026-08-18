@@ -6,8 +6,10 @@ import { validateWorkspaceSearch, type WorkspaceSearch } from './searchParams'
 // `npm run typecheck` fails if either assertion stops holding.
 const validSearch: WorkspaceSearch = {
   component: 'shop-platform.orders.domain',
+  relationship: 'rel-orders-read',
   focus: 'feedback',
   history: true,
+  layout: 'left-right',
 }
 // @ts-expect-error 'runs' is not one of the two deep-focus targets
 const invalidSearch: WorkspaceSearch = { focus: 'runs' }
@@ -15,6 +17,19 @@ const invalidSearch: WorkspaceSearch = { focus: 'runs' }
 describe('validateWorkspaceSearch', () => {
   it('accepts the documented parameters', () => {
     expect(validateWorkspaceSearch({ ...validSearch })).toEqual(validSearch)
+  })
+
+  it('accepts both shareable graph orientations', () => {
+    expect(validateWorkspaceSearch({ layout: 'top-down' })).toEqual({
+      layout: 'top-down',
+    })
+    expect(validateWorkspaceSearch({ layout: 'left-right' })).toEqual({
+      layout: 'left-right',
+    })
+  })
+
+  it('drops an unknown graph orientation', () => {
+    expect(validateWorkspaceSearch({ layout: 'diagonal' })).toEqual({})
   })
 
   it('rejects an unknown focus target and falls back cleanly', () => {
@@ -34,6 +49,10 @@ describe('validateWorkspaceSearch', () => {
     // TanStack Router parses search values as JSON, so `?component=42` arrives
     // as a number even though the contract calls component ids strings.
     expect(validateWorkspaceSearch({ component: 42 })).toEqual({ component: '42' })
+  })
+
+  it('normalises a numeric relationship id back to a string', () => {
+    expect(validateWorkspaceSearch({ relationship: 42 })).toEqual({ relationship: '42' })
   })
 
   it('drops parameters the workspace does not know', () => {

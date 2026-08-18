@@ -1,11 +1,11 @@
-import { act, screen, waitFor, within } from '@testing-library/react'
+import { act, cleanup, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it } from 'vitest'
 
 import { queryKeys } from '@/api/queryKeys'
 import type { ArchitectureResponse } from '@/api/types'
 import { applyLiveEvent } from '@/api/useLiveStream'
-import { DEFAULT_CAMERA, useUiStore } from '@/state/uiStore'
+import { DEFAULT_CAMERA, resetUiStore, useUiStore } from '@/state/uiStore'
 import {
   BUNDLED_TOPIC_CHANNELS,
   NESTED_COMPONENTS,
@@ -51,14 +51,21 @@ function architectureFetch(initial: ArchitectureResponse) {
  * ADR 0017), which is what `ArchitectureZoom.test.tsx` covers. The assertions
  * in this file are about bundling, selection and the camera on components that
  * sit three and four levels down, so they start from the state the user reaches
- * with "Gesamtes Modell einpassen" — a real, reachable state, and the one these
+ * with "Gesamtkarte" — a real, reachable state, and the one these
  * tests have always described.
  */
-function renderCanvas(url = WORKSPACE_URL, initial = nestedArchitectureResponse) {
+function renderCanvas(
+  url = WORKSPACE_URL,
+  initial = nestedArchitectureResponse,
+  collapsedComponentIds?: string[],
+) {
   const architecture = architectureFetch(initial)
+  if (collapsedComponentIds !== undefined) {
+    useUiStore.getState().setCollapsedComponentIds(collapsedComponentIds)
+  }
   const app = renderApp(url, {
     fetchImpl: architecture.fetchImpl,
-    expandAllComponents: true,
+    expandAllComponents: collapsedComponentIds === undefined,
   })
   return { ...app, ...architecture }
 }
@@ -161,6 +168,34 @@ describe('architecture canvas — rendering', () => {
     },
     CANVAS_TIMEOUT,
   )
+
+  it(
+    'keeps a nested edge label above its own SVG hit path',
+    async () => {
+      renderCanvas()
+      await waitForCanvas()
+
+      const label = await screen.findByTestId(`edge-bundle-${BUNDLE_EDGE_ID}`)
+      const edgeGroup = document.querySelector<SVGGElement>(
+        `.react-flow__edge[data-id="${BUNDLE_EDGE_ID}"]`,
+      )
+      const edgeSvg = edgeGroup?.closest('svg')
+      const renderer = document.querySelector<HTMLElement>(
+        '.react-flow__edgelabel-renderer',
+      )
+
+      expect(edgeSvg).not.toBeNull()
+      expect(renderer).not.toBeNull()
+      // The portal stays unstacked. The label itself carries the contextual
+      // z-index, so a deeper parent chain cannot put its transparent SVG hit
+      // path in front of the button.
+      expect(renderer).not.toHaveStyle({ zIndex: '1' })
+      expect(Number(label.style.zIndex)).toBeGreaterThan(
+        Number(edgeSvg?.style.zIndex ?? 0),
+      )
+    },
+    CANVAS_TIMEOUT,
+  )
 })
 
 describe('architecture canvas — colour-independent relationship kinds', () => {
@@ -218,6 +253,36 @@ describe('architecture canvas — colour-independent relationship kinds', () => 
 
 describe('architecture canvas — edge bundling stays resolvable', () => {
   it(
+    'selects a single relationship from its line in the overview',
+    async () => {
+      const user = userEvent.setup()
+      const { router } = renderCanvas()
+      const canvas = await waitForCanvas()
+
+      // The initial fit intentionally stays readable. Explicitly fitting the
+      // whole model gives this test the actual overview interaction state.
+      await user.click(screen.getByTestId('canvas-fit-view'))
+      await waitFor(() => expect(canvas).toHaveAttribute('data-detail-level', 'minimal'))
+
+      // Individual labels stay hidden at overview so the graph does not become
+      // a wall of long reported values. The line itself remains the hit target.
+      expect(screen.queryByTestId('edge-label-r-01')).not.toBeInTheDocument()
+      await user.click(
+        screen.getByTestId('edge-path-rel:platform.api.http.router~>platform.core.orders'),
+      )
+
+      await waitFor(() =>
+        expect(router.state.location.search).toEqual({ relationship: 'r-01' }),
+      )
+      expect(await screen.findByTestId('inspector-relationship-context')).toHaveAttribute(
+        'data-relationship-id',
+        'r-01',
+      )
+    },
+    CANVAS_TIMEOUT,
+  )
+
+  it(
     'bundles the three NATS topics and makes each of them reachable by clicking',
     async () => {
       const user = userEvent.setup()
@@ -233,6 +298,9 @@ describe('architecture canvas — edge bundling stays resolvable', () => {
 
       // Unfolding it is an interaction on the canvas, available at any zoom.
       await user.click(bundle)
+      // Opening a bundle is a disclosure action, not an implicit selection of
+      // whichever relationship happens to be first in its list.
+      expect(useUiStore.getState().selectedRelationshipId).toBeNull()
 
       // Every single topic is now individually addressable, labelled with its
       // own channel — the bundle was a rendering, never a merge.
@@ -264,6 +332,63 @@ describe('architecture canvas — edge bundling stays resolvable', () => {
   )
 
   it(
+    'keeps a bundled relationship inspectable from the icon-only map control',
+    async () => {
+      const user = userEvent.setup()
+      const { router } = renderCanvas()
+      const canvas = await waitForCanvas()
+
+      await user.click(screen.getByTestId('canvas-fit-view'))
+      await waitFor(() => expect(canvas).toHaveAttribute('data-detail-level', 'minimal'))
+
+      const bundle = await screen.findByTestId(`edge-bundle-${BUNDLE_EDGE_ID}`)
+      expect(bundle).toHaveAttribute('title', expect.stringContaining('Inspector'))
+      expect(bundle).toHaveAttribute('aria-label', expect.stringContaining('Inspector'))
+      expect(bundle.querySelector('svg')).toBeInTheDocument()
+      expect(bundle.textContent).not.toContain('NATS')
+
+      // Map-level activation selects a real member, so the inspector can show
+      // the selected relationship and the complete bundle without tiny labels.
+      await user.click(bundle)
+      await waitFor(() =>
+        expect(router.state.location.search).toEqual({ relationship: 'r-05' }),
+      )
+      expect(await screen.findByTestId('inspector-relationship-context')).toHaveAttribute(
+        'data-relationship-id',
+        'r-05',
+      )
+      expect(screen.getByTestId('inspector-relationship-bundle')).toHaveTextContent(
+        'NATS · orders.created',
+      )
+      expect(screen.queryByTestId('edge-label-r-05')).not.toBeInTheDocument()
+    },
+    CANVAS_TIMEOUT,
+  )
+
+  it(
+    'selects the first bundle member from the map control when another member is selected',
+    async () => {
+      const user = userEvent.setup()
+      const { router } = renderCanvas(`${WORKSPACE_URL}?relationship=r-06`)
+      const canvas = await waitForCanvas()
+
+      await user.click(screen.getByTestId('canvas-fit-view'))
+      await waitFor(() => expect(canvas).toHaveAttribute('data-detail-level', 'minimal'))
+
+      await user.click(await screen.findByTestId(`edge-bundle-${BUNDLE_EDGE_ID}`))
+
+      await waitFor(() =>
+        expect(router.state.location.search).toEqual({ relationship: 'r-05' }),
+      )
+      expect(await screen.findByTestId('inspector-relationship-context')).toHaveAttribute(
+        'data-relationship-id',
+        'r-05',
+      )
+    },
+    CANVAS_TIMEOUT,
+  )
+
+  it(
     'selecting one topic of an unfolded bundle marks exactly that relationship',
     async () => {
       const user = userEvent.setup()
@@ -274,12 +399,247 @@ describe('architecture canvas — edge bundling stays resolvable', () => {
       await user.click(screen.getByTestId('edge-label-r-06'))
 
       expect(useUiStore.getState().selectedRelationshipId).toBe('r-06')
+      await waitFor(() => {
+        expect(screen.getByTestId('edge-path-r-06')).not.toHaveClass('opacity-25')
+        expect(screen.getByTestId('edge-path-r-05')).toHaveClass('opacity-25')
+        expect(screen.getByTestId('edge-path-r-07')).toHaveClass('opacity-25')
+        expect(screen.getByTestId('edge-label-r-06')).not.toHaveClass('opacity-25')
+        expect(screen.getByTestId('edge-label-r-05')).toHaveClass('opacity-25')
+        expect(screen.getByTestId('edge-label-r-06')).toHaveAttribute('aria-current', 'true')
+        expect(screen.getByTestId('edge-label-r-05')).not.toHaveAttribute('aria-current')
+      })
+    },
+    CANVAS_TIMEOUT,
+  )
+
+  it(
+    'writes an individual relationship selection to the URL and inspector',
+    async () => {
+      const user = userEvent.setup()
+      const { router } = renderCanvas()
+      await waitForCanvas()
+
+      await user.click(await screen.findByTestId(`edge-bundle-${BUNDLE_EDGE_ID}`))
+      await user.click(screen.getByTestId('edge-label-r-06'))
+
+      await waitFor(() =>
+        expect(router.state.location.search).toEqual({ relationship: 'r-06' }),
+      )
+      expect(await screen.findByTestId('inspector-relationship-context')).toHaveAttribute(
+        'data-relationship-id',
+        'r-06',
+      )
+      expect(screen.getByTestId('inspector-relationship-bundle')).toHaveTextContent(
+        'NATS · orders.cancelled',
+      )
+    },
+    CANVAS_TIMEOUT,
+  )
+
+  it(
+    'restores a relationship selection from a deep link without selecting a component',
+    async () => {
+      const { router } = renderCanvas(`${WORKSPACE_URL}?relationship=r-06`)
+      await waitForCanvas()
+
+      await waitFor(() =>
+        expect(router.state.location.search).toEqual({ relationship: 'r-06' }),
+      )
+      expect(await screen.findByTestId('inspector-relationship-context')).toBeInTheDocument()
+      expect(useUiStore.getState().selectedComponentId).toBeNull()
+      expect(useUiStore.getState().selectedRelationshipId).toBe('r-06')
+    },
+    CANVAS_TIMEOUT,
+  )
+
+  it(
+    'keeps the canvas undimmed for a valid-looking but missing relationship id',
+    async () => {
+      const { router } = renderCanvas(`${WORKSPACE_URL}?relationship=not-in-snapshot`)
+      await waitForCanvas()
+
+      await waitFor(() =>
+        expect(router.state.location.search).toEqual({
+          relationship: 'not-in-snapshot',
+        }),
+      )
+      expect(await screen.findByTestId('inspector-relationship-context')).toHaveTextContent(
+        'nicht im aktuellen Architektur-Snapshot',
+      )
+      expect(
+        screen.getByTestId('edge-path-rel:platform.api.http.router~>platform.core.orders'),
+      ).not.toHaveClass('opacity-25')
+      expect(screen.getByTestId('canvas-node-platform.db')).not.toHaveAttribute(
+        'data-relationship-selected',
+        'true',
+      )
+    },
+    CANVAS_TIMEOUT,
+  )
+
+  it(
+    'does not resurrect a stale store relationship when the URL has no selection',
+    async () => {
+      useUiStore.getState().setSelectedRelationshipId('r-06')
+      const { router } = renderCanvas()
+      await waitForCanvas()
+
+      expect(router.state.location.search).toEqual({})
+      expect(
+        screen.getByTestId('edge-path-rel:platform.api.http.router~>platform.core.orders'),
+      ).not.toHaveClass('opacity-25')
+      expect(
+        screen.getByTestId('edge-path-rel:platform.core.orders~>platform.bus'),
+      ).not.toHaveClass('opacity-25')
+    },
+    CANVAS_TIMEOUT,
+  )
+
+  it(
+    'clears a selected relationship when Escape is pressed on the folded bundle control',
+    async () => {
+      const user = userEvent.setup()
+      const { router } = renderCanvas(`${WORKSPACE_URL}?relationship=r-06`)
+      await waitForCanvas()
+
+      const bundle = await screen.findByTestId(`edge-bundle-${BUNDLE_EDGE_ID}`)
+      act(() => bundle.focus())
+      await user.keyboard('{Escape}')
+
+      await waitFor(() => expect(router.state.location.search).toEqual({}))
+      expect(useUiStore.getState().selectedRelationshipId).toBeNull()
+      expect(document.activeElement).toBe(bundle)
     },
     CANVAS_TIMEOUT,
   )
 })
 
 describe('architecture canvas — selection', () => {
+  it(
+    'searches name, kind, technology, tags and id, then selects the result',
+    async () => {
+      const user = userEvent.setup()
+      const { router } = renderCanvas()
+      await waitForCanvas()
+
+      await user.click(screen.getByTestId('canvas-component-search'))
+      const input = screen.getByTestId('canvas-component-search-input')
+      expect(
+        screen.getByText('Nach Name, Art, Technologie, Tag oder Komponenten-ID suchen.'),
+      ).toBeVisible()
+
+      input.focus()
+      await user.keyboard('routing')
+      const result = screen.getByTestId('canvas-component-search-result')
+      expect(result).toHaveAttribute('data-component-id', 'platform.api.http.router')
+      expect(result).toHaveTextContent('Router')
+      expect(result).toHaveTextContent('Modul')
+      expect(result).toHaveTextContent('Shop Platform / API Gateway / HTTP Layer')
+
+      await user.click(result)
+      await waitFor(() =>
+        expect(router.state.location.search).toEqual({
+          component: 'platform.api.http.router',
+        }),
+      )
+      expect(screen.getByTestId('inspector-context')).toHaveAttribute(
+        'data-component-id',
+        'platform.api.http.router',
+      )
+    },
+    CANVAS_TIMEOUT,
+  )
+
+  it(
+    'opens search with the command shortcut and reports an empty result state',
+    async () => {
+      const user = userEvent.setup()
+      renderCanvas()
+      await waitForCanvas()
+
+      const trigger = screen.getByTestId('canvas-component-search')
+      trigger.focus()
+      await user.keyboard('{Control>}k{/Control}')
+      const input = screen.getByTestId('canvas-component-search-input')
+      input.focus()
+      await user.keyboard('does-not-exist')
+
+      expect(screen.getByText('Keine passende Komponente gefunden.')).toBeVisible()
+      await user.keyboard('{Escape}')
+      expect(screen.queryByTestId('canvas-component-search-input')).not.toBeInTheDocument()
+    },
+    CANVAS_TIMEOUT,
+  )
+
+  it(
+    'announces the active search result while navigating with the arrow keys',
+    async () => {
+      const user = userEvent.setup()
+      renderCanvas()
+      await waitForCanvas()
+
+      await user.click(screen.getByTestId('canvas-component-search'))
+      const input = screen.getByTestId('canvas-component-search-input')
+      input.focus()
+      await user.keyboard('service')
+
+      const results = screen.getAllByTestId('canvas-component-search-result')
+      expect(input).toHaveAttribute('role', 'combobox')
+      expect(input).toHaveAttribute('aria-controls', 'canvas-component-search-results')
+      expect(input).toHaveAttribute('aria-expanded', 'true')
+      expect(input).toHaveAttribute(
+        'aria-activedescendant',
+        results[0]?.getAttribute('id') ?? '',
+      )
+      expect(results[0]).toHaveAttribute('aria-selected', 'true')
+      expect(results[1]).toHaveAttribute('aria-selected', 'false')
+
+      await user.keyboard('{ArrowDown}')
+      expect(input).toHaveAttribute(
+        'aria-activedescendant',
+        results[1]?.getAttribute('id') ?? '',
+      )
+      expect(results[0]).toHaveAttribute('aria-selected', 'false')
+      expect(results[1]).toHaveAttribute('aria-selected', 'true')
+    },
+    CANVAS_TIMEOUT,
+  )
+
+  it(
+    'opens only target ancestors and keeps independent nested collapse state',
+    async () => {
+      const user = userEvent.setup()
+      const { router } = renderCanvas(WORKSPACE_URL, nestedArchitectureResponse, [
+        'platform.api',
+        'platform.api.http',
+        'platform.core',
+      ])
+      await waitForCanvas()
+
+      await user.click(screen.getByTestId('canvas-component-search'))
+      const input = screen.getByTestId('canvas-component-search-input')
+      input.focus()
+      await user.keyboard('gRPC Layer')
+      await user.click(screen.getByTestId('canvas-component-search-result'))
+
+      await waitFor(() =>
+        expect(router.state.location.search).toEqual({ component: 'platform.api.grpc' }),
+      )
+      await waitForCanvas()
+
+      expect(screen.getByTestId('canvas-node-platform.api.grpc')).toBeVisible()
+      expect(screen.getByTestId('node-disclosure-platform.api.http')).toHaveAttribute(
+        'aria-expanded',
+        'false',
+      )
+      expect(screen.getByTestId('node-disclosure-platform.core')).toHaveAttribute(
+        'aria-expanded',
+        'false',
+      )
+    },
+    CANVAS_TIMEOUT,
+  )
+
   it(
     'writes the clicked component into the `component` search parameter',
     async () => {
@@ -323,9 +683,140 @@ describe('architecture canvas — selection', () => {
     },
     CANVAS_TIMEOUT,
   )
+
+  it(
+    'uses the URL orientation and switches handles and camera explicitly',
+    async () => {
+      const user = userEvent.setup()
+      const { router } = renderCanvas(`${WORKSPACE_URL}?layout=left-right`)
+      const canvas = await waitForCanvas()
+
+      expect(canvas).toHaveAttribute('data-layout-orientation', 'left-right')
+      expect(
+        document.querySelector('.react-flow__node[data-id="platform"] .react-flow__handle-right'),
+      ).not.toBeNull()
+      expect(canvas).toHaveAttribute('data-fit-view-count', '1')
+
+      await user.click(screen.getByTestId('canvas-layout-top-down'))
+      await waitFor(() =>
+        expect(canvas).toHaveAttribute('data-layout-orientation', 'top-down'),
+      )
+      await waitFor(() => expect(canvas).toHaveAttribute('data-layouting', 'false'))
+      await waitFor(() => expect(canvas).toHaveAttribute('data-fit-view-count', '2'))
+
+      expect(router.state.location.search).toMatchObject({ layout: 'top-down' })
+      expect(
+        document.querySelector('.react-flow__node[data-id="platform"] .react-flow__handle-bottom'),
+      ).not.toBeNull()
+    },
+    CANVAS_TIMEOUT,
+  )
 })
 
 describe('architecture canvas — live updates never move the camera', () => {
+  it(
+    'drops pending search focus when orientation changes during the relayout',
+    async () => {
+      const user = userEvent.setup()
+      const collapsed = ['platform.api', 'platform.api.http', 'platform.core']
+
+      // Establish the camera produced by the explicit orientation fit without
+      // any pending search action to compare against below.
+      renderCanvas(
+        `${WORKSPACE_URL}?component=platform.api.grpc`,
+        nestedArchitectureResponse,
+        collapsed,
+      )
+      await waitForCanvas()
+      await user.click(screen.getByTestId('canvas-layout-left-right'))
+      await waitFor(() =>
+        expect(screen.getByTestId('architecture-canvas')).toHaveAttribute(
+          'data-layouting',
+          'false',
+        ),
+      )
+      const cameraAfterOrientation = useUiStore.getState().camera
+
+      cleanup()
+      resetUiStore()
+
+      const rendered = renderCanvas(WORKSPACE_URL, nestedArchitectureResponse, collapsed)
+      await waitForCanvas()
+      await user.click(screen.getByTestId('canvas-component-search'))
+      const input = screen.getByTestId('canvas-component-search-input')
+      input.focus()
+      await user.keyboard('gRPC Layer')
+      await user.click(screen.getByTestId('canvas-component-search-result'))
+
+      // The search has opened a collapsed ancestor, so ELK is still solving the
+      // graph when this explicit camera action arrives.
+      expect(rendered.router.state.location.search).toEqual({
+        component: 'platform.api.grpc',
+      })
+      await user.click(screen.getByTestId('canvas-layout-left-right'))
+      await waitFor(() =>
+        expect(screen.getByTestId('architecture-canvas')).toHaveAttribute(
+          'data-layouting',
+          'false',
+        ),
+      )
+
+      // Orientation owns the resulting camera. A stale search focus would add
+      // another pan after this fit and produce a different viewport.
+      expect(useUiStore.getState().camera).toEqual(cameraAfterOrientation)
+    },
+    CANVAS_TIMEOUT,
+  )
+
+  it(
+    'does not replay a completed no-relayout search focus after a live re-layout',
+    async () => {
+      const user = userEvent.setup()
+      const { queryClient, publish } = renderCanvas()
+      const canvas = await waitForCanvas()
+
+      await user.click(screen.getByTestId('canvas-component-search'))
+      const input = screen.getByTestId('canvas-component-search-input')
+      input.focus()
+      await user.keyboard('platform.db')
+      await user.click(screen.getByTestId('canvas-component-search-result'))
+      await waitFor(() => expect(canvas).toHaveAttribute('data-layouting', 'false'))
+
+      const cameraAfterSearch = useUiStore.getState().camera
+      const transformAfterSearch = viewportTransform()
+      expect(canvas).toHaveAttribute('data-fit-view-count', '1')
+
+      // An equal refetch is deliberately quiet too; the pending search ref must
+      // not turn a data refresh into a second focus request.
+      await act(async () => {
+        await queryClient.refetchQueries({ queryKey: queryKeys.architecture(PROJECT_ID) })
+      })
+      expect(viewportTransform()).toBe(transformAfterSearch)
+      expect(useUiStore.getState().camera).toEqual(cameraAfterSearch)
+
+      publish(grownArchitectureResponse)
+      await act(async () => {
+        applyLiveEvent(
+          queryClient,
+          streamedEvent('architecture.snapshot_published', {
+            snapshotId: 'snapshot-after-search',
+            components: grownArchitectureResponse.components,
+            relationships: grownArchitectureResponse.relationships,
+          }),
+        )
+      })
+      await waitFor(
+        () => expect(canvas).toHaveAttribute('data-layouting', 'false'),
+        { timeout: CANVAS_TIMEOUT },
+      )
+
+      expect(viewportTransform()).toBe(transformAfterSearch)
+      expect(useUiStore.getState().camera).toEqual(cameraAfterSearch)
+      expect(canvas).toHaveAttribute('data-fit-view-count', '1')
+    },
+    CANVAS_TIMEOUT,
+  )
+
   it(
     'keeps zoom, pan and selection when the architecture is replaced live',
     async () => {
@@ -391,6 +882,65 @@ describe('architecture canvas — live updates never move the camera', () => {
       expect(canvas.getAttribute('data-fit-view-count')).toBe('1')
       await user.click(screen.getByTestId('canvas-fit-view'))
       expect(canvas.getAttribute('data-fit-view-count')).toBe('2')
+    },
+    CANVAS_TIMEOUT,
+  )
+
+  it(
+    'folds both panes, keeps the URL context and does not refit on a later live event',
+    async () => {
+      const user = userEvent.setup()
+      const { queryClient, publish } = renderCanvas(
+        `${WORKSPACE_URL}?component=platform.db`,
+      )
+      const canvas = await waitForCanvas()
+      const previousLayout = {
+        'workspace-left': 23,
+        'workspace-center': 47,
+        'workspace-right': 30,
+      }
+      useUiStore.setState({
+        layout: previousLayout,
+        leftCollapsed: true,
+        rightCollapsed: false,
+      })
+
+      await user.click(screen.getByTestId('canvas-toggle-architecture-focus'))
+      await waitFor(() => expect(useUiStore.getState().architectureFocus).toBe(true))
+      expect(useUiStore.getState()).toMatchObject({
+        leftCollapsed: true,
+        rightCollapsed: true,
+        layout: previousLayout,
+        selectedComponentId: 'platform.db',
+      })
+      await waitFor(() => expect(canvas).toHaveAttribute('data-fit-view-count', '2'))
+
+      const cameraAfterFocus = useUiStore.getState().camera
+      const fitCountAfterFocus = canvas.getAttribute('data-fit-view-count')
+      publish(grownArchitectureResponse)
+      await act(async () => {
+        applyLiveEvent(
+          queryClient,
+          streamedEvent('architecture.snapshot_published', {
+            snapshotId: 'snapshot-after-architecture-focus',
+            components: grownArchitectureResponse.components,
+            relationships: grownArchitectureResponse.relationships,
+          }),
+        )
+      })
+      await waitFor(() => expect(canvas).toHaveAttribute('data-layouting', 'false'))
+      expect(useUiStore.getState().camera).toEqual(cameraAfterFocus)
+      expect(canvas.getAttribute('data-fit-view-count')).toBe(fitCountAfterFocus)
+      expect(useUiStore.getState().selectedComponentId).toBe('platform.db')
+
+      await user.click(screen.getByTestId('canvas-toggle-architecture-focus'))
+      await waitFor(() => expect(useUiStore.getState().architectureFocus).toBe(false))
+      await waitFor(() => expect(canvas).toHaveAttribute('data-fit-view-count', '3'))
+      expect(useUiStore.getState()).toMatchObject({
+        layout: previousLayout,
+        leftCollapsed: true,
+        rightCollapsed: false,
+      })
     },
     CANVAS_TIMEOUT,
   )

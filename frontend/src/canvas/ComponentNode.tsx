@@ -18,8 +18,15 @@ import {
   componentTags,
   technologyParts,
 } from './componentKinds'
-import { DISCLOSURE_LABEL_KEYS, showsTags, showsTechnology } from './detailLevel'
+import {
+  DISCLOSURE_LABEL_KEYS,
+  showsKind,
+  showsPrimaryText,
+  showsTags,
+  showsTechnology,
+} from './detailLevel'
 import { HANDLE_IDS, type ArchitectureNode } from './graphProjection'
+import type { GraphOrientation } from './graphOrientation'
 import { CanvasNodeActionsContext } from './nodeActions'
 import { useCanvasVoice } from './useCanvasVoice'
 import { useDetailLevel } from './useDetailLevel'
@@ -122,7 +129,7 @@ function DisclosureToggle({
   return (
     <button
       type="button"
-      className="nodrag nopan text-muted-foreground hover:text-foreground hover:bg-secondary/70 focus-visible:ring-ring -m-0.5 flex shrink-0 items-center gap-0.5 rounded-sm p-0.5 focus-visible:ring-2 focus-visible:outline-none"
+      className="canvas-flow-hit-area nodrag nopan text-muted-foreground hover:text-foreground hover:bg-secondary/70 focus-visible:ring-ring -m-0.5 flex shrink-0 items-center justify-center gap-0.5 rounded-sm p-0.5 focus-visible:ring-2 focus-visible:outline-none"
       title={title}
       aria-label={label}
       aria-expanded={!collapsed}
@@ -133,26 +140,29 @@ function DisclosureToggle({
         toggleCollapsed(componentId, !collapsed)
       }}
     >
-      <Icon className="size-3.5" aria-hidden="true" />
+      <span className="canvas-flow-hit-area-visual">
+        <Icon className="size-3.5" aria-hidden="true" />
+      </span>
     </button>
   )
 }
 
 /** Invisible, non-interactive connection points. v0 is read-only. */
-function NodeHandles() {
+function NodeHandles({ orientation }: { orientation: GraphOrientation }) {
+  const topDown = orientation === 'top-down'
   return (
     <>
       <Handle
         type="target"
         id={HANDLE_IDS.target}
-        position={Position.Left}
+        position={topDown ? Position.Top : Position.Left}
         isConnectable={false}
         className="!size-1.5 !border-0 !bg-transparent"
       />
       <Handle
         type="source"
         id={HANDLE_IDS.source}
-        position={Position.Right}
+        position={topDown ? Position.Bottom : Position.Right}
         isConnectable={false}
         className="!size-1.5 !border-0 !bg-transparent"
       />
@@ -216,7 +226,7 @@ export const ComponentNode = memo(function ComponentNode({
 }: NodeProps<ArchitectureNode>) {
   const { t } = useTranslation('canvas')
   const level = useDetailLevel()
-  const { component, overlay, applied } = data
+  const { component, overlay, applied, relationshipSelected } = data
   const kind = componentKindStyle(component.kind)
   const Icon = kind.icon
   const technology = technologyParts(component.technology)
@@ -233,32 +243,42 @@ export const ComponentNode = memo(function ComponentNode({
         'hover:border-muted-foreground/60',
         box.className,
         selected && 'ring-ring border-ring/70 ring-2',
+        relationshipSelected && !selected && 'ring-ring/60 border-ring/60 ring-1',
       )}
       style={box.style}
       data-testid={`canvas-node-${component.componentId}`}
       data-component-id={component.componentId}
       data-detail-level={level}
       data-selected={selected ? 'true' : 'false'}
+      data-relationship-selected={relationshipSelected ? 'true' : 'false'}
       {...box.attributes}
     >
       <div className="flex items-start gap-1.5">
         <Icon className="text-muted-foreground mt-px size-3.5 shrink-0" aria-hidden="true" />
-        <span
-          className="text-foreground min-w-0 flex-1 truncate text-[13px] leading-tight font-medium"
-          title={component.name}
-          data-testid="node-name"
-        >
-          {/* The component's reported name. Not ours, so never translated. */}
-          <ReportedText value={component.name} />
-        </span>
-        <KindBadge label={componentKindLabel(component.kind, t)} />
+        {showsPrimaryText(level) && (
+          <span
+            className="text-foreground min-w-0 flex-1 truncate text-[13px] leading-tight font-medium"
+            title={component.name}
+            data-testid="node-name"
+          >
+            {/* The component's reported name. Not ours, so never translated. */}
+            <ReportedText value={component.name} />
+          </span>
+        )}
+        {showsKind(level) && <KindBadge label={componentKindLabel(component.kind, t)} />}
       </div>
 
-      {overlay && <ChangeOverlayMark overlay={overlay} className="self-start" />}
+      {overlay && (
+        <ChangeOverlayMark
+          overlay={overlay}
+          compact={!showsPrimaryText(level)}
+          className="self-start"
+        />
+      )}
       {showsTechnology(level) && <TechnologyRow parts={technology} />}
       {showsTags(level) && <TagRow tags={tags} />}
 
-      <NodeHandles />
+      <NodeHandles orientation={data.orientation} />
     </div>
   )
 })
@@ -270,8 +290,15 @@ export const CompoundNode = memo(function CompoundNode({
   const { t } = useTranslation('canvas')
   const { t: tCommon } = useTranslation('common')
   const level = useDetailLevel()
-  const { component, childCount, overlay, applied, collapsed, hiddenDescendantCount } =
-    data
+  const {
+    component,
+    childCount,
+    overlay,
+    applied,
+    collapsed,
+    hiddenDescendantCount,
+    relationshipSelected,
+  } = data
   const kind = componentKindStyle(component.kind)
   const Icon = kind.icon
   const technology = technologyParts(component.technology)
@@ -290,6 +317,7 @@ export const CompoundNode = memo(function CompoundNode({
           'bg-card/95 shadow-[4px_4px_0_-1px_var(--card),4px_4px_0_var(--border)]',
         box.className,
         selected && 'ring-ring border-ring/70 ring-2',
+        relationshipSelected && !selected && 'ring-ring/60 border-ring/60 ring-1',
       )}
       style={box.style}
       data-testid={`canvas-node-${component.componentId}`}
@@ -297,6 +325,7 @@ export const CompoundNode = memo(function CompoundNode({
       data-detail-level={level}
       data-compound="true"
       data-selected={selected ? 'true' : 'false'}
+      data-relationship-selected={relationshipSelected ? 'true' : 'false'}
       {...(collapsed
         ? {
             'data-collapsed': 'true',
@@ -321,13 +350,15 @@ export const CompoundNode = memo(function CompoundNode({
           hiddenCount={collapsed ? hiddenCount : childCount}
         />
         <Icon className="text-muted-foreground size-3.5 shrink-0" aria-hidden="true" />
-        <span
-          className="text-foreground min-w-0 flex-1 truncate text-[13px] leading-tight font-medium"
-          title={component.name}
-          data-testid="node-name"
-        >
-          <ReportedText value={component.name} />
-        </span>
+        {showsPrimaryText(level) && (
+          <span
+            className="text-foreground min-w-0 flex-1 truncate text-[13px] leading-tight font-medium"
+            title={component.name}
+            data-testid="node-name"
+          >
+            <ReportedText value={component.name} />
+          </span>
+        )}
         {/* A closed container is only as wide as a leaf, so the metadata moves
             out of the header — squeezed between a technology string and two
             badges, the name is the first thing to lose its space, and the name
@@ -340,31 +371,32 @@ export const CompoundNode = memo(function CompoundNode({
             <ReportedText value={technology.join(' · ')} />
           </span>
         )}
-        {overlay && <ChangeOverlayMark overlay={overlay} />}
-        {!collapsed && (
-          <span className="text-muted-foreground shrink-0 text-[10px]">
+        {overlay && <ChangeOverlayMark overlay={overlay} compact={!showsPrimaryText(level)} />}
+        {!collapsed && showsPrimaryText(level) && (
+          <span className="text-muted-foreground shrink-0 text-[11px]">
             {tCommon('count.child', { count: childCount })}
           </span>
         )}
-        <KindBadge label={componentKindLabel(component.kind, t)} />
+        {showsKind(level) && <KindBadge label={componentKindLabel(component.kind, t)} />}
       </div>
 
       {collapsed && (
         <div className="flex flex-col gap-1 px-2.5 pt-1.5">
-          <p
-            className="text-muted-foreground text-[10px] leading-tight"
-            data-testid="node-hidden-count"
-          >
-            {t('node.collapsed', {
-              components: tCommon('count.component', { count: hiddenCount }),
-            })}
-          </p>
+          {showsPrimaryText(level) && (
+            <p
+              className="text-muted-foreground text-[11px] leading-tight"
+              data-testid="node-hidden-count"
+            >
+              {t('node.collapsed', {
+                components: tCommon('count.component', { count: hiddenCount }),
+              })}
+            </p>
+          )}
           {showsTechnology(level) && <TechnologyRow parts={technology} />}
         </div>
       )}
 
-      <NodeHandles />
+      <NodeHandles orientation={data.orientation} />
     </div>
   )
 })
-

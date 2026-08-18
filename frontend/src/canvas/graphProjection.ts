@@ -10,6 +10,10 @@ import type {
 } from '@/api/types'
 
 import type { ChangeOverlay, ChangeOverlayModel } from './changeOverlays'
+import {
+  DEFAULT_GRAPH_ORIENTATION,
+  type GraphOrientation,
+} from './graphOrientation'
 import { relationshipDiscriminator, relationshipDisplayName } from './relationshipKinds'
 
 /**
@@ -62,26 +66,32 @@ export const HANDLE_IDS = { source: 'out', target: 'in' } as const
  * on a rendered layout — which makes it different in a browser and in a test,
  * and different again before and after the first measurement. Declaring the
  * handles explicitly makes the geometry a pure function of the layout: incoming
- * on the left edge, outgoing on the right edge, both vertically centred, which
- * is exactly where the ELK ports sit.
+ * They are on the top/bottom edges for the default top-down reading and on the
+ * left/right edges for the explicit left-to-right reading, exactly where the
+ * matching ELK ports sit.
  */
-export function nodeHandles(width: number, height: number): NodeHandle[] {
+export function nodeHandles(
+  width: number,
+  height: number,
+  orientation: GraphOrientation = DEFAULT_GRAPH_ORIENTATION,
+): NodeHandle[] {
+  const topDown = orientation === 'top-down'
   return [
     {
       id: HANDLE_IDS.target,
       type: 'target',
-      position: 'left' as Position,
-      x: 0,
-      y: height / 2,
+      position: (topDown ? 'top' : 'left') as Position,
+      x: topDown ? width / 2 : 0,
+      y: topDown ? 0 : height / 2,
       width: 1,
       height: 1,
     },
     {
       id: HANDLE_IDS.source,
       type: 'source',
-      position: 'right' as Position,
-      x: width,
-      y: height / 2,
+      position: (topDown ? 'bottom' : 'right') as Position,
+      x: topDown ? width / 2 : width,
+      y: topDown ? height : height / 2,
       width: 1,
       height: 1,
     },
@@ -103,6 +113,8 @@ export interface ComponentNodeData extends Record<string, unknown> {
   childCount: number
   /** `true` when this node is a compound container. */
   isCompound: boolean
+  /** Handle direction for this rendered projection. */
+  orientation: GraphOrientation
   /** Reported work state of this component, or `null` when none was reported. */
   overlay: ChangeOverlay | null
   /**
@@ -119,6 +131,8 @@ export interface ComponentNodeData extends Record<string, unknown> {
    * agent is doing to it.
    */
   overlayRolledUp?: boolean
+  /** `true` when this visible endpoint belongs to the selected relationship. */
+  relationshipSelected?: boolean
 }
 
 export type ArchitectureNode = Node<ComponentNodeData, ArchitectureNodeType>
@@ -138,12 +152,24 @@ export interface RelationshipEdgeData extends Record<string, unknown> {
   overlays: Record<Identifier, ChangeOverlay>
   /** `true` when more than one relationship shares this pair of components. */
   bundled: boolean
+  /** Direction used by the orthogonal fallback after a node drag. */
+  fallbackOrientation?: GraphOrientation
+  /**
+   * Route-relative lane for this edge's HTML relationship label. Assigned by
+   * the canvas when independent edges share an endpoint; absent means the
+   * route midpoint remains the preferred anchor.
+   */
+  labelRatio?: number
   /**
    * Absolute polyline computed by ELK, attached by the canvas after the layout.
    * Absent while no layout exists or after one of the endpoints was dragged;
    * the edge then falls back to a plain orthogonal connection.
    */
   route?: { x: number; y: number }[]
+  /** URL-backed selection callback injected by the canvas shell. */
+  onSelectRelationship?: (relationshipId: Identifier | null) => void
+  /** URL-backed relationship selection used for immediate rendering. */
+  selectedRelationshipId?: Identifier | null
 }
 
 export type ArchitectureEdge = Edge<RelationshipEdgeData, typeof RELATIONSHIP_EDGE_TYPE>
@@ -296,7 +322,10 @@ const compareIds = (a: string, b: string): number => (a < b ? -1 : a > b ? 1 : 0
  * Pure: the same input always produces the same output, including the order of
  * every array.
  */
-export function projectArchitecture(model: ArchitectureModel): ArchitectureProjection {
+export function projectArchitecture(
+  model: ArchitectureModel,
+  orientation: GraphOrientation = DEFAULT_GRAPH_ORIENTATION,
+): ArchitectureProjection {
   const diagnostics: ProjectionDiagnostics = {
     orphanedParents: [],
     hierarchyCycles: [],
@@ -436,13 +465,14 @@ export function projectArchitecture(model: ArchitectureModel): ArchitectureProje
       // waiting for a `ResizeObserver` is the honest answer, and it makes the
       // canvas behave identically before and after the first paint.
       measured: { width: size.width, height: size.height },
-      handles: nodeHandles(size.width, size.height),
+      handles: nodeHandles(size.width, size.height, orientation),
       data: {
         component,
         applied: appliedComponentIds.has(entry.componentId),
         depth: entry.depth,
         childCount: children.length,
         isCompound,
+        orientation,
         overlay: overlayOfComponent.get(entry.componentId) ?? null,
       },
       ...(parentId !== null ? { parentId, extent: 'parent' as const } : {}),
@@ -553,6 +583,7 @@ export function projectArchitecture(model: ArchitectureModel): ArchitectureProje
           applied,
           overlays,
           bundled: relationships.length > 1,
+          fallbackOrientation: orientation,
         },
       }
     })
