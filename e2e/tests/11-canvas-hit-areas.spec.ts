@@ -221,7 +221,7 @@ async function viewportTransform(page: Page): Promise<string> {
   return page.locator('.react-flow__viewport').evaluate((element) => element.getAttribute('style') ?? '')
 }
 
-test('10 · canvas hit areas stay measurable at several zoom levels for fine and coarse pointers', async ({
+test('11 · canvas hit areas stay measurable at several zoom levels for fine and coarse pointers', async ({
   browser,
 }) => {
   for (const pointer of [

@@ -1,4 +1,4 @@
-# 25. Screen-space hit areas for canvas interactions
+# 26. Screen-space hit areas for canvas interactions
 
 - **Status:** accepted
 - **Date:** 2026-08-17
