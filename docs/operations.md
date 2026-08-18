@@ -164,9 +164,9 @@ Checkout funktionieren.
 `docker-compose.yml` fest gesetzt und ist bewusst nicht in `.env.example`: der
 Container-Port ist Teil der Topologie, nicht der Konfiguration.
 
-`DOCKERHUB_NAMESPACE` und `IMAGE_TAG` werden nur vom optionalen Compose-Override
-für veröffentlichte Images verwendet; der normale lokale Start baut weiterhin
-aus `./backend` und `./frontend`.
+`IMAGE_TAG` wird nur vom optionalen Compose-Override für veröffentlichte Images
+verwendet. Der Override nutzt fest den Docker-Hub-Namespace `risqy3d`; der
+normale lokale Start baut weiterhin aus `./backend` und `./frontend`.
 
 > **`MAX_EVENT_BYTES` anzuheben genügt allein nicht.** Nginx steht davor und
 > begrenzt den Request-Body auf `MAX_REQUEST_BODY_SIZE` (Default `4m`). Ein
@@ -201,9 +201,8 @@ In den Repository-Einstellungen sind folgende Werte erforderlich:
 | Secret `DOCKERHUB_TOKEN` | Persönlicher Zugriffstoken mit Push-Rechten |
 
 Der Workflow verwendet ausschließlich diese getrennten Repositories:
-`${DOCKERHUB_NAMESPACE}/visualise-ai-backend` und
-`${DOCKERHUB_NAMESPACE}/visualise-ai-frontend`. Ein stabiles `v1.2.3` erzeugt
-die Tags `1.2.3`, `1.2`, `1` und `latest`. Ein Prerelease wie `v1.2.3-rc.1`
+`risqy3d/visualise-ai-backend` und `risqy3d/visualise-ai-frontend`. Ein stabiles
+`v1.2.3` erzeugt die Tags `1.2.3`, `1.2`, `1` und `latest`. Ein Prerelease wie `v1.2.3-rc.1`
 erzeugt nur `1.2.3-rc.1`; es überschreibt keine stabilen Versionen und nicht
 `latest`. Beide Images tragen OCI-Labels für Source, Revision, Version und
 Erstellungszeitpunkt; beim Backend wird die Version ohne führendes `v` als
@@ -212,18 +211,19 @@ Build-Argument gesetzt.
 Ein Image lässt sich direkt prüfen oder ziehen:
 
 ```bash
-docker pull "$DOCKERHUB_NAMESPACE/visualise-ai-backend:1.2.3"
-docker pull "$DOCKERHUB_NAMESPACE/visualise-ai-frontend:1.2.3"
+docker pull "risqy3d/visualise-ai-backend:1.2.3"
+docker pull "risqy3d/visualise-ai-frontend:1.2.3"
 ```
 
 Der optionale
 [`docker-compose.images.yml`](../docker-compose.images.yml)-Override nutzt
-die gezogenen Images. `IMAGE_TAG` ist standardmäßig `latest`:
+die fest unter `risqy3d` veröffentlichten Images. `IMAGE_TAG` ist standardmäßig
+`latest`:
 
 ```bash
-DOCKERHUB_NAMESPACE=example IMAGE_TAG=1.2.3 \
+IMAGE_TAG=1.2.3 \
   docker compose -f docker-compose.yml -f docker-compose.images.yml pull
-DOCKERHUB_NAMESPACE=example IMAGE_TAG=1.2.3 \
+IMAGE_TAG=1.2.3 \
   docker compose -f docker-compose.yml -f docker-compose.images.yml up -d --no-build
 ```
 

@@ -3,8 +3,8 @@
 services:
   backend:
     build: !reset null
-    image: "${DOCKERHUB_NAMESPACE:?set DOCKERHUB_NAMESPACE}/visualise-ai-backend:${IMAGE_TAG:-latest}"
+    image: "risqy3d/visualise-ai-backend:${IMAGE_TAG:-latest}"
 
   frontend:
     build: !reset null
-    image: "${DOCKERHUB_NAMESPACE:?set DOCKERHUB_NAMESPACE}/visualise-ai-frontend:${IMAGE_TAG:-latest}"
+    image: "risqy3d/visualise-ai-frontend:${IMAGE_TAG:-latest}"
