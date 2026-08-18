@@ -68,8 +68,8 @@ In den Repository-Einstellungen werden dafür die Variable
 `DOCKERHUB_TOKEN` hinterlegt. Kein Secret wird in einen Build-Arg, ein Image
 oder ein Log geschrieben. Die beiden getrennten Docker-Hub-Repositories sind:
 
-- `${DOCKERHUB_NAMESPACE}/visualise-ai-backend`
-- `${DOCKERHUB_NAMESPACE}/visualise-ai-frontend`
+- `risqy3d/visualise-ai-backend`
+- `risqy3d/visualise-ai-frontend`
 
 Ein stabiles Tag wie `v1.2.3` erzeugt `1.2.3`, `1.2`, `1` und `latest`. Ein
 Prerelease wie `v1.2.3-rc.1` erzeugt ausschließlich `1.2.3-rc.1`; stabile Tags
@@ -78,17 +78,17 @@ und `latest` bleiben dabei unverändert.
 Ein veröffentlichtes Image kann direkt gezogen werden:
 
 ```bash
-docker pull "$DOCKERHUB_NAMESPACE/visualise-ai-backend:1.2.3"
-docker pull "$DOCKERHUB_NAMESPACE/visualise-ai-frontend:1.2.3"
+docker pull "risqy3d/visualise-ai-backend:1.2.3"
+docker pull "risqy3d/visualise-ai-frontend:1.2.3"
 ```
 
 Für einen Compose-Start mit den veröffentlichten Images statt mit lokalen
 Quell-Builds:
 
 ```bash
-DOCKERHUB_NAMESPACE=example IMAGE_TAG=1.2.3 \
+IMAGE_TAG=1.2.3 \
   docker compose -f docker-compose.yml -f docker-compose.images.yml pull
-DOCKERHUB_NAMESPACE=example IMAGE_TAG=1.2.3 \
+IMAGE_TAG=1.2.3 \
   docker compose -f docker-compose.yml -f docker-compose.images.yml up -d --no-build
 ```
 
