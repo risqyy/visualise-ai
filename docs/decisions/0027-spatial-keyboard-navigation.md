@@ -1,4 +1,4 @@
-# 25. Spatial keyboard navigation as a roving architecture-graph composite
+# 27. Spatial keyboard navigation as a roving architecture-graph composite
 
 - **Status:** accepted
 - **Date:** 2026-08-17
@@ -37,10 +37,9 @@ independent node controls.
 
 ## Integration risk
 
-The next free local ADR number is 0025. Unmerged PRs #67 and #68 may add ADR
-or E2E files using the same sequence, so integration must reconcile filenames
-and numbering after those branches are reviewed. Their changes are not part of
-this decision or this branch.
+ADR 0027 follows the focus-mode and hit-area decisions that were merged from
+PRs #67 and #68 as ADRs 0025 and 0026. The numbering is now aligned with
+`develop`; no content from those PRs is duplicated in this decision.
 
 ## Consequences
 
