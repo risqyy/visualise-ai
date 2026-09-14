@@ -90,6 +90,7 @@ func TestComponentChangePlannedDoesNotTouchTheAppliedModel(t *testing.T) {
 func TestComponentChangeAppliedUpdatesTheModelAndClosesThePlannedChange(t *testing.T) {
 	s := newScenario(t)
 	s.startRun()
+	s.append(s.loadExample("architecture-snapshot.json"))
 	s.append(s.loadExample("component-change-planned.json"))
 	planned := s.activeChange("change-2026-08-04-0007")
 
@@ -473,6 +474,9 @@ func TestEveryCatalogueTypeIsProjected(t *testing.T) {
 		"retractsClientEventId": "`+relationshipPlanned.ClientEventID+`",
 		"reason": "Superseded by the applied change."
 	}`)
+	mutation := s.event(parent, nil, TypeModelMutationApplied, `{"expectedModelRevision":3,"operations":[{"op":"component.update","componentId":"shop-platform","set":{"name":"Shop Platform"}}]}`)
+	mutation.SchemaVersion = "2.0"
+	s.append(mutation)
 	s.emit("subagent-implementer", subagent, TypeAgentFinished, `{"outcome":"completed","summary":"VAT extracted."}`)
 	s.append(s.loadExample("run-finished.json"))
 
@@ -488,8 +492,8 @@ func TestEveryCatalogueTypeIsProjected(t *testing.T) {
 	}
 
 	catalogue := EventTypes()
-	if len(catalogue) != 20 {
-		t.Fatalf("the catalogue has %d types, want 20", len(catalogue))
+	if len(catalogue) != 21 {
+		t.Fatalf("the catalogue has %d types, want 21", len(catalogue))
 	}
 	for _, evType := range catalogue {
 		if !stored[evType] {

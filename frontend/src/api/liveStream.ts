@@ -264,6 +264,7 @@ export function affectedQueryKeys(event: StreamedEvent, depth = 0): QueryKey[] {
         event.payload.componentIds.map((id) => queryKeys.component(project, id)),
       )
 
+    case 'model.mutation_applied':
     case 'architecture.snapshot_published':
       return [queryKeys.architecture(project), queryKeys.components(project)]
 

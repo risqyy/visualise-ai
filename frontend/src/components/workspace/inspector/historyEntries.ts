@@ -132,6 +132,7 @@ export const EVENT_TYPE_LABEL_KEY: Record<EventType, InspectorKey> = {
   'work.step_started': 'eventType.workStepStarted',
   'work.step_completed': 'eventType.workStepCompleted',
   'feedback.published': 'eventType.feedbackPublished',
+  'model.mutation_applied': 'eventType.modelMutationApplied',
   'architecture.snapshot_published': 'eventType.architectureSnapshotPublished',
   'component.change_planned': 'eventType.componentChangePlanned',
   'component.change_applied': 'eventType.componentChangeApplied',

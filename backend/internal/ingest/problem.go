@@ -13,13 +13,14 @@ import (
 // for a plain Problem and populated for a ValidationProblem, which the contract
 // defines as a Problem plus that array.
 type Problem struct {
-	Type     string       `json:"type"`
-	Title    string       `json:"title"`
-	Status   int          `json:"status"`
-	Detail   string       `json:"detail"`
-	Code     string       `json:"code"`
-	Instance string       `json:"instance,omitempty"`
-	Errors   []FieldError `json:"errors,omitempty"`
+	CurrentModelRevision *int64       `json:"currentModelRevision,omitempty"`
+	Type                 string       `json:"type"`
+	Title                string       `json:"title"`
+	Status               int          `json:"status"`
+	Detail               string       `json:"detail"`
+	Code                 string       `json:"code"`
+	Instance             string       `json:"instance,omitempty"`
+	Errors               []FieldError `json:"errors,omitempty"`
 }
 
 // problemContentType is the media type RFC 9457 prescribes.
@@ -58,6 +59,13 @@ const (
 // type. A code without an entry is a programming error, not a client error, so
 // the fallback stays generic rather than inventing a title.
 var problemTitles = map[string]string{
+	"revision_conflict":          "Model revision conflict",
+	"reference_invalid":          "Invalid model reference",
+	"element_exists":             "Model identity already used",
+	"element_not_found":          "Model element not found",
+	"project_not_found":          "Project not found",
+	"invalid_input":              "Invalid input",
+	"agent_already_started":      "Agent already started",
 	CodeInvalidField:             "Invalid field",
 	CodeUnsupportedEventType:     "Unsupported event type",
 	CodeUnsupportedSchemaVersion: "Unsupported schema version",

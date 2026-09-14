@@ -120,6 +120,7 @@ export const projectResponse: ProjectResponse = {
 }
 
 export const architectureResponse: ArchitectureResponse = {
+  modelRevision: 1,
   projectPosition: 42,
   components: [component()],
   relationships: [],

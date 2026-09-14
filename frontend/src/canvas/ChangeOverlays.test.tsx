@@ -55,6 +55,7 @@ const RELATIONSHIP_ONLY_PROPOSAL: Relationship = {
 
 /** The nested model after the payment provider and its edge were removed. */
 const withoutPayments: ArchitectureResponse = {
+  modelRevision: 0,
   projectPosition: 70,
   components: NESTED_COMPONENTS.filter(
     (one) => one.componentId !== 'external.payments',

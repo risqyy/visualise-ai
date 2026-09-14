@@ -44,6 +44,20 @@ function invalidatedNames(
 }
 
 describe('affectedQueryKeys', () => {
+  it('invalidates the complete model and component histories once per atomic batch', () => {
+    const event = streamedEvent('model.mutation_applied', {
+      expectedModelRevision: 1,
+      operations: [
+        { op: 'component.remove', componentId: COMPONENT_A },
+        { op: 'relationship.remove', relationshipId: 'edge-1' },
+      ],
+    }, { schemaVersion: '2.0' })
+    expect(affectedQueryKeys(event)).toEqual([
+      queryKeys.architecture(PROJECT_ID),
+      queryKeys.components(PROJECT_ID),
+    ])
+  })
+
   it('maps a component change to the architecture and that one component only', () => {
     const event = streamedEvent('component.change_applied', {
       operation: 'modify',

@@ -14,6 +14,8 @@ import (
 func Models() []any {
 	return []any{
 		&Project{},
+		&ModelIdentity{},
+		&CommandReceipt{},
 		&Run{},
 		&Agent{},
 		&Event{},
@@ -48,5 +50,5 @@ func Migrate(db *gorm.DB) error {
 	if err := db.AutoMigrate(Models()...); err != nil {
 		return fmt.Errorf("store: automigrate: %w", err)
 	}
-	return nil
+	return migrateModelTracking(db)
 }

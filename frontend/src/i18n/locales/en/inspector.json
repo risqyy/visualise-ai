@@ -57,6 +57,7 @@
     "agentProgressReported": "Progress reported",
     "agentStarted": "Agent started",
     "agentStatusReported": "Status reported",
+    "modelMutationApplied": "Model mutation applied",
     "architectureSnapshotPublished": "Architecture snapshot published",
     "componentChangeApplied": "Component change applied",
     "componentChangePlanned": "Component change planned",

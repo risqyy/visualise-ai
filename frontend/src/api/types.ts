@@ -105,6 +105,7 @@ export const EVENT_TYPES = [
   'work.step_completed',
   'feedback.published',
   'architecture.snapshot_published',
+  'model.mutation_applied',
   'component.change_planned',
   'component.change_applied',
   'relationship.change_planned',
@@ -154,6 +155,7 @@ export type PlanStepUpdatedPayload = Schemas['PlanStepUpdatedPayload']
 export type WorkStepStartedPayload = Schemas['WorkStepStartedPayload']
 export type WorkStepCompletedPayload = Schemas['WorkStepCompletedPayload']
 export type FeedbackPublishedPayload = Schemas['FeedbackPublishedPayload']
+export type ModelMutationPayload = Schemas['MV_ModelMutationPayload']
 export type ArchitectureSnapshotPublishedPayload =
   Schemas['ArchitectureSnapshotPublishedPayload']
 export type ComponentChangePlannedPayload = Schemas['ComponentChangePlannedPayload']
