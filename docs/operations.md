@@ -59,8 +59,8 @@ nichts zu sehen, bis ein Agent etwas meldet. Der mitgelieferte Simulator meldet
 einen vollständigen, deterministischen Run über dieselbe öffentliche Route, die
 auch ein echter Agent benutzt.
 
-Er läuft auf dem Host und braucht dafür Node (der Container-Build verwendet
-Node 22):
+Er läuft auf dem Host und braucht dafür Node 24 mit npm, wie die
+Simulator-Prüfung in der CI:
 
 ```bash
 cd simulator
