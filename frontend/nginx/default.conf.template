@@ -28,6 +28,29 @@ server {
         return 413 '{"type":"https://visualise-ai.local/problems/event-too-large","title":"Content Too Large","status":413,"detail":"The request body exceeds the size the entry point accepts. See MAX_EVENT_BYTES and MAX_REQUEST_BODY_SIZE.","code":"event_too_large"}';
     }
 
+    # MCP shares the published entry point. Preserve Host INCLUDING port for
+    # exact backend allowlist checks; pass MCP session/version headers unchanged.
+    location @mcp_too_large {
+        default_type text/plain;
+        return 413 'MCP request exceeds the entry point body limit.';
+    }
+
+    location = /mcp {
+        error_page 413 = @mcp_too_large;
+        proxy_pass $backend;
+        proxy_http_version 1.1;
+        proxy_set_header Host $http_host;
+        proxy_set_header Connection "";
+        proxy_buffering off;
+        proxy_cache off;
+        proxy_request_buffering off;
+        gzip off;
+        proxy_connect_timeout 5s;
+        proxy_read_timeout 24h;
+        proxy_send_timeout 60s;
+        add_header X-Accel-Buffering no always;
+    }
+
     # ---- Server-Sent Events -------------------------------------------------
     # Must be declared before the generic /api/ prefix: regex locations win.
     # Buffering, caching and chunked re-encoding are disabled so every event

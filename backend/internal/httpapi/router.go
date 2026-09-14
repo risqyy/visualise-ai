@@ -37,6 +37,8 @@ type Options struct {
 	// Stream serves the project SSE endpoint. Nil leaves the route
 	// unregistered, so a router without a broker stays usable in tests.
 	Stream *sse.Handler
+	// MCP serves the official Streamable HTTP transport at /mcp.
+	MCP http.Handler
 }
 
 // New builds the Gin engine.
@@ -57,6 +59,9 @@ func New(opts Options) *gin.Engine {
 	registerIngestRoutes(engine, opts.Ingest)
 	registerRead(engine, opts.Read, opts.Logger)
 	registerStream(engine, opts.Stream)
+	if opts.MCP != nil {
+		engine.Any("/mcp", gin.WrapH(opts.MCP))
+	}
 
 	engine.NoRoute(notFoundHandler())
 
