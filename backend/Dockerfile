@@ -20,11 +20,11 @@ RUN CGO_ENABLED=0 GOOS=${TARGETOS} GOARCH=${TARGETARCH} go build \
     -o /out/server ./cmd/server
 
 # ---- runtime --------------------------------------------------------------
-FROM alpine:3.21 AS runtime
+FROM alpine:3.24 AS runtime
 
 # wget (busybox) backs the container healthcheck; ca-certificates keeps
 # outbound TLS usable.
-RUN apk add --no-cache ca-certificates \
+RUN apk add --no-cache ca-certificates chromium font-noto \
     && adduser -D -u 10001 app
 
 COPY --from=build /out/server /usr/local/bin/server

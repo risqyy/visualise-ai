@@ -157,6 +157,21 @@ also retain screenshots of overlapping scopes and selected removal under their
 Playwright test output directory. `E2E_SKIP_COMPOSE=1` is only for a deliberately
 prepared stack, never evidence that a fresh full acceptance deployment passed.
 
+## Native MCP images (#81)
+
+`tests/16-native-render.spec.ts` uses the production native render entry and
+the official MCP client. It checks empty views, valid self relationships,
+partially clipped unfolded bundles, one actual PNG at the requested pixel
+dimensions, model/view revision conflicts and structured domain errors. The
+first MCP image is requested with no user page; a later request preserves an
+open user's camera and selection. The flow reads, renders, corrects one known
+component label and renders again, then explicitly finishes the run.
+
+Successful outputs retain the before/after PNGs, native regression screenshots
+and a measurement attachment with sample count, model size, viewport/detail and
+execution conditions. Run with `npx playwright test 16-native-render.spec.ts`;
+the default full suite includes it automatically.
+
 ## Native architecture view acceptance (#82)
 
 `tests/16-native-views.spec.ts` creates an isolated project through the official

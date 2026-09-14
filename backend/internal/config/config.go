@@ -32,6 +32,8 @@ type Config struct {
 	MCPAllowedOrigins []string
 	MCPRequestTimeout time.Duration
 	MCPSessionTimeout time.Duration
+	RenderEntryURL    string
+	RenderBrowserPath string
 }
 
 // Default values are chosen so that `docker compose up` works unconfigured.
@@ -79,6 +81,8 @@ func Load() (Config, error) {
 	}
 
 	cfg.MCPAllowedHosts = strings.Split(envString("MCP_ALLOWED_HOSTS", "localhost:8080,127.0.0.1:8080,[::1]:8080"), ",")
+	cfg.RenderEntryURL = envString("RENDER_ENTRY_URL", "")
+	cfg.RenderBrowserPath = envString("RENDER_BROWSER_PATH", "/usr/bin/chromium")
 	cfg.MCPAllowedOrigins = strings.Split(envString("MCP_ALLOWED_ORIGINS", "http://localhost:8080,http://127.0.0.1:8080,http://[::1]:8080"), ",")
 	for i := range cfg.MCPAllowedHosts {
 		cfg.MCPAllowedHosts[i] = strings.TrimSpace(cfg.MCPAllowedHosts[i])

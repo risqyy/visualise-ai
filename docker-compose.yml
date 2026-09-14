@@ -28,6 +28,10 @@ services:
     # No `ports:` on purpose — PostgreSQL stays internal.
 
   backend:
+    security_opt:
+      - seccomp=./deploy/chromium/seccomp-profile.json
+    init: true
+    shm_size: 256mb
     build:
       context: ./backend
       args:
@@ -46,6 +50,8 @@ services:
       MCP_ALLOWED_ORIGINS: ${MCP_ALLOWED_ORIGINS:-http://localhost:${FRONTEND_HTTP_PORT:-8080},http://127.0.0.1:${FRONTEND_HTTP_PORT:-8080},http://[::1]:${FRONTEND_HTTP_PORT:-8080}}
       MCP_REQUEST_TIMEOUT: ${MCP_REQUEST_TIMEOUT:-45s}
       MCP_SESSION_TIMEOUT: ${MCP_SESSION_TIMEOUT:-5m}
+      RENDER_ENTRY_URL: http://frontend:8080/render.html
+      RENDER_BROWSER_PATH: /usr/bin/chromium
     depends_on:
       postgres:
         condition: service_healthy

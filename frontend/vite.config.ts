@@ -29,6 +29,12 @@ export default defineConfig({
   build: {
     outDir: 'dist',
     sourcemap: false,
+    rollupOptions: {
+      input: {
+        app: fileURLToPath(new URL('./index.html', import.meta.url)),
+        render: fileURLToPath(new URL('./render.html', import.meta.url)),
+      },
+    },
   },
   test: {
     environment: 'jsdom',

@@ -1,6 +1,8 @@
 import { useStore } from '@xyflow/react'
+import { useContext } from 'react'
 
 import { detailLevelForZoom, type DetailLevel } from './detailLevel'
+import { DetailOverrideContext } from './detailOverride'
 
 /**
  * The current detail level, derived from the canvas zoom.
@@ -12,5 +14,6 @@ import { detailLevelForZoom, type DetailLevel } from './detailLevel'
  * something different.
  */
 export function useDetailLevel(): DetailLevel {
-  return useStore((state) => detailLevelForZoom(state.transform[2]))
+  const override = useContext(DetailOverrideContext)
+  return useStore((state) => override ?? detailLevelForZoom(state.transform[2]))
 }
