@@ -91,7 +91,7 @@ func run() error {
 		if err != nil {
 			return err
 		}
-		renderer = render.New(store.New(db), browser)
+		renderer = render.New(store.New(db), browser, logger)
 		toolOptions.Renderer = renderer
 		defer func() {
 			cleanup, cancel := context.WithTimeout(context.Background(), cfg.ShutdownTimeout)

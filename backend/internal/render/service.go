@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/risqyy/visualise-ai/backend/internal/store"
+	"github.com/rs/zerolog"
 )
 
 const MaxImageBytes = 4 * 1024 * 1024
@@ -65,6 +66,7 @@ type Browser interface {
 	Paint(context.Context, store.ViewSnapshot, Request) ([]byte, Painting, error)
 }
 type Service struct {
+	logger   zerolog.Logger
 	timeout  time.Duration
 	provider SnapshotProvider
 	browser  Browser
@@ -76,8 +78,12 @@ type Service struct {
 	done     chan struct{}
 }
 
-func New(provider SnapshotProvider, browser Browser) *Service {
-	return &Service{provider: provider, browser: browser, timeout: Deadline, slots: make(chan struct{}, 2), active: map[uint64]context.CancelFunc{}, done: make(chan struct{})}
+func New(provider SnapshotProvider, browser Browser, loggers ...zerolog.Logger) *Service {
+	logger := zerolog.Nop()
+	if len(loggers) > 0 {
+		logger = loggers[0]
+	}
+	return &Service{logger: logger, provider: provider, browser: browser, timeout: Deadline, slots: make(chan struct{}, 2), active: map[uint64]context.CancelFunc{}, done: make(chan struct{})}
 }
 func fail(code, detail string) error { return &store.DomainError{Code: code, Detail: detail} }
 func (s *Service) Render(parent context.Context, request Request) (Result, error) {
@@ -126,6 +132,13 @@ func (s *Service) Render(parent context.Context, request Request) (Result, error
 	}
 	data, painting, err := s.browser.Paint(ctx, snapshot, request)
 	if err != nil {
+		// Keep operational diagnostics server-side. Do not attach the captured
+		// model, request, project/context IDs or browser protocol traffic.
+		detail := []rune(err.Error())
+		if len(detail) > 4096 {
+			detail = append(detail[:4096], []rune(" [truncated]")...)
+		}
+		s.logger.Error().Str("error", string(detail)).Msg("native render failed")
 		return Result{}, renderError(ctx, parent, err)
 	}
 	if err = ctx.Err(); err != nil {

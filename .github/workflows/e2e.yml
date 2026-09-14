@@ -39,6 +39,9 @@ jobs:
       # exercised. Locally the suite defaults to 8100.
       FRONTEND_HTTP_PORT: '8080'
       E2E_COMPOSE_PROJECT: vai-e2e-ci
+      # Retain containers until failure logs have been collected below.
+      # Global setup still starts from an empty database on every run.
+      E2E_KEEP_STACK: '1'
 
     steps:
       - uses: actions/checkout@v5
@@ -97,3 +100,7 @@ jobs:
       - name: Dump the deployment logs on failure
         if: failure()
         run: docker compose -p "${E2E_COMPOSE_PROJECT}" logs --no-color --tail 400 || true
+
+      - name: Remove the acceptance deployment
+        if: always()
+        run: docker compose -p "${E2E_COMPOSE_PROJECT}" down -v --remove-orphans

@@ -62,12 +62,17 @@ func (b *Chromium) Paint(ctx context.Context, snapshot store.ViewSnapshot, reque
 	})
 	var painting Painting
 	var png []byte
+	// Separate allocation so launch/sandbox failures cannot be mistaken for
+	// native frontend failures. chromedp includes Chromium's startup stderr.
+	if err := chromedp.Run(browser); err != nil {
+		return nil, Painting{}, fmt.Errorf("start Chromium: %w", err)
+	}
 	err := chromedp.Run(browser,
-		emulation.SetDeviceMetricsOverride(request.Viewport.Width, request.Viewport.Height, float64(request.Viewport.PixelRatio), false),
-		fetch.Enable().WithPatterns([]*fetch.RequestPattern{{URLPattern: "*"}}),
-		chromedp.Navigate(b.entry),
-		chromedp.Poll("typeof window.visualiseRender === 'function'", nil),
-		chromedp.ActionFunc(func(ctx context.Context) error {
+		renderStage("configure viewport and network", emulation.SetDeviceMetricsOverride(request.Viewport.Width, request.Viewport.Height, float64(request.Viewport.PixelRatio), false),
+			fetch.Enable().WithPatterns([]*fetch.RequestPattern{{URLPattern: "*"}})),
+		renderStage("navigate native entry", chromedp.Navigate(b.entry)),
+		renderStage("wait for native entry", chromedp.Poll("typeof window.visualiseRender === 'function'", nil)),
+		renderStage("paint captured snapshot", chromedp.ActionFunc(func(ctx context.Context) error {
 			captured, err := json.Marshal(snapshot)
 			if err != nil {
 				return err
@@ -94,12 +99,21 @@ func (b *Chromium) Paint(ctx context.Context, snapshot store.ViewSnapshot, reque
 				return fmt.Errorf("native render entry failed: %s", exception.Text)
 			}
 			return json.Unmarshal(result.Value, &painting)
-		}),
-		chromedp.ActionFunc(func(ctx context.Context) error {
+		})),
+		renderStage("capture PNG", chromedp.ActionFunc(func(ctx context.Context) error {
 			var err error
 			png, err = page.CaptureScreenshot().WithFormat(page.CaptureScreenshotFormatPng).WithCaptureBeyondViewport(false).WithFromSurface(true).Do(ctx)
 			return err
-		}),
+		})),
 	)
 	return png, painting, err
+}
+
+func renderStage(name string, actions ...chromedp.Action) chromedp.Action {
+	return chromedp.ActionFunc(func(ctx context.Context) error {
+		if err := (chromedp.Tasks(actions)).Do(ctx); err != nil {
+			return fmt.Errorf("%s: %w", name, err)
+		}
+		return nil
+	})
 }

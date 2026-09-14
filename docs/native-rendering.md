@@ -117,6 +117,14 @@ paint and screenshot; expiry gets `render_timeout`, explicit cancellation
 gets `cancelled`. Size overflow gets `response_too_large`; reduce scope,
 viewport or pixel ratio. Layout/browser failure gets `render_failed`.
 
+The backend logs the failing browser stage and a bounded underlying error for
+operators, while the MCP response retains its generic structured error. These
+diagnostics do not attach the request, captured model or context IDs. Preserve
+backend logs before removing a failed deployment: startup stderr can distinguish
+a Chromium launch/sandbox restriction from entry loading, native painting or
+PNG capture failures. A frontend browser test alone does not exercise the
+backend container's Chromium process.
+
 The tested runtime is nonroot Alpine 3.24, Chromium 152.0.7977.82, Noto fonts
 and chromedp 0.14.2. It requires only the GPU-specific sandbox workaround
 documented in [ADR 0034](decisions/0034-native-headless-view-rendering.md).

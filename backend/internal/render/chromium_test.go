@@ -3,11 +3,40 @@ package render
 import (
 	"context"
 	"encoding/json"
+	"errors"
+	"fmt"
+	"github.com/chromedp/chromedp"
 	"github.com/risqyy/visualise-ai/backend/internal/store"
 	"os"
+	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 )
+
+func TestChromiumLaunchFailureIdentifiesStage(t *testing.T) {
+	browser, err := NewChromium(filepath.Join(t.TempDir(), "missing-chromium"), "http://frontend:8080/render.html")
+	if err != nil {
+		t.Fatal(err)
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	defer cancel()
+	_, _, err = browser.Paint(ctx, snapshotFixture(), requestFixture())
+	if err == nil || !strings.HasPrefix(err.Error(), "start Chromium: ") {
+		t.Fatalf("missing launch diagnostic: %v", err)
+	}
+}
+
+func TestRenderStagePreservesCauseAndStops(t *testing.T) {
+	cause := fmt.Errorf("native failure")
+	err := renderStage("paint captured snapshot", chromedp.ActionFunc(func(context.Context) error { return cause }), chromedp.ActionFunc(func(context.Context) error {
+		t.Fatal("ran after failed action")
+		return nil
+	})).Do(context.Background())
+	if !errors.Is(err, cause) || err.Error() != "paint captured snapshot: native failure" {
+		t.Fatal(err)
+	}
+}
 
 // Opt-in real Chromium test, run in the shipped Linux runtime against the
 // production frontend. Unit suites never silently substitute a fake browser.

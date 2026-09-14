@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"github.com/risqyy/visualise-ai/backend/internal/store"
+	"github.com/rs/zerolog"
 	"image"
 	"image/png"
 	"strings"
@@ -233,6 +234,34 @@ func TestNativeEntryNetworkAllowlist(t *testing.T) {
 	for _, raw := range []string{"file:///tmp/render.html", "http://frontend:8080/", "http://user:password@frontend/render.html", "http://frontend/render.html?x=1"} {
 		if _, err = NewChromium("chromium", raw); err == nil {
 			t.Fatal(raw)
+		}
+	}
+}
+
+func TestBrowserFailureDiagnosticIsBoundedAndServerOnly(t *testing.T) {
+	var output bytes.Buffer
+	detail := "start Chromium: launch denied " + strings.Repeat("x", 5000)
+	s := New(providerFixture(), browserFunc(func(context.Context, store.ViewSnapshot, Request) ([]byte, Painting, error) {
+		return nil, Painting{}, errors.New(detail)
+	}), zerolog.New(&output))
+	_, err := s.Render(context.Background(), requestFixture())
+	code(t, err, "render_failed")
+	if strings.Contains(err.Error(), "launch denied") {
+		t.Fatal("browser diagnostic leaked to client", err)
+	}
+	var event map[string]any
+	if err := json.Unmarshal(output.Bytes(), &event); err != nil {
+		t.Fatal(err)
+	}
+	if event["message"] != "native render failed" || !strings.HasPrefix(event["error"].(string), "start Chromium: launch denied") || !strings.HasSuffix(event["error"].(string), " [truncated]") {
+		t.Fatal(event)
+	}
+	if len([]rune(event["error"].(string))) != 4096+len(" [truncated]") || len(event) != 3 {
+		t.Fatal("diagnostic exceeded bound or attached unexpected fields", event)
+	}
+	for _, private := range []string{"project-aa", "view-aa", "Before capture"} {
+		if strings.Contains(output.String(), private) {
+			t.Fatal("request or snapshot was logged", private)
 		}
 	}
 }
