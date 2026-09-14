@@ -35,6 +35,7 @@ interface Request {
   route: readonly LayoutPoint[]
   ratio: number
   compact: boolean
+  width?: number | undefined
 }
 
 function intersects(first: Box, second: Box): boolean {
@@ -125,8 +126,8 @@ export function placeEdgeLabels(
     if (!route.length) continue
     const bundled = resolved.length > 1
     const unfolded = bundled && options.detailLevel !== 'minimal' && expanded.has(edge.id)
-    const add = (key: string, labelRoute: readonly LayoutPoint[], ratio: number, compact = false) => {
-      requests.push({ edgeId: edge.id, key, route: labelRoute, ratio, compact })
+    const add = (key: string, labelRoute: readonly LayoutPoint[], ratio: number, compact = false, width?: number) => {
+      requests.push({ edgeId: edge.id, key, route: labelRoute, ratio, compact, width })
     }
     if (unfolded) {
       for (const [index, entry] of resolved.entries()) {
@@ -142,7 +143,10 @@ export function placeEdgeLabels(
       add('collapse', route, 0.12, true)
     } else {
       if (bundled || options.detailLevel === 'standard' || options.detailLevel === 'full') {
-        add('badge', route, edge.data.labelRatio ?? 0.5, options.detailLevel === 'minimal')
+        const singleKind = new Set(resolved.map((entry) => entry.relationship.kind)).size === 1
+        const bundleWidth = bundled && singleKind && options.detailLevel !== 'minimal'
+          ? Math.min(EDGE_LABEL_MAX_WIDTH, 72 + String(resolved.length).length * 8) : undefined
+        add('badge', route, edge.data.labelRatio ?? 0.5, options.detailLevel === 'minimal', bundleWidth)
       }
       if (Object.keys(edge.data.overlays).length) add('overlay', route, 0.74, options.detailLevel === 'minimal')
     }
@@ -155,8 +159,9 @@ export function placeEdgeLabels(
   for (const request of requests) {
     // The collapse action includes the member count; unlike the map icon it
     // needs room for several digits as well as its minimum pointer target.
-    const baseWidth = request.key === 'collapse' ? 80
+    const baseWidth = request.width ?? (request.key === 'collapse' ? 80
       : request.compact ? EDGE_LABEL_HIT_SIZE : EDGE_LABEL_MAX_WIDTH
+    )
     const width = Math.max(baseWidth, baseWidth / zoom) + gap
     const rect = (point: LayoutPoint): Box => ({
       left: point.x - width / 2,

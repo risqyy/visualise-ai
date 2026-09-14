@@ -38,6 +38,15 @@ function expectSeparate(positions: readonly LayoutPoint[], zoom: number) {
 }
 
 describe('shared edge label placement', () => {
+  it('keeps a short bundle count in the corridor instead of reserving a long description', () => {
+    const graph = fixture(3)
+    graph.nodes[0]!.position = { x: 0, y: 0 }
+    graph.nodes[1]!.position = { x: 318, y: 0 }
+    const edge = graph.edges[0]!
+    edge.data!.route = [{ x: 228, y: 48 }, { x: 318, y: 48 }]
+    const badge = placeEdgeLabels(graph.edges, graph.nodes, { detailLevel: 'standard', zoom: 1 }).get(edge.id)!.badge
+    expect(badge).toEqual({ x: 273, y: 48 })
+  })
   it.each(['top-down', 'left-right'] as const)('separates dense long labels for %s routes', (orientation) => {
     const graph = fixture(1)
     const template = graph.edges[0] as ArchitectureEdge
