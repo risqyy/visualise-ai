@@ -1210,6 +1210,9 @@ components:
         - retraction.issued
         - run.finished
         - model.mutation_applied
+        - work.scope_reported
+        - work.reported
+        - context.opened
 
     ChangeOperation:
       type: string
@@ -2216,6 +2219,9 @@ components:
         - $ref: '#/components/schemas/RetractionIssuedEvent'
         - $ref: '#/components/schemas/RunFinishedEvent'
         - $ref: '#/components/schemas/ModelMutationAppliedEvent'
+        - $ref: '#/components/schemas/WorkScopeReportedEvent'
+        - $ref: '#/components/schemas/WorkReportedEvent'
+        - $ref: '#/components/schemas/ContextOpenedEvent'
       discriminator:
         propertyName: type
         mapping:
@@ -2240,6 +2246,9 @@ components:
           retraction.issued: '#/components/schemas/RetractionIssuedEvent'
           run.finished: '#/components/schemas/RunFinishedEvent'
           model.mutation_applied: '#/components/schemas/ModelMutationAppliedEvent'
+          work.scope_reported: '#/components/schemas/WorkScopeReportedEvent'
+          work.reported: '#/components/schemas/WorkReportedEvent'
+          context.opened: '#/components/schemas/ContextOpenedEvent'
 
     # ---------------------------------------------------------------------------
     # Streaming envelopes
@@ -2576,6 +2585,9 @@ components:
         - $ref: '#/components/schemas/StreamedRetractionIssuedEvent'
         - $ref: '#/components/schemas/StreamedRunFinishedEvent'
         - $ref: '#/components/schemas/StreamedModelMutationAppliedEvent'
+        - $ref: '#/components/schemas/StreamedWorkScopeReportedEvent'
+        - $ref: '#/components/schemas/StreamedWorkReportedEvent'
+        - $ref: '#/components/schemas/StreamedContextOpenedEvent'
       discriminator:
         propertyName: type
         mapping:
@@ -2600,6 +2612,9 @@ components:
           retraction.issued: '#/components/schemas/StreamedRetractionIssuedEvent'
           run.finished: '#/components/schemas/StreamedRunFinishedEvent'
           model.mutation_applied: '#/components/schemas/StreamedModelMutationAppliedEvent'
+          work.scope_reported: '#/components/schemas/StreamedWorkScopeReportedEvent'
+          work.reported: '#/components/schemas/StreamedWorkReportedEvent'
+          context.opened: '#/components/schemas/StreamedContextOpenedEvent'
 
     # ---------------------------------------------------------------------------
     # Responses
@@ -3376,6 +3391,16 @@ components:
         `progress` stays `null` until the agent reported a number, and `finishedOutcome` stays
         `null` until `agent.finished`. Silence changes nothing.
       properties:
+        workScope:
+          oneOf:
+            - $ref: '#/components/schemas/MV_Scope'
+            - type: 'null'
+        workScopePosition:
+          oneOf:
+            - $ref: '#/components/schemas/MV_Revision'
+            - type: 'null'
+        missingScopeReferences:
+          $ref: '#/components/schemas/MV_Scope'
         agentId:
           $ref: '#/components/schemas/AgentId'
         runId:
@@ -3453,6 +3478,8 @@ components:
         Body of `GET /api/v1/projects/{projectId}/runs/{runId}/agents`. Flat, ordered so a
         parent precedes the subagents it spawned.
       properties:
+        modelRevision:
+          $ref: '#/components/schemas/MV_Revision'
         projectPosition:
           $ref: '#/components/schemas/ProjectPosition'
         agents:
@@ -5222,7 +5249,7 @@ components:
         - retraction.issued
         - run.finished
     ModelMutationAppliedEvent:
-      description: Atomic model mutation command, generated from contract 2.0.0.
+      description: model.mutation_applied command, generated from contract 2.0.0.
       type: object
       required:
         - schemaVersion
@@ -5257,7 +5284,7 @@ components:
         payload:
           $ref: "#/components/schemas/MV_ModelMutationPayload"
     StreamedModelMutationAppliedEvent:
-      description: Atomic model mutation command, generated from contract 2.0.0.
+      description: model.mutation_applied command, generated from contract 2.0.0.
       type: object
       required:
         - schemaVersion
@@ -5294,6 +5321,306 @@ components:
           const: model.mutation_applied
         payload:
           $ref: "#/components/schemas/MV_ModelMutationPayload"
+        position:
+          type: integer
+          minimum: 1
+        serverEventId:
+          $ref: "#/components/schemas/Uuid"
+        receivedAt:
+          $ref: "#/components/schemas/Timestamp"
+    ContextOpenedEvent:
+      description: context.opened command, generated from contract 2.0.0.
+      type: object
+      required:
+        - schemaVersion
+        - clientEventId
+        - projectId
+        - runId
+        - agentId
+        - parentAgentId
+        - occurredAt
+        - type
+        - payload
+      additionalProperties: false
+      properties:
+        schemaVersion:
+          const: "2.0"
+        clientEventId:
+          $ref: "#/components/schemas/MV_Uuid"
+        projectId:
+          $ref: "#/components/schemas/MV_ProjectId"
+        runId:
+          $ref: "#/components/schemas/MV_RunId"
+        agentId:
+          $ref: "#/components/schemas/MV_AgentId"
+        parentAgentId:
+          oneOf:
+            - $ref: "#/components/schemas/MV_AgentId"
+            - type: "null"
+        occurredAt:
+          $ref: "#/components/schemas/MV_Timestamp"
+        type:
+          const: context.opened
+        payload:
+          type: object
+          required:
+            - role
+            - displayName
+            - assignedTask
+          additionalProperties: false
+          properties:
+            role:
+              enum:
+                - orchestrator
+                - subagent
+            displayName:
+              type: string
+              minLength: 1
+              maxLength: 200
+            assignedTask:
+              type: string
+              minLength: 1
+              maxLength: 4000
+    StreamedContextOpenedEvent:
+      description: context.opened command, generated from contract 2.0.0.
+      type: object
+      required:
+        - schemaVersion
+        - clientEventId
+        - projectId
+        - runId
+        - agentId
+        - parentAgentId
+        - occurredAt
+        - type
+        - payload
+        - position
+        - serverEventId
+        - receivedAt
+      additionalProperties: false
+      properties:
+        schemaVersion:
+          const: "2.0"
+        clientEventId:
+          $ref: "#/components/schemas/MV_Uuid"
+        projectId:
+          $ref: "#/components/schemas/MV_ProjectId"
+        runId:
+          $ref: "#/components/schemas/MV_RunId"
+        agentId:
+          $ref: "#/components/schemas/MV_AgentId"
+        parentAgentId:
+          oneOf:
+            - $ref: "#/components/schemas/MV_AgentId"
+            - type: "null"
+        occurredAt:
+          $ref: "#/components/schemas/MV_Timestamp"
+        type:
+          const: context.opened
+        payload:
+          type: object
+          required:
+            - role
+            - displayName
+            - assignedTask
+          additionalProperties: false
+          properties:
+            role:
+              enum:
+                - orchestrator
+                - subagent
+            displayName:
+              type: string
+              minLength: 1
+              maxLength: 200
+            assignedTask:
+              type: string
+              minLength: 1
+              maxLength: 4000
+        position:
+          type: integer
+          minimum: 1
+        serverEventId:
+          $ref: "#/components/schemas/Uuid"
+        receivedAt:
+          $ref: "#/components/schemas/Timestamp"
+    WorkReportedEvent:
+      description: work.reported command, generated from contract 2.0.0.
+      type: object
+      required:
+        - schemaVersion
+        - clientEventId
+        - projectId
+        - runId
+        - agentId
+        - parentAgentId
+        - occurredAt
+        - type
+        - payload
+      additionalProperties: false
+      properties:
+        schemaVersion:
+          const: "2.0"
+        clientEventId:
+          $ref: "#/components/schemas/MV_Uuid"
+        projectId:
+          $ref: "#/components/schemas/MV_ProjectId"
+        runId:
+          $ref: "#/components/schemas/MV_RunId"
+        agentId:
+          $ref: "#/components/schemas/MV_AgentId"
+        parentAgentId:
+          oneOf:
+            - $ref: "#/components/schemas/MV_AgentId"
+            - type: "null"
+        occurredAt:
+          $ref: "#/components/schemas/MV_Timestamp"
+        type:
+          const: work.reported
+        payload:
+          type: object
+          required:
+            - report
+          additionalProperties: false
+          properties:
+            report:
+              $ref: "#/components/schemas/MV_WorkReport"
+    StreamedWorkReportedEvent:
+      description: work.reported command, generated from contract 2.0.0.
+      type: object
+      required:
+        - schemaVersion
+        - clientEventId
+        - projectId
+        - runId
+        - agentId
+        - parentAgentId
+        - occurredAt
+        - type
+        - payload
+        - position
+        - serverEventId
+        - receivedAt
+      additionalProperties: false
+      properties:
+        schemaVersion:
+          const: "2.0"
+        clientEventId:
+          $ref: "#/components/schemas/MV_Uuid"
+        projectId:
+          $ref: "#/components/schemas/MV_ProjectId"
+        runId:
+          $ref: "#/components/schemas/MV_RunId"
+        agentId:
+          $ref: "#/components/schemas/MV_AgentId"
+        parentAgentId:
+          oneOf:
+            - $ref: "#/components/schemas/MV_AgentId"
+            - type: "null"
+        occurredAt:
+          $ref: "#/components/schemas/MV_Timestamp"
+        type:
+          const: work.reported
+        payload:
+          type: object
+          required:
+            - report
+          additionalProperties: false
+          properties:
+            report:
+              $ref: "#/components/schemas/MV_WorkReport"
+        position:
+          type: integer
+          minimum: 1
+        serverEventId:
+          $ref: "#/components/schemas/Uuid"
+        receivedAt:
+          $ref: "#/components/schemas/Timestamp"
+    WorkScopeReportedEvent:
+      description: work.scope_reported command, generated from contract 2.0.0.
+      type: object
+      required:
+        - schemaVersion
+        - clientEventId
+        - projectId
+        - runId
+        - agentId
+        - parentAgentId
+        - occurredAt
+        - type
+        - payload
+      additionalProperties: false
+      properties:
+        schemaVersion:
+          const: "2.0"
+        clientEventId:
+          $ref: "#/components/schemas/MV_Uuid"
+        projectId:
+          $ref: "#/components/schemas/MV_ProjectId"
+        runId:
+          $ref: "#/components/schemas/MV_RunId"
+        agentId:
+          $ref: "#/components/schemas/MV_AgentId"
+        parentAgentId:
+          oneOf:
+            - $ref: "#/components/schemas/MV_AgentId"
+            - type: "null"
+        occurredAt:
+          $ref: "#/components/schemas/MV_Timestamp"
+        type:
+          const: work.scope_reported
+        payload:
+          type: object
+          required:
+            - scope
+          additionalProperties: false
+          properties:
+            scope:
+              $ref: "#/components/schemas/MV_Scope"
+    StreamedWorkScopeReportedEvent:
+      description: work.scope_reported command, generated from contract 2.0.0.
+      type: object
+      required:
+        - schemaVersion
+        - clientEventId
+        - projectId
+        - runId
+        - agentId
+        - parentAgentId
+        - occurredAt
+        - type
+        - payload
+        - position
+        - serverEventId
+        - receivedAt
+      additionalProperties: false
+      properties:
+        schemaVersion:
+          const: "2.0"
+        clientEventId:
+          $ref: "#/components/schemas/MV_Uuid"
+        projectId:
+          $ref: "#/components/schemas/MV_ProjectId"
+        runId:
+          $ref: "#/components/schemas/MV_RunId"
+        agentId:
+          $ref: "#/components/schemas/MV_AgentId"
+        parentAgentId:
+          oneOf:
+            - $ref: "#/components/schemas/MV_AgentId"
+            - type: "null"
+        occurredAt:
+          $ref: "#/components/schemas/MV_Timestamp"
+        type:
+          const: work.scope_reported
+        payload:
+          type: object
+          required:
+            - scope
+          additionalProperties: false
+          properties:
+            scope:
+              $ref: "#/components/schemas/MV_Scope"
         position:
           type: integer
           minimum: 1

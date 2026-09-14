@@ -40,6 +40,14 @@ func (p *Projector) Apply(tx *gorm.DB, ev *Event) error {
 
 func (p *Projector) applyPayload(tx *gorm.DB, ev *Event, evType string, payload []byte, depth int) error {
 	switch evType {
+	case TypeContextOpened, TypeWorkReported:
+		effective, err := EffectiveWork(Envelope{Type: evType, Payload: payload})
+		if err != nil {
+			return err
+		}
+		return p.applyPayload(tx, ev, effective.Type, effective.Payload, depth)
+	case TypeWorkScopeReported:
+		return applyWorkScope(tx, ev, payload)
 	case TypeModelMutationApplied:
 		return applyModelMutation(tx, ev, payload)
 	case TypeAgentStarted:
@@ -363,6 +371,7 @@ func applyWorkStepStarted(tx *gorm.DB, ev *Event, payload []byte) error {
 	for _, id := range normaliseIDs(p.ComponentIDs) {
 		link := &WorkStepComponent{
 			ProjectID:                  ev.ProjectID,
+			RunID:                      ev.RunID,
 			WorkStepID:                 p.WorkStepID,
 			ComponentID:                id,
 			LastAppliedProjectPosition: ev.Position,
@@ -934,5 +943,5 @@ var (
 	diffComponentKey     = cols("project_id", "diff_id", "component_id")
 	riskComponentKey     = cols("project_id", "risk_id", "component_id")
 	problemComponentKey  = cols("project_id", "problem_id", "component_id")
-	workStepComponentKey = cols("project_id", "work_step_id", "component_id")
+	workStepComponentKey = cols("project_id", "run_id", "work_step_id", "component_id")
 )

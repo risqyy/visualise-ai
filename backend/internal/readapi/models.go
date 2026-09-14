@@ -2,6 +2,7 @@ package readapi
 
 import (
 	"encoding/json"
+	"github.com/risqyy/visualise-ai/backend/internal/store"
 	"time"
 )
 
@@ -183,14 +184,18 @@ type RunCounts struct {
 // tree. A flat list keeps arbitrarily deep spawn chains renderable without the
 // server deciding on a nesting depth.
 type AgentsResponse struct {
+	ModelRevision   int64   `json:"modelRevision"`
 	ProjectPosition int64   `json:"projectPosition"`
 	Agents          []Agent `json:"agents"`
 }
 
 // Agent is one node of the agent tree of a run.
 type Agent struct {
-	AgentID string `json:"agentId"`
-	RunID   string `json:"runId"`
+	WorkScope              *store.AffectedIDs `json:"workScope,omitempty"`
+	WorkScopePosition      *int64             `json:"workScopePosition,omitempty"`
+	MissingScopeReferences *store.AffectedIDs `json:"missingScopeReferences,omitempty"`
+	AgentID                string             `json:"agentId"`
+	RunID                  string             `json:"runId"`
 	// ParentAgentID is null for the root orchestrator.
 	ParentAgentID *string `json:"parentAgentId"`
 	Role          string  `json:"role"`

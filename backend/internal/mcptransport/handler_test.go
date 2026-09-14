@@ -295,7 +295,24 @@ func TestPublishedEndpoint(t *testing.T) {
 		return string(body)
 	}
 	before := read()
-	assertEmptyRegistry(t, endpoint)
+	session := clientSession(t, endpoint)
+	list, err := session.ListTools(context.Background(), nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	seen := map[string]bool{}
+	for _, tool := range list.Tools {
+		seen[tool.Name] = true
+	}
+	for _, name := range []string{"visualise_discover", "visualise_projects_list", "visualise_model_read", "visualise_element_get", "visualise_context_read", "visualise_context_open", "visualise_work_report", "visualise_work_scope_set", "visualise_model_mutate"} {
+		if !seen[name] {
+			t.Fatalf("missing implemented tool %s", name)
+		}
+	}
+	discovery, err := session.CallTool(context.Background(), &mcp.CallToolParams{Name: "visualise_discover", Arguments: map[string]any{}})
+	if err != nil || discovery.IsError {
+		t.Fatalf("discovery %v %v", discovery, err)
+	}
 	if after := read(); after != before {
 		t.Fatalf("MCP connection changed domain state: before %s after %s", before, after)
 	}

@@ -237,6 +237,12 @@ export function affectedQueryKeys(event: StreamedEvent, depth = 0): QueryKey[] {
   const run = event.runId
 
   switch (event.type) {
+    case 'context.opened':
+      return [queryKeys.agents(project, run), queryKeys.runs(project), queryKeys.projectDetail(project)]
+    case 'work.scope_reported':
+      return [queryKeys.agents(project, run)]
+    case 'work.reported':
+      return [queryKeys.agents(project, run), queryKeys.components(project), queryKeys.runDetail(project, run), queryKeys.runs(project), queryKeys.projectDetail(project)]
     case 'agent.started':
     case 'agent.status_reported':
     case 'agent.progress_reported':

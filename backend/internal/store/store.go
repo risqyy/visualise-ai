@@ -263,7 +263,17 @@ func (s *Store) AppendGuarded(ctx context.Context, env Envelope, guard Guard) (R
 		result.RunID = env.RunID
 		result.AgentID = env.AgentID
 		result.ModelRevision = project.ModelRevision
-		result.Affected = affectedIDs(env.Type, env.Payload)
+		result.Affected, err = workAffected(tx, env)
+		if err != nil {
+			return err
+		}
+		if env.Type == TypeWorkReported || env.Type == TypeWorkScopeReported {
+			for _, id := range result.Affected.ComponentIDs {
+				if err := tx.Clauses(clause.OnConflict{DoNothing: true}).Create(&EventComponent{ProjectID: env.ProjectID, Position: event.Position, ComponentID: id}).Error; err != nil {
+					return err
+				}
+			}
+		}
 		return saveReceipt(tx, env, identity, result)
 	})
 	if err != nil {

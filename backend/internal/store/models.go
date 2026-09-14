@@ -387,6 +387,7 @@ func (ProblemComponent) TableName() string { return "problem_components" }
 
 // WorkStepComponent links a work step to one component.
 type WorkStepComponent struct {
+	RunID                      string `gorm:"column:run_id;type:text;primaryKey"`
 	ProjectID                  string `gorm:"column:project_id;type:text;primaryKey;index:idx_work_step_components_component,priority:1"`
 	WorkStepID                 string `gorm:"column:work_step_id;type:text;primaryKey"`
 	ComponentID                string `gorm:"column:component_id;type:text;primaryKey;index:idx_work_step_components_component,priority:2"`

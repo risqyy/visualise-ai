@@ -477,6 +477,15 @@ func TestEveryCatalogueTypeIsProjected(t *testing.T) {
 	mutation := s.event(parent, nil, TypeModelMutationApplied, `{"expectedModelRevision":3,"operations":[{"op":"component.update","componentId":"shop-platform","set":{"name":"Shop Platform"}}]}`)
 	mutation.SchemaVersion = "2.0"
 	s.append(mutation)
+	for _, command := range []struct{ kind, payload string }{
+		{TypeContextOpened, `{"role":"subagent","displayName":"MCP worker","assignedTask":"Explicit work"}`},
+		{TypeWorkReported, `{"report":{"action":"status","status":"working"}}`},
+		{TypeWorkScopeReported, `{"scope":{"componentIds":[],"relationshipIds":[]}}`},
+	} {
+		env := s.event("mcp-worker", subagent, command.kind, command.payload)
+		env.SchemaVersion = "2.0"
+		s.append(env)
+	}
 	s.emit("subagent-implementer", subagent, TypeAgentFinished, `{"outcome":"completed","summary":"VAT extracted."}`)
 	s.append(s.loadExample("run-finished.json"))
 
@@ -492,8 +501,8 @@ func TestEveryCatalogueTypeIsProjected(t *testing.T) {
 	}
 
 	catalogue := EventTypes()
-	if len(catalogue) != 21 {
-		t.Fatalf("the catalogue has %d types, want 21", len(catalogue))
+	if len(catalogue) != 24 {
+		t.Fatalf("the catalogue has %d types, want 24", len(catalogue))
 	}
 	for _, evType := range catalogue {
 		if !stored[evType] {

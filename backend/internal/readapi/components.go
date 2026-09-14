@@ -331,7 +331,7 @@ func (s *Service) currentWorkStep(ctx context.Context, projectID, runID, compone
 	linked := s.db.WithContext(ctx).
 		Model(&store.WorkStepComponent{}).
 		Select("work_step_id").
-		Where("project_id = ? AND component_id = ?", projectID, componentID)
+		Where("project_id = ? AND run_id = ? AND component_id = ?", projectID, runID, componentID)
 
 	var rows []store.WorkStep
 	if err := s.db.WithContext(ctx).
