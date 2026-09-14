@@ -40,6 +40,8 @@ func (p *Projector) Apply(tx *gorm.DB, ev *Event) error {
 
 func (p *Projector) applyPayload(tx *gorm.DB, ev *Event, evType string, payload []byte, depth int) error {
 	switch evType {
+	case TypeModelMutationApplied:
+		return applyModelMutation(tx, ev, payload)
 	case TypeAgentStarted:
 		return applyAgentStarted(tx, ev, payload)
 	case TypeAgentStatusReported:

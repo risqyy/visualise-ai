@@ -88,6 +88,9 @@ func (EventComponent) TableName() string { return "event_components" }
 // It is also the serialisation point of position assignment: every append locks
 // this row before it reads LastPosition.
 type Project struct {
+	ModelRevision            int64 `gorm:"not null;default:0"`
+	ModelActivatedAtPosition *int64
+
 	ProjectID                  string    `gorm:"column:project_id;type:text;primaryKey"`
 	FirstSeenAt                time.Time `gorm:"column:first_seen_at;type:timestamptz;not null"`
 	LastEventAt                time.Time `gorm:"column:last_event_at;type:timestamptz;not null"`

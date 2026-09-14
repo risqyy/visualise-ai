@@ -47,8 +47,8 @@ func TestContractExposesTheClosedCatalogue(t *testing.T) {
 	contract := testContract(t)
 
 	types := contract.EventTypes()
-	if len(types) != 20 {
-		t.Fatalf("want the 20 v0 event types, got %d: %v", len(types), types)
+	if len(types) != 21 {
+		t.Fatalf("want 20 legacy event types and one model command, got %d: %v", len(types), types)
 	}
 	for _, eventType := range types {
 		if !contract.KnowsEventType(eventType) {
@@ -84,18 +84,18 @@ func TestCatalogueMatchesTheStore(t *testing.T) {
 	}
 }
 
-// TestOnlySchemaVersionOneZeroIsAccepted pins the version gate to the contract.
-func TestOnlySchemaVersionOneZeroIsAccepted(t *testing.T) {
+// TestLegacyAndCommandSchemaVersionsAreAccepted pins the version gate to the contract.
+func TestLegacyAndCommandSchemaVersionsAreAccepted(t *testing.T) {
 	contract := testContract(t)
 
 	versions := contract.SchemaVersions()
-	if len(versions) != 1 || versions[0] != "1.0" {
-		t.Fatalf("want exactly the accepted version 1.0, got %v", versions)
+	if len(versions) != 2 || versions[0] != "1.0" || versions[1] != "2.0" {
+		t.Fatalf("want accepted versions 1.0 and 2.0, got %v", versions)
 	}
 	if !contract.AcceptsSchemaVersion("1.0") {
 		t.Error("1.0 must be accepted")
 	}
-	if contract.AcceptsSchemaVersion("2.0") {
-		t.Error("2.0 must not be accepted")
+	if !contract.AcceptsSchemaVersion("2.0") {
+		t.Error("2.0 commands must be accepted")
 	}
 }

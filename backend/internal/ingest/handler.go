@@ -12,7 +12,6 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/rs/zerolog"
-	"gorm.io/gorm"
 
 	"github.com/risqyy/visualise-ai/backend/internal/store"
 )
@@ -131,6 +130,10 @@ func (h *Handler) Ingest(c *gin.Context) {
 	}
 	document, ok := h.decodeBody(c, body)
 	if !ok {
+		return
+	}
+	if document["schemaVersion"] == "2.0" && len(body) > 1048576 {
+		writeProblem(c, http.StatusRequestEntityTooLarge, CodeEventTooLarge, "Command body exceeds the 1 MiB limit.")
 		return
 	}
 	eventType, ok := h.eventType(c, document)
@@ -281,7 +284,15 @@ func (h *Handler) eventType(c *gin.Context, document map[string]any) (string, bo
 // reports it as a field violation together with everything else that is wrong.
 func (h *Handler) checkSchemaVersion(c *gin.Context, document map[string]any) bool {
 	version, ok := document["schemaVersion"].(string)
-	if !ok || h.contract.AcceptsSchemaVersion(version) {
+	eventType, _ := document["type"].(string)
+	accepted := h.contract.AcceptsSchemaVersion(version)
+	if eventType != store.TypeModelMutationApplied && version != "1.0" {
+		accepted = false
+	}
+	if eventType == store.TypeModelMutationApplied && version != "2.0" {
+		accepted = false
+	}
+	if !ok || accepted {
 		return true
 	}
 	writeValidationProblem(c, http.StatusBadRequest, CodeUnsupportedSchemaVersion,
@@ -337,15 +348,16 @@ func (h *Handler) buildEvent(c *gin.Context, body []byte) (acceptedEvent, bool) 
 
 	return acceptedEvent{
 		envelope: store.Envelope{
-			ProjectID:     envelope.ProjectID,
-			ClientEventID: envelope.ClientEventID,
-			RunID:         envelope.RunID,
-			AgentID:       envelope.AgentID,
-			ParentAgentID: envelope.ParentAgentID,
-			Type:          envelope.Type,
-			SchemaVersion: envelope.SchemaVersion,
-			OccurredAt:    occurredAt.UTC(),
-			Payload:       envelope.Payload,
+			ProjectID:      envelope.ProjectID,
+			ClientEventID:  envelope.ClientEventID,
+			RunID:          envelope.RunID,
+			AgentID:        envelope.AgentID,
+			ParentAgentID:  envelope.ParentAgentID,
+			Type:           envelope.Type,
+			SchemaVersion:  envelope.SchemaVersion,
+			OccurredAt:     occurredAt.UTC(),
+			OccurredAtText: envelope.OccurredAt,
+			Payload:        envelope.Payload,
 		},
 		role:             role,
 		correctionTarget: correctionTarget,
@@ -391,9 +403,7 @@ func payloadFacts(eventType string, payload json.RawMessage) (role, correctionTa
 func (h *Handler) append(c *gin.Context, event acceptedEvent) {
 	ctx := c.Request.Context()
 
-	result, err := h.store.AppendGuarded(ctx, event.envelope, func(tx *gorm.DB, env store.Envelope) error {
-		return checkLifecycle(tx, event)
-	})
+	result, err := h.submit(ctx, event.envelope)
 	if err != nil {
 		h.writeAppendError(c, event, err)
 		return
@@ -402,12 +412,12 @@ func (h *Handler) append(c *gin.Context, event acceptedEvent) {
 	status := http.StatusCreated
 	if result.Duplicate {
 		status = http.StatusOK
-	} else {
-		// After the commit and never before: an event reaches a subscriber only
-		// once it is durably part of the log at this exact position.
-		h.publisher.Publish(ctx, committedEvent(event.envelope, result))
 	}
 
+	if event.envelope.SchemaVersion == "2.0" {
+		c.JSON(status, result)
+		return
+	}
 	c.JSON(status, EventAccepted{
 		ProjectID:     result.ProjectID,
 		Position:      result.Position,
@@ -420,6 +430,24 @@ func (h *Handler) append(c *gin.Context, event acceptedEvent) {
 
 // writeAppendError maps a store failure onto its status code.
 func (h *Handler) writeAppendError(c *gin.Context, event acceptedEvent, err error) {
+	var domain *store.DomainError
+	if errors.As(err, &domain) {
+		status := http.StatusUnprocessableEntity
+		if domain.Code == "revision_conflict" {
+			status = http.StatusConflict
+		}
+		if domain.Code == "project_not_found" {
+			status = http.StatusNotFound
+		}
+		if domain.Code == "invalid_input" {
+			status = http.StatusBadRequest
+		}
+		problem := newProblem(status, domain.Code, domain.Detail)
+		problem.CurrentModelRevision = domain.CurrentModelRevision
+		problem.Errors = []FieldError{{Field: domain.Field, Code: domain.Code, Message: domain.Detail}}
+		respond(c, status, problem)
+		return
+	}
 	var lifecycle *LifecycleError
 	if errors.As(err, &lifecycle) {
 		writeProblem(c, http.StatusUnprocessableEntity, lifecycle.Code, lifecycle.Detail)

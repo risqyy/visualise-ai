@@ -71,6 +71,7 @@ type ProjectCounts struct {
 // changes that are still pending (`state: planned`); an applied change has
 // become the model and a retracted one was withdrawn, so neither is active.
 type ArchitectureResponse struct {
+	ModelRevision   int64          `json:"modelRevision"`
 	ProjectPosition int64          `json:"projectPosition"`
 	Components      []Component    `json:"components"`
 	Relationships   []Relationship `json:"relationships"`

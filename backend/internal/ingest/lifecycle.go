@@ -1,6 +1,7 @@
 package ingest
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 
@@ -88,6 +89,18 @@ func checkLifecycle(tx *gorm.DB, ev acceptedEvent) error {
 			env.RunID)
 	}
 
+	if env.Type == store.TypeAgentStarted {
+		_, found, err := loadAgent(tx, env.ProjectID, env.RunID, env.AgentID)
+		if err != nil {
+			return err
+		}
+		if found {
+			return reject("agent_already_started", "agent %q is already registered in run %q", env.AgentID, env.RunID)
+		}
+		if env.ParentAgentID == nil {
+			return reject(CodeParentAgentUnknown, "a non-root agent must have a registered parent")
+		}
+	}
 	// An agent.started introduces its own agent, so it is the one event that
 	// does not require the reporting agent to be known already.
 	if env.Type != store.TypeAgentStarted {
@@ -98,6 +111,10 @@ func checkLifecycle(tx *gorm.DB, ev acceptedEvent) error {
 		if !found {
 			return reject(CodeUnknownAgent,
 				"agent %q never reported agent.started in run %q", env.AgentID, env.RunID)
+		}
+
+		if !sameParent(agent.ParentAgentID, env.ParentAgentID) {
+			return reject(CodeParentAgentUnknown, "reported parent does not match the immutable parent of agent %q", env.AgentID)
 		}
 		if env.Type == store.TypeRunFinished && !isRunOrchestrator(run, agent) {
 			return reject(CodeTerminalEventNotAllowed,
@@ -128,6 +145,9 @@ func checkLifecycle(tx *gorm.DB, ev acceptedEvent) error {
 		}
 	}
 
+	if env.Type == store.TypeCorrectionIssued {
+		return checkEffectiveCorrection(tx, ev)
+	}
 	return nil
 }
 
@@ -177,4 +197,55 @@ func eventExists(tx *gorm.DB, projectID, clientEventID string) (bool, error) {
 		return false, err
 	}
 	return count > 0, nil
+}
+
+func sameParent(a, b *string) bool {
+	return (a == nil && b == nil) || (a != nil && b != nil && *a == *b)
+}
+
+// Corrections use the correcting envelope's reporter/run in the existing
+// projector; validate that exact effective event without reopening closed runs.
+func checkEffectiveCorrection(tx *gorm.DB, ev acceptedEvent) error {
+	var p struct {
+		Type    string          `json:"correctedType"`
+		Payload json.RawMessage `json:"correctedPayload"`
+	}
+	if err := json.Unmarshal(ev.envelope.Payload, &p); err != nil {
+		return err
+	}
+	if p.Type == store.TypeCorrectionIssued || p.Type == store.TypeRetractionIssued {
+		return nil
+	}
+	env := ev.envelope
+	env.Type = p.Type
+	env.Payload = p.Payload
+	run, _, err := loadRun(tx, env.ProjectID, env.RunID)
+	if err != nil {
+		return err
+	}
+	agent, found, err := loadAgent(tx, env.ProjectID, env.RunID, env.AgentID)
+	if err != nil {
+		return err
+	}
+	if !found {
+		return reject(CodeUnknownAgent, "unknown correction reporter")
+	}
+	if p.Type == store.TypeAgentStarted {
+		var start struct {
+			Role string `json:"role"`
+		}
+		if err := json.Unmarshal(p.Payload, &start); err != nil {
+			return err
+		}
+		if !sameParent(agent.ParentAgentID, env.ParentAgentID) || agent.Role != start.Role {
+			return reject("agent_already_started", "a correction cannot change agent parentage or role")
+		}
+		if env.ParentAgentID == nil && (run.RootAgentID != env.AgentID || start.Role != roleOrchestrator) {
+			return reject(CodeRunAlreadyStarted, "a correction cannot replace the run root")
+		}
+	}
+	if p.Type == store.TypeRunFinished && !isRunOrchestrator(run, agent) {
+		return reject(CodeTerminalEventNotAllowed, "only the run root can correct run.finished")
+	}
+	return nil
 }

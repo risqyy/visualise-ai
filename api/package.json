@@ -8,7 +8,9 @@
     "bundle": "redocly bundle openapi.yaml -o dist/openapi.bundled.yaml",
     "validate:examples": "node scripts/validate-examples.mjs",
     "validate:model-view": "node scripts/validate-model-view-contract.mjs",
-    "test": "npm run lint && npm run bundle && npm run validate:examples && npm run validate:model-view"
+    "test": "npm run check:model-contract && npm run lint && npm run bundle && npm run validate:examples && npm run validate:model-view",
+    "generate:model-contract": "node scripts/generate-model-contract.mjs",
+    "check:model-contract": "node scripts/generate-model-contract.mjs --check"
   },
   "devDependencies": {
     "@redocly/cli": "^2.4.0",
