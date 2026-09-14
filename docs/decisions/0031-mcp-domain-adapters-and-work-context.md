@@ -1,5 +1,10 @@
 # 0031 — Shared domain adapters and explicit work context
 
+Current implementation status: the integrated source-built Compose deployment
+implements all 14 tools, including native views and PNG feedback. This ADR
+retains its original decision/delivery context; see [current usage](../mcp-domain-tools.md)
+and [local acceptance](../epic-75-acceptance.md) for present capabilities and evidence.
+
 Status: accepted for local implementation of #79; builds on 0029 and 0030.
 
 MCP registers only implemented catalogue tools. Generate its complete local

@@ -1,5 +1,10 @@
 # 30. Official MCP SDK over the existing published HTTP entry point
 
+Current implementation status: the integrated source-built Compose deployment
+implements all 14 tools, including native views and PNG feedback. This ADR
+retains its original decision/delivery context; see [current usage](../mcp-domain-tools.md)
+and [local acceptance](../epic-75-acceptance.md) for present capabilities and evidence.
+
 - **Status:** accepted, transport implemented in #78; domain tools follow in #79
 - **Date:** 2026-09-14
 - **Builds on:** [ADR 0029](0029-model-view-and-mcp-contract.md)

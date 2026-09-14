@@ -37,7 +37,7 @@ npm run simulate -- --help
 
 | Scenario | Project | Run | What it demonstrates |
 | --- | --- | --- | --- |
-| `full` | `visualise-ai` | `run-2026-08-04-0001` | The representative run: 62 events, every event type except the optional `run.finished` |
+| `full` | `visualise-ai` | `run-2026-08-04-0001` | The representative legacy run: 62 events, every `1.0` event type except the optional `run.finished` |
 | `retry` | `visualise-ai-retry` | `run-2026-08-04-0002` | `201`, then a byte-identical redelivery answering `200 duplicate: true` with the **same** position |
 | `conflict` | `visualise-ai-conflict` | `run-2026-08-04-0003` | The same `clientEventId` with different content answering `409 client_event_id_conflict` |
 | `self` | `visualise-ai-self` | `run-v0-epic-1` | 122 events reporting **this repository**: 28 components, 35 relationships, 10 agents, 7 diffs — nothing invented |
@@ -111,5 +111,8 @@ npm test
 
 The tests cover determinism, conformance of every generated event to
 `IngestEventRequest`, the lifecycle preconditions the backend enforces, coverage
-of the closed event catalogue, and the structural cases the end-to-end acceptance
-test depends on.
+of the closed `LegacyEventType` catalogue, and the structural cases the end-to-end
+acceptance test depends on. The full ingestion contract also accepts six `2.0`
+command events; those are covered through the official MCP client in the mandatory
+[`e2e` suite](../e2e/README.md). Adding a legacy type still fails this simulator's
+coverage gate until its scenario exercises the new type.

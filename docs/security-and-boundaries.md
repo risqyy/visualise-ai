@@ -48,6 +48,26 @@ Das hat zwei Konsequenzen, die zusammengehören:
 Die Routen, die Nginx weiterreicht, stehen im
 [README](../README.md#netzwerktopologie).
 
+## MCP und native Bilder
+
+MCP prüft den exakten Host einschließlich Port und, falls vorhanden, den Origin.
+Native Clients dürfen Origin weglassen. Diese Prüfungen begrenzen unerwünschte
+Browser-/Host-Zugriffe, sind jedoch keine Authentifizierung: Ein Client mit
+passenden Headern erhält dieselben Projektzugriffe wie REST.
+
+Der Renderer startet seinen eigenen gebündelten Chromium-Prozess als Nicht-Root
+und lädt einen konfigurierten internen Frontend-Einstieg. Modellfelder bestimmen
+keine Navigations-URL. Zwei parallele Jobs, 30 Sekunden Deadline und feste
+Antwortgrenzen begrenzen den Ressourcenverbrauch. Ein Nutzerbrowser oder dessen
+Session/Kamera wird dafür nicht verwendet. Bilder sind native Architekturansichten;
+UML-/PlantUML-Parität und eine automatische Qualitätsbewertung sind nicht enthalten.
+
+Das [versionierte Seccomp-Profil](../deploy/chromium/README.md) ergänzt das
+Docker-28.0.4-Profil um Freigaben für `clone`, `setns` und `unshare`. Diese Ausnahme
+gilt für den gesamten Backend-Container; sie fügt keine Capabilities hinzu und
+verwendet weder einen privilegierten Container noch `seccomp=unconfined`.
+AppArmor und die User-Namespace-Regeln des Hosts bleiben wirksam.
+
 ## Agent-Feedback ist nicht vertrauenswürdiger Input
 
 `feedback.published` trägt Markdown, das ein Agent geschrieben hat. Dessen
@@ -90,7 +110,8 @@ Nutzer eines davon erwartet, ist die Erwartung falsch, nicht das System.
 | **Bewertung, ob die Arbeit richtig ist** | Das System führt keine Qualitäts- oder Driftbewertung durch. `risk.reported` und `problem.reported` sind Aussagen des Agenten über sich selbst. Der Mensch urteilt. |
 
 Ebenfalls nicht abgeleitet, sondern nur gemeldet: der Status. Es gibt keine
-Stall-Erkennung, keine Timeouts und keine Heuristik. Ein Run ohne Terminalevent
+Stall-Erkennung und keine zeitbasierte Ableitung von Arbeit. Transport- und
+Render-Timeouts begrenzen Ressourcen, ohne den Run-Status zu verändern. Ein Run ohne Terminalevent
 bleibt offen und zeigt seinen letzten gemeldeten Stand. Details im
 [Lifecycle-Abschnitt](./agent-integration.md#lifecycle).
 

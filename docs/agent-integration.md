@@ -5,14 +5,18 @@ steht, lässt sich allein mit [`api/openapi.yaml`](../api/openapi.yaml)
 umsetzen — dieser Text erklärt die Regeln, die aus dem Schema allein nicht
 hervorgehen, und nennt die Fehler, die man sonst der Reihe nach macht.
 
-Ein Agent braucht genau eine URL: `POST <base>/api/v1/events`. Alles andere —
-Datenbank, interne Ports, Read Models — geht ihn nichts an.
+Agenten können über `<base>/mcp` mit dem offiziellen Streamable-HTTP-SDK
+lesen, atomar schreiben, Ansichten speichern und native PNGs abrufen. Die
+[MCP-Anleitung](mcp-domain-tools.md) enthält die Client-Konfiguration und einen
+ausführbaren Ablauf. Bestehende Integrationen verwenden weiterhin
+`POST <base>/api/v1/events`; beide Wege teilen Transaktion, Lifecycle und
+Idempotenz. Datenbank und interne Ports bleiben außerhalb des Clients.
 
 ## Grundregeln in vier Sätzen
 
-1. **Ein Request, ein Event.** Kein Batching.
+1. **Ein REST-Request, ein Event.** Ein Modellkommando enthält 1–100 atomare Operationen, aber nur einen Umschlag.
 2. **`Content-Type: application/json`**, sonst `415`.
-3. **Der Katalog ist geschlossen.** 20 Eventtypen, keine Erweiterung, kein
+3. **Der Katalog ist geschlossen.** 20 Legacy-Typen und sechs neue Kommandotypen, kein
    Freiform-Fallback.
 4. **Es wird nur gemeldet, nie abgeleitet.** Was der Agent nicht sendet,
    existiert für das Cockpit nicht.
@@ -24,31 +28,41 @@ Felder sind auf jeder Ebene verboten (`additionalProperties: false`).
 
 | Feld | Pflicht | Bedeutung |
 | --- | --- | --- |
-| `schemaVersion` | ja | v0 akzeptiert ausschließlich `"1.0"` |
+| `schemaVersion` | ja | `"1.0"` für Legacy-Events, `"2.0"` für die sechs Kommandotypen |
 | `clientEventId` | ja | UUID, vom Agenten vergeben. Der Idempotenzschlüssel — siehe [Idempotenz](#idempotenz-und-retries) |
 | `projectId` | ja | Projekt-Slug |
 | `runId` | ja | Run-Slug |
 | `agentId` | ja | Der **meldende** Agent |
-| `parentAgentId` | nein | Der delegierende Agent; `null` oder weggelassen beim Root-Orchestrator. Gehört in **jedes** Event des Subagenten, nicht nur in sein `agent.started` |
+| `parentAgentId` | Legacy optional; Kommandos erforderlich | Der delegierende Agent; `null` oder weggelassen beim Root-Orchestrator. Gehört in **jedes** Event des Subagenten, nicht nur in sein `agent.started` |
 | `occurredAt` | ja | RFC-3339-Zeitstempel in UTC (`Z`-Suffix), aus Sicht des Agenten. Unabhängig vom serverseitigen `receivedAt` |
-| `type` | ja | Einer der 20 Katalogtypen |
+| `type` | ja | Einer der 26 Katalogtypen |
 | `payload` | ja | Vom `type` bestimmtes Objekt |
 
 ### Zwei verschiedene ID-Formate — eine häufige Stolperfalle
 
-`projectId`, `runId`, `agentId` und `componentId` sind **Slugs** mit einem
-strengen Muster: Kleinbuchstaben, Ziffern und Bindestriche, mindestens 3
-Zeichen, Anfang und Ende alphanumerisch (`componentId` erlaubt zusätzlich `.`
-und `_`). `MyAgent`, `agent_1` oder `ab` werden mit `400` abgelehnt.
+`projectId`, `runId` und `agentId` verwenden Kleinbuchstaben, Ziffern und
+Bindestriche, mindestens drei Zeichen, Anfang und Ende alphanumerisch.
+`componentId` erlaubt zusätzlich `.` und `_` und bereits zwei Zeichen; Punkte
+implizieren keine Hierarchie. Nur `parentComponentId` legt die Hierarchie fest.
+`MyAgent` oder `agent_1` sind keine gültigen Agent-IDs.
 
 `feedbackId`, `diffId`, `planId`, `workStepId`, `relationshipId`, `changeId`,
-`snapshotId` dagegen sind freie `Identifier`: 1 bis 128 beliebige Zeichen.
+`snapshotId` und `viewId` sind freie `Identifier`: 1 bis 128 beliebige Zeichen.
+Für Views verwendet REST deshalb die feste Query-Route
+`/api/v1/projects/{projectId}/view?viewId=…`; der Listenpfad lautet `/views`.
+Ein Pfadsegment wäre für IDs wie `/`, `.` oder `..` nicht zuverlässig.
 
 ## Lifecycle
 
 Die Reihenfolge der Events ist keine Empfehlung. Sie wird beim Schreiben
 erzwungen, innerhalb derselben Transaktion, die das Event anhängt — ein
 abgelehntes Event hinterlässt keine Spur und verbraucht keine Position.
+
+MCP registriert einen Agenten mit `visualise_context_open` (REST-Kommando
+`context.opened`); `visualise_work_report` mit `report.action: "run_finish"` schließt den
+Run ausdrücklich. Das sind dieselben fachlichen Lifecycle-Regeln wie bei den
+folgenden weiterhin gültigen Legacy-Events. Eine Transportverbindung eröffnet
+oder beendet keinen Run.
 
 ### Ein Run wird vom Root-Orchestrator eröffnet
 
@@ -84,7 +98,7 @@ Runs kommen; von jedem anderen Agenten ergibt es
 `422 terminal_event_not_allowed`.
 
 Nach `run.finished` werden **Work-Events abgelehnt** (`422
-run_already_finished`). Genau zwei Typen bleiben erlaubt:
+run_already_finished`). Für neue Legacy-Ereignisse bleiben genau zwei Typen erlaubt:
 `correction.issued` und `retraction.issued` — ein geschlossener Run muss
 korrigierbar bleiben, denn der Log ist append-only und es gibt keinen anderen
 Weg, eine falsche Meldung geradezurücken.
@@ -95,9 +109,13 @@ selben **Projekt** bereits akzeptiert wurde — sonst
 `422 correction_target_unknown`. Beide ersetzen nichts: Das Original bleibt im
 Log stehen und wird im Cockpit als korrigiert bzw. zurückgezogen markiert.
 
+Identische Wiederholungen bereits akzeptierter Kommandos liefern auch nach
+Run-Abschluss ihren ursprünglichen Receipt, ohne erneut zu schreiben.
+
 ### Status wird gemeldet, nie abgeleitet
 
-Es gibt **keine Stall-Erkennung**, keine Timeouts, keine Heuristik. Aus Stille
+Es gibt **keine Stall-Erkennung** und keinen aus Zeitablauf abgeleiteten Arbeitsstatus.
+Transport- und Render-Timeouts begrenzen Anfragen, nicht fachliche Arbeit. Aus Stille
 entsteht kein Status: Der zuletzt gemeldete `agent.status_reported` bleibt
 gültig, bis der Agent einen neuen sendet. **Ein Run ohne Terminalevent bleibt
 offen** und zeigt seinen letzten gemeldeten Stand — das Cockpit erfindet weder
@@ -109,7 +127,7 @@ sichtbar haben will, muss ihn melden.
 
 ## Relevante statt rohe Events
 
-Der Katalog umfasst genau diese 20 Typen:
+Die 20 bestehenden Typen verwenden `schemaVersion: "1.0"`:
 
 | Gruppe | Typen |
 | --- | --- |
@@ -130,6 +148,13 @@ und rohe Modellausgaben sind kein Bestandteil des Vertrags** und werden
 strukturell abgelehnt, nicht bloß ignoriert: `type` ist eine Enumeration, jedes
 Payload-Schema ist geschlossen, und der Request-Body ist eine diskriminierte
 `oneOf`-Union. Es gibt kein Feld, in das sich Terminalausgabe schmuggeln ließe.
+
+Die sechs Kommandotypen mit `schemaVersion: "2.0"` sind
+`model.mutation_applied`, `context.opened`, `work.reported`,
+`work.scope_reported`, `view.saved` und `view.removed`. MCP-Inputs verwenden
+statt eines Event-Umschlags `contractVersion: "2.0.0"`. Die Modelländerung ist
+kein Beleg für eine Repository-Codeänderung. Scope und Arbeitsschritte werden
+explizit gemeldet; Verbindung, Stille und Uhrzeit erzeugen keine Aktivität.
 
 Gemeldet wird, was ein menschlicher Reviewer der beobachteten Anwendung braucht:
 was gearbeitet wird, woran, mit welchem Ergebnis. Wer 200 Tool-Aufrufe pro
@@ -177,13 +202,28 @@ einmal senden**. Es kann nicht doppelt ankommen. Was man nicht tun darf, ist
 den Zeitstempel neu zu berechnen oder ein Feld nachzubessern — dann ist es ein
 anderes Event unter derselben ID und wird zum `409`.
 
+Bei den sechs neuen Kommandotypen gehört die vollständige Identität zum Retry,
+einschließlich Reporter, Elternagent, Zeitpunkt und erwarteter Revisionen.
+Numerische Schreibweisen wie `0` und `0.0` sind beide gültige Ganzzahlen, aber
+unterschiedliche Retry-Inhalte. Der gespeicherte Receipt enthält die damalige
+`projectPosition`, `modelRevision` und gegebenenfalls `viewRevision`; ein Retry
+ersetzt diese Werte nicht durch den aktuellen Stand. Bei `revision_conflict`
+erst lesen und abgleichen, dann mit neuer ID schreiben. Modell-, Ansichtsrevision
+und Logposition sind getrennte Zähler.
+
 Beispielantworten:
 [`retry-idempotent-response.json`](../api/examples/retry-idempotent-response.json),
 [`conflict-response.json`](../api/examples/conflict-response.json).
 
 ## Größenlimit
 
-Ein einzelnes Event darf standardmäßig **2 MiB (2097152 Bytes)** groß sein.
+Die folgenden Größen- und HTTP-Fehlerangaben gelten für REST. MCP begrenzt
+Requests und strukturierte Antworten separat auf 1 MiB und ein natives PNG auf
+4 MiB dekodiert. MCP-Domainfehler sind strukturierte Toolfehler; ein Proxy-413
+ist eine einfache HTTP-Ablehnung. Siehe [MCP](mcp-domain-tools.md).
+
+Ein Legacy-Event darf standardmäßig **2 MiB (2097152 Bytes)** groß sein.
+Die sechs `schemaVersion: "2.0"`-Kommandos haben zusätzlich die feste 1-MiB-Grenze.
 Darüber antwortet der Server `413` mit dem Code `event_too_large`. Der Wert ist
 serverseitig über die Umgebungsvariable `MAX_EVENT_BYTES` konfigurierbar
 (siehe [Betrieb](./operations.md#konfiguration)) — ein Agent kann ihn nicht

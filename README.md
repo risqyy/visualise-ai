@@ -19,6 +19,8 @@ Agenten richtig ist.
 | Dokument | Inhalt |
 | --- | --- |
 | [`docs/operations.md`](docs/operations.md) | Voraussetzungen, Compose-Start, alle Umgebungsvariablen, Healthchecks, Datenpersistenz, Simulator, End-to-End-Test |
+| [`docs/mcp-domain-tools.md`](docs/mcp-domain-tools.md) | Geprüfter SDK-Client: lesen, atomar ändern, View speichern, natives PNG prüfen |
+| [`docs/epic-75-acceptance.md`](docs/epic-75-acceptance.md) | Lokale Abnahmen, Messbedingungen und verbleibende Grenzen |
 | [`docs/agent-integration.md`](docs/agent-integration.md) | Eventvertrag in der Praxis: Lifecycle, Idempotenz, Fehlercodes, SSE-Reconnect, eine minimale gültige Sequenz |
 | [`docs/security-and-boundaries.md`](docs/security-and-boundaries.md) | Vertrauensgrenze, Angriffsfläche, v0-Ausschlüsse, `RepositoryProvider`-Grenze |
 | [`api/README.md`](api/README.md) | Der Vertrag selbst: Schemata, Beispiele, Ablehnungs-Fixtures |
@@ -53,6 +55,20 @@ npm run simulate
 Danach zeigt <http://localhost:8080/projects/visualise-ai> den vollständigen
 Demo-Run. Details:
 [Demo ausführen](docs/operations.md#demo-ausfuehren).
+
+## MCP: Modell lesen, ändern und als Bild prüfen
+
+Der aktuelle Quell-Build stellt unter `http://localhost:8080/mcp` **14 Tools**
+bereit. Ein MCP-Client mit Streamable HTTP und Bildunterstützung kann einen
+Kontext explizit öffnen, das gemeinsame Projektmodell lesen und atomar ändern,
+Ansichten speichern und ein natives PNG bei exakten Modell-/Ansichtsrevisionen
+abrufen. Dafür muss kein Nutzerbrowser geöffnet sein. Modelländerungen sind
+keine Repository-Codeänderungen; Fortschritt und Arbeit werden separat gemeldet.
+
+Die [MCP-Anleitung](docs/mcp-domain-tools.md) enthält den vollständigen Ablauf
+und ein ausführbares SDK-Beispiel. [Betrieb](docs/operations.md) beschreibt
+Konfiguration, Migration und Grenzen. Diese Fähigkeiten gehören zum Quell-Build;
+ältere veröffentlichte Images enthalten sie nicht automatisch.
 
 ## Veröffentlichte Docker-Hub-Images
 
@@ -123,12 +139,13 @@ Host :8080
 └──────────────┘        └─────────────┘        └──────────────┘
 ```
 
-Nginx liefert das Produktions-Bundle aus und proxyt vier Arten von Verkehr an
+Nginx liefert das Produktions-Bundle aus und proxyt diese Arten von Verkehr an
 das Backend:
 
 | Route | Zweck |
 | --- | --- |
-| `POST /api/v1/events` | Agent-Event-Ingestion |
+| `/mcp` | Streamable HTTP: Modell, Arbeit, Ansichten und PNG-Feedback |
+| `POST /api/v1/events` | Kompatible Event- und Command-Ingestion |
 | `GET /api/v1/…` | Read Models für die Oberfläche |
 | `GET /api/v1/projects/{id}/stream` | SSE-Livestream, **ungepuffert** geproxyt |
 | `GET /healthz`, `GET /readyz` | Backend-Probes |

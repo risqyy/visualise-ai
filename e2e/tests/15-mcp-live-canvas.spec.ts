@@ -8,6 +8,14 @@ test('15 · official MCP writes update the interactive canvas, preserve contribu
   const run = 'run-canvas'
   const root = 'canvas-root'
   const child = 'canvas-worker'
+  const cdp = await context.newCDPSession(page)
+  await cdp.send('Network.enable')
+  const browserPositions: number[] = []
+  const streamStatuses: number[] = []
+  cdp.on('Network.eventSourceMessageReceived', (event) => { browserPositions.push(Number(event.eventId)) })
+  cdp.on('Network.responseReceived', (event) => {
+    if (new URL(event.response.url).pathname.endsWith('/stream')) streamStatuses.push(event.response.status)
+  })
   let revision = 0
   const identity = (agent = root) => writeIdentity(project, run, agent, agent === root ? null : root)
   async function mutate(operations: Record<string, unknown>[], agent = root) {
@@ -22,7 +30,7 @@ test('15 · official MCP writes update the interactive canvas, preserve contribu
     expect(mcp.catalogue.tools.map((one) => one.name)).toContain('visualise_model_mutate')
     await mcp.call('visualise_context_open', { ...identity(), role: 'orchestrator', displayName: 'Canvas root', assignedTask: 'Describe architecture' })
     await mcp.call('visualise_context_open', { ...identity(child), role: 'subagent', displayName: 'Canvas worker', assignedTask: 'Inspect shared elements' })
-    await mutate([{ op: 'component.add', component: component('mcp-api', 'MCP API') }, { op: 'component.add', component: component('mcp-worker', 'MCP Worker') }, { op: 'relationship.add', relationship: relationship('api-worker', 'mcp-worker') }])
+    const initial = await mutate([{ op: 'component.add', component: component('mcp-api', 'MCP API') }, { op: 'component.add', component: component('mcp-worker', 'MCP Worker') }, { op: 'relationship.add', relationship: relationship('api-worker', 'mcp-worker') }])
     await page.goto(`/projects/${project}/runs/${run}`)
     const canvas = page.getByTestId('architecture-canvas')
     await expect(canvas).toHaveAttribute('data-node-count', '2')
@@ -83,12 +91,26 @@ test('15 · official MCP writes update the interactive canvas, preserve contribu
 
     // Browser reconnect replays the missed mutation; the SDK remains connected.
     await context.setOffline(true)
-    await mutate([{ op: 'component.update', componentId: 'mcp-api', set: { description: 'Delivered during reconnect' } }])
+    await cdp.send('Page.stopLoading')
+    await expect(page.getByTestId('live-connection-state')).not.toHaveAttribute('data-state', 'live')
+    const cut = browserPositions.at(-1) ?? 0
+    expect(cut).toBeGreaterThan(Number(initial.receipt.projectPosition))
+    const missed = await mutate([{ op: 'component.update', componentId: 'mcp-api', set: { description: 'Delivered during reconnect' } }])
+    expect(Number(missed.receipt.projectPosition)).toBeGreaterThan(cut)
+    expect(browserPositions).not.toContain(Number(missed.receipt.projectPosition))
     await context.setOffline(false)
     await expect(page.getByTestId('inspector-context')).toContainText('Delivered during reconnect')
     await expect(page.getByTestId('live-connection-state')).toHaveAttribute('data-state', 'live')
     expect(await page.locator('.react-flow__viewport').getAttribute('style')).toBe(camera)
     await expect(api).toBeFocused()
+
+    await expect.poll(() => browserPositions).toContain(Number(missed.receipt.projectPosition))
+    const continued = await mutate([{ op: 'component.update', componentId: 'mcp-api', set: { description: 'Continued live after replay' } }])
+    await expect(page.getByTestId('inspector-context')).toContainText('Continued live after replay')
+    await expect.poll(() => browserPositions.at(-1)).toBe(continued.receipt.projectPosition)
+    expect(streamStatuses.filter((status) => status === 200).length).toBeGreaterThanOrEqual(2)
+    expect(browserPositions).toEqual(Array.from({ length: Number(continued.receipt.projectPosition) - Number(initial.receipt.projectPosition) }, (_, i) => Number(initial.receipt.projectPosition) + i + 1))
+    await testInfo.attach('browser-sse-replay', { body: JSON.stringify({ streamStatuses, initialSnapshotPosition: initial.receipt.projectPosition, cut, missed: missed.receipt.projectPosition, continued: continued.receipt.projectPosition, browserPositions }), contentType: 'application/json' })
 
     // Hydration after an intentional reload keeps both explicit scope reports.
     await page.reload()
@@ -116,6 +138,7 @@ test('15 · official MCP writes update the interactive canvas, preserve contribu
     await expect(page.getByTestId('element-contributions')).toContainText('beendet')
   } finally {
     await context.setOffline(false)
+    await cdp.detach()
     await mcp.close()
   }
 })

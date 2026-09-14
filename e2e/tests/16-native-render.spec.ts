@@ -2,6 +2,7 @@ import { test, expect } from '@playwright/test'
 import { randomUUID } from 'node:crypto'
 import { writeFile } from 'node:fs/promises'
 import { connectMcp, writeIdentity } from '../src/mcp.js'
+import { attachMeasurements } from '../src/measurements.js'
 import { BASE_URL } from '../src/config.js'
 
 // Browser-level regression of the actual dedicated production entry. These
@@ -158,6 +159,6 @@ test('official MCP client reads a real native PNG without a user page, handles e
     expect(staleView.structuredContent).toMatchObject({ code: 'revision_conflict', currentModelRevision: 2, currentViewRevision: 2 })
     await render({ ...args, expectedModelRevision: 2, expectedViewRevision: 2 })
     await mcp.call('visualise_work_report', { ...identity(), report: { action: 'run_finish', outcome: 'completed', summary: 'Native image checked and gateway label corrected' } })
-    await testInfo.attach('native-render-measurements', { body: JSON.stringify({ samplesMs: samples, model: { components: 2, relationships: 1 }, viewport: args.viewport, detailLevel: args.detailLevel, conditions: 'Fresh Chromium process in built Linux Compose backend; official TypeScript MCP SDK through published Nginx' }, null, 2), contentType: 'application/json' })
+    await attachMeasurements(testInfo, browser, 'native-render-measurements', samples, { measurement: 'successful MCP image call roundtrip', model: { components: 2, relationships: 1 }, viewport: args.viewport, detailLevel: args.detailLevel })
   } finally { await mcp.close() }
 })

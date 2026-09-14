@@ -117,8 +117,9 @@ export function loadContract(contractPath: string = locateContract()): Contract 
   const validateUnion = compile('IngestEventRequest')
   const branchCache = new Map<string, ValidateFunction>()
 
-  // This simulator emits schemaVersion 1.0; typed 2.0 command events have
-  // separate coverage and do not expand this closed legacy scenario.
+  // This simulator emits schemaVersion 1.0. Keep its closed legacy coverage
+  // gate independent of the six 2.0 command events exercised through real MCP
+  // in the mandatory E2E suite.
   const eventTypes = (schemas.LegacyEventType?.enum as string[] | undefined) ?? []
   if (eventTypes.length === 0) {
     throw new Error(`LegacyEventType in ${contractPath} has no enumeration`)
