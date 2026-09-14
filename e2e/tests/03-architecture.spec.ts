@@ -1,7 +1,7 @@
 import { expect, test, type Page } from '@playwright/test'
 
 import { asAccepted, bootstrapEvent, getJson, postEvent } from '../src/api.js'
-import { showWholeModel } from '../src/canvas.js'
+import { panIntoCanvas, showWholeModel } from '../src/canvas.js'
 import {
   MAIN_PROJECT,
   MAIN_RUN,
@@ -394,6 +394,7 @@ test('2 · selecting one relationship is a reproducible URL and inspector contex
 
   const label = page.getByTestId('edge-label-rel-orders-publishes-order-created')
   await expect(label).toBeVisible()
+  await panIntoCanvas(page, label)
   await label.click()
 
   await expect(page).toHaveURL(/relationship=rel-orders-publishes-order-created/)
