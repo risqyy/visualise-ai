@@ -11,6 +11,7 @@ import {
 } from './graphOrientation'
 import {
   EMPTY_DIAGNOSTICS,
+  nodeHandles,
   projectArchitecture,
   projectionSignature,
   type ArchitectureEdge,
@@ -206,24 +207,20 @@ export function useArchitectureGraph(
     // structurally identical after a refetch does not re-run ELK.
   }, [visible, layoutSignature, orientation])
 
-  // The edges always come from the current projection — an incoming update must
-  // show up immediately, even if its layout is still being computed. Only the
-  // node positions wait for ELK.
+  // Inventory, parentage and edges always come from ONE current projection.
+  // Only positions are borrowed from the last solve. New nodes get provisional
+  // positions, so an atomic node+edge batch stays coherent while ELK is pending
+  // or fails, without blanking the graph or retaining deleted nodes.
   return useMemo<ArchitectureGraph>(() => {
     const isEmpty = visible.nodes.length === 0
     const isCurrent = laidOut !== null && laidOut.signature === layoutSignature
-    // Keep the last layout's positions while ELK solves the new structure, but
-    // do not keep its data. A removal can turn an applied node into a ghost
-    // without changing its id, and the overlay state must be visible in that
-    // first render (the metrics below are already derived from `visible`).
-    // `withCurrentData` intentionally matches only ids that are still drawn;
-    // genuinely new proposal nodes wait for their first valid layout.
+    // Geometry can lag a solve; inventory and node data cannot.
     const nodesWithCurrentData =
-      laidOut === null ? [] : withCurrentData(laidOut.nodes, visible.nodes)
+      laidOut === null ? [] : reconcileLayoutNodes(laidOut.nodes, visible.nodes)
 
     return {
       nodes: isEmpty ? [] : nodesWithCurrentData,
-      edges: visible.edges,
+      edges: laidOut === null ? [] : visible.edges,
       routes: isCurrent ? laidOut.routes : {},
       diagnostics: projection.diagnostics ?? EMPTY_DIAGNOSTICS,
       isInitialLayout: !isEmpty && laidOut === null,
@@ -260,14 +257,25 @@ export function useArchitectureGraph(
  * step a state change would be invisible until something structural happened to
  * force a new layout.
  */
-function withCurrentData(
+export function reconcileLayoutNodes(
   laidOut: readonly ArchitectureNode[],
   current: readonly ArchitectureNode[],
 ): ArchitectureNode[] {
-  const dataById = new Map(current.map((node) => [node.id, node.data]))
-  return laidOut.map((node) => {
-    const data = dataById.get(node.id)
-    return data === undefined || data === node.data ? node : { ...node, data }
+  const previous = new Map(laidOut.map((node) => [node.id, node]))
+  return current.map((node, index) => {
+    const before = previous.get(node.id)
+    // Positions are relative to the parent; reparented nodes cannot inherit a
+    // coordinate from their old container. Keep the current structure intact.
+    const position = before?.parentId === node.parentId && before
+      ? before.position
+      : { x: 32 + (index % 4) * 280, y: 64 + Math.floor(index / 4) * 180 }
+    return { ...node, position,
+      ...(before?.parentId === node.parentId && before
+        ? { width: before.width, height: before.height, measured: before.measured,
+          handles: nodeHandles(before.width ?? 228, before.height ?? 96, node.data.orientation),
+          style: { ...node.style, width: before.width, height: before.height } }
+        : {}),
+    }
   })
 }
 

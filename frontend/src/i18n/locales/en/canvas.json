@@ -98,7 +98,9 @@
       "remove": "remove"
     },
     "proposalNote": "Proposal: not part of the applied architecture model.",
-    "workStepRunning": "Work step running: {{title}}"
+    "workStepRunning": "Work step running: {{title}}",
+    "workScopeReported": "Explicitly reported work scope",
+    "workScopeEnded": "Retained work scope · agent or run ended"
   },
   "pane": {
     "emptyDescription": "The model appears as soon as an agent sends architecture.snapshot_published.",

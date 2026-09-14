@@ -6,6 +6,7 @@ import { useArchitecture, useComponentHistory, useComponentInspector } from '@/a
 import type { AppliedRelationship, ComponentId, Identifier, ProjectId, Relationship, RunId } from '@/api/types'
 import { bundleEdgeId, overlayEdgeId } from '@/canvas/graphProjection'
 import { useChangeOverlays } from '@/canvas/useChangeOverlays'
+import { contributionDetail } from '@/canvas/changeOverlays'
 import { AsyncState, EmptyState } from '@/components/AsyncState'
 import { PaneHeader } from '@/components/workspace/PaneHeader'
 import { ComponentContextCard } from '@/components/workspace/inspector/ComponentContextCard'
@@ -75,8 +76,10 @@ export function InspectorPane({
   const { t } = useTranslation('inspector')
   const { t: tWorkspace } = useTranslation('workspace')
   const { t: tCommon } = useTranslation('common')
+  const { t: tCanvas } = useTranslation('canvas')
   const architecture = useArchitecture(projectId)
-  const overlay = useChangeOverlays(projectId, architecture.data)
+  const overlay = useChangeOverlays(projectId, architecture.data, runId)
+  const contributions = overlay.evidence?.get(relationshipId ? `relationship:${relationshipId}` : `component:${componentId}`) ?? []
   const inspector = useComponentInspector(
     projectId,
     relationshipId ? undefined : componentId,
@@ -231,6 +234,20 @@ export function InspectorPane({
         data-testid="inspector-scroll"
       >
         <div className="space-y-4 p-3">
+          {contributions.length > 0 && (
+            <section aria-label={t('contributions.label')} data-testid="element-contributions" className="border-border space-y-2 rounded-md border p-2">
+              <h3 className="pane-heading">{t('contributions.label')}</h3>
+              <p className="text-muted-foreground text-xs">{t('contributions.note')}</p>
+              <ul className="space-y-2 text-xs">
+                {contributions.map((entry, index) => (
+                  <li key={`${entry.runId}:${entry.agentId}:${entry.position}:${entry.source}:${index}`} data-agent-id={entry.agentId} data-source={entry.source}>
+                    <ReportedText value={entry.agentId} /> · <ReportedText value={entry.runId} />
+                    <p>{contributionDetail(entry, tCanvas)}</p>
+                  </li>
+                ))}
+              </ul>
+            </section>
+          )}
           {relationshipId ? (
             <RelationshipContextCard
               relationshipId={relationshipId}

@@ -240,7 +240,7 @@ export function affectedQueryKeys(event: StreamedEvent, depth = 0): QueryKey[] {
     case 'context.opened':
       return [queryKeys.agents(project, run), queryKeys.runs(project), queryKeys.projectDetail(project)]
     case 'work.scope_reported':
-      return [queryKeys.agents(project, run)]
+      return [queryKeys.agents(project, run), queryKeys.components(project)]
     case 'work.reported':
       return [queryKeys.agents(project, run), queryKeys.components(project), queryKeys.runDetail(project, run), queryKeys.runs(project), queryKeys.projectDetail(project)]
     case 'agent.started':
@@ -272,7 +272,7 @@ export function affectedQueryKeys(event: StreamedEvent, depth = 0): QueryKey[] {
 
     case 'model.mutation_applied':
     case 'architecture.snapshot_published':
-      return [queryKeys.architecture(project), queryKeys.components(project)]
+      return [queryKeys.architecture(project), queryKeys.components(project), queryKeys.runScope(project)]
 
     case 'component.change_planned':
     case 'component.change_applied':

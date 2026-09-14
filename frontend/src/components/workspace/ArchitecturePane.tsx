@@ -19,6 +19,7 @@ import type { GraphOrientation } from '@/canvas/graphOrientation'
 
 export interface ArchitecturePaneProps {
   projectId: ProjectId
+  runId?: string
   /** Selection from the URL; the canvas mirrors it, it never owns it. */
   selectedComponentId?: ComponentId | undefined
   /** Selection from the URL for one reported relationship. */
@@ -42,6 +43,7 @@ export interface ArchitecturePaneProps {
  */
 export function ArchitecturePane({
   projectId,
+  runId,
   selectedComponentId,
   selectedRelationshipId,
   onSelectComponent,
@@ -51,7 +53,7 @@ export function ArchitecturePane({
 }: ArchitecturePaneProps) {
   const { t } = useTranslation('canvas')
   const architecture = useArchitecture(projectId)
-  const overlay = useChangeOverlays(projectId, architecture.data)
+  const overlay = useChangeOverlays(projectId, architecture.data, runId)
 
   const componentCount = architecture.data?.components.length ?? 0
   const relationshipCount = architecture.data?.relationships.length ?? 0

@@ -139,6 +139,7 @@ export function WorkspacePage() {
         center={
           <ArchitecturePane
             projectId={projectId}
+            runId={runId}
             selectedComponentId={search.component}
             selectedRelationshipId={search.relationship}
             onSelectComponent={setSelectedComponent}

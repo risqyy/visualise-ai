@@ -140,3 +140,19 @@ Beziehungen auf `orders.order.created`, drei Dateien unter einer `changeId`.
 `.github/workflows/e2e.yml` fährt denselben Lauf auf einem Ubuntu-Runner mit
 `FRONTEND_HTTP_PORT=8080` und lädt den Playwright-Report als Artefakt hoch. Die
 schnellen Suiten laufen getrennt in `.github/workflows/ci.yml`.
+
+## MCP live Canvas acceptance (#80)
+
+`tests/15-mcp-live-canvas.spec.ts` drives the published `/mcp` endpoint using the
+official `@modelcontextprotocol/sdk`, pinned to 1.30.0, while Chromium operates
+the real UI. It creates an isolated project and checks atomic node/edge changes,
+direct applied state, overlapping scopes, selection/focus and camera retention,
+exact retries, browser offline/replay, reload hydration, selected removal and
+history fallback. It adds to the REST/simulator suite.
+
+Run it with `npx playwright test 15-mcp-live-canvas.spec.ts`. The normal global
+setup builds Compose and uses `E2E_COMPOSE_PROJECT` and `FRONTEND_HTTP_PORT` for
+isolation. `E2E_KEEP_STACK=1` retains the stack for inspection. Successful runs
+also retain screenshots of overlapping scopes and selected removal under their
+Playwright test output directory. `E2E_SKIP_COMPOSE=1` is only for a deliberately
+prepared stack, never evidence that a fresh full acceptance deployment passed.
