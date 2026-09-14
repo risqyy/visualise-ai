@@ -10,6 +10,7 @@ package ingest
 import (
 	_ "embed"
 	"fmt"
+	"strings"
 
 	"github.com/pb33f/libopenapi"
 	"github.com/pb33f/libopenapi-validator/config"
@@ -163,6 +164,36 @@ func (c *Contract) AcceptsSchemaVersion(version string) bool {
 // meant as failures too, which would bury the real errors. The discriminator is
 // what the contract itself prescribes for choosing the branch.
 func (c *Contract) Validate(eventType string, document any) []FieldError {
+	if violations := c.validateShape(eventType, document); len(violations) > 0 {
+		return violations
+	}
+	if eventType != "correction.issued" {
+		return nil
+	}
+	original, ok := document.(map[string]any)
+	if !ok {
+		return []FieldError{{Field: "", Code: CodeInvalidType, Message: "expected an event object"}}
+	}
+	payload, _ := original["payload"].(map[string]any)
+	correctedType, _ := payload["correctedType"].(string)
+	effective := make(map[string]any, len(original))
+	for key, value := range original {
+		effective[key] = value
+	}
+	effective["type"] = correctedType
+	effective["payload"] = payload["correctedPayload"]
+	violations := c.validateShape(correctedType, effective)
+	for i := range violations {
+		if strings.HasPrefix(violations[i].Field, "/payload") {
+			violations[i].Field = "/payload/correctedPayload" + strings.TrimPrefix(violations[i].Field, "/payload")
+		}
+	}
+	return violations
+}
+
+// A nested correction is evidence only in the existing projector, so only the
+// first effective payload is validated as a projected event here.
+func (c *Contract) validateShape(eventType string, document any) []FieldError {
 	schema, ok := c.eventSchemas[eventType]
 	if !ok {
 		return []FieldError{{

@@ -103,32 +103,11 @@ func (s *Service) Run(ctx context.Context, projectID, runID string) (RunResponse
 // time so a parent is emitted before the subagents it spawned, which lets a
 // consumer build the tree in a single pass.
 func (s *Service) Agents(ctx context.Context, projectID, runID string) (AgentsResponse, error) {
-	project, err := s.project(ctx, projectID)
+	snapshot, err := s.context(ctx, projectID, runID, true)
 	if err != nil {
 		return AgentsResponse{}, err
 	}
-	run, err := s.resolveRun(ctx, project, runID)
-	if err != nil {
-		return AgentsResponse{}, err
-	}
-
-	var rows []store.Agent
-	if err := s.db.WithContext(ctx).
-		Model(&store.Agent{}).
-		Where("project_id = ? AND run_id = ?", projectID, run.RunID).
-		Order("started_at ASC, agent_id ASC").
-		Find(&rows).Error; err != nil {
-		return AgentsResponse{}, err
-	}
-
-	response := AgentsResponse{
-		ProjectPosition: project.LastPosition,
-		Agents:          make([]Agent, 0, len(rows)),
-	}
-	for _, row := range rows {
-		response.Agents = append(response.Agents, agentOf(row))
-	}
-	return response, nil
+	return AgentsResponse{ModelRevision: snapshot.Project.ModelRevision, ProjectPosition: snapshot.Project.LastPosition, Agents: snapshot.Agents}, nil
 }
 
 // Plans returns every plan of one run with all of its revisions and steps.

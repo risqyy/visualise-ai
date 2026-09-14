@@ -57,6 +57,7 @@
     "agentProgressReported": "Fortschritt gemeldet",
     "agentStarted": "Agent gestartet",
     "agentStatusReported": "Status gemeldet",
+    "modelMutationApplied": "Modelländerung angewendet",
     "architectureSnapshotPublished": "Architektur-Snapshot veröffentlicht",
     "componentChangeApplied": "Komponentenänderung angewandt",
     "componentChangePlanned": "Komponentenänderung geplant",
@@ -72,7 +73,12 @@
     "riskReported": "Risiko gemeldet",
     "runFinished": "Run beendet",
     "workStepCompleted": "Arbeitsschritt abgeschlossen",
-    "workStepStarted": "Arbeitsschritt begonnen"
+    "workStepStarted": "Arbeitsschritt begonnen",
+    "contextOpened": "Arbeitskontext eröffnet",
+    "workReported": "Arbeit gemeldet",
+    "workScopeReported": "Arbeitsbereich gemeldet",
+    "viewSaved": "Ansicht gespeichert",
+    "viewRemoved": "Ansicht entfernt"
   },
   "feedback": {
     "emptyDescription": "Für diese Komponente wurde in diesem Run kein feedback.published gemeldet.",
@@ -136,5 +142,9 @@
     "currentRun": "Aktueller Run",
     "history": "Historie",
     "label": "Belegquelle"
+  },
+  "contributions": {
+    "label": "Gemeldete Beiträge",
+    "note": "Modelländerungen werden direkt angewandt. Arbeitsbereiche werden separat gemeldet und belegen keine Codeänderungen."
   }
 }

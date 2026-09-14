@@ -2,7 +2,9 @@ package readapi
 
 import (
 	"context"
+	"database/sql"
 	"encoding/json"
+	"gorm.io/gorm"
 	"time"
 
 	"github.com/risqyy/visualise-ai/backend/internal/store"
@@ -71,6 +73,18 @@ func (s *Service) Project(ctx context.Context, projectID string) (ProjectRespons
 // kept apart on purpose: a planned change never touches `components` or
 // `relationships`, so a proposal cannot be mistaken for reality.
 func (s *Service) Architecture(ctx context.Context, projectID string) (ArchitectureResponse, error) {
+	var response ArchitectureResponse
+	err := s.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		snapshotService := *s
+		snapshotService.db = tx
+		var err error
+		response, err = snapshotService.architecture(ctx, projectID)
+		return err
+	}, &sql.TxOptions{Isolation: sql.LevelRepeatableRead, ReadOnly: true})
+	return response, err
+}
+
+func (s *Service) architecture(ctx context.Context, projectID string) (ArchitectureResponse, error) {
 	project, err := s.project(ctx, projectID)
 	if err != nil {
 		return ArchitectureResponse{}, err
@@ -100,6 +114,7 @@ func (s *Service) Architecture(ctx context.Context, projectID string) (Architect
 	}
 
 	response := ArchitectureResponse{
+		ModelRevision:   project.ModelRevision,
 		ProjectPosition: project.LastPosition,
 		Components:      make([]Component, 0, len(componentRows)),
 		Relationships:   make([]Relationship, 0, len(relationshipRows)),

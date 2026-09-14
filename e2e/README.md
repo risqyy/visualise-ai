@@ -140,3 +140,108 @@ Beziehungen auf `orders.order.created`, drei Dateien unter einer `changeId`.
 `.github/workflows/e2e.yml` fährt denselben Lauf auf einem Ubuntu-Runner mit
 `FRONTEND_HTTP_PORT=8080` und lädt den Playwright-Report als Artefakt hoch. Die
 schnellen Suiten laufen getrennt in `.github/workflows/ci.yml`.
+
+## MCP live Canvas acceptance (#80)
+
+`tests/15-mcp-live-canvas.spec.ts` drives the published `/mcp` endpoint using the
+official `@modelcontextprotocol/sdk`, pinned to 1.30.0, while Chromium operates
+the real UI. It creates an isolated project and checks atomic node/edge changes,
+direct applied state, overlapping scopes, selection/focus and camera retention,
+exact retries, browser offline/replay, reload hydration, selected removal and
+history fallback. It adds to the REST/simulator suite.
+
+Run it with `npx playwright test 15-mcp-live-canvas.spec.ts`. The normal global
+setup builds Compose and uses `E2E_COMPOSE_PROJECT` and `FRONTEND_HTTP_PORT` for
+isolation. `E2E_KEEP_STACK=1` retains the stack for inspection. Successful runs
+also retain screenshots of overlapping scopes and selected removal under their
+Playwright test output directory. `E2E_SKIP_COMPOSE=1` is only for a deliberately
+prepared stack, never evidence that a fresh full acceptance deployment passed.
+
+## Native MCP images (#81)
+
+`tests/16-native-render.spec.ts` uses the production native render entry and
+the official MCP client. It checks empty views, valid self relationships,
+partially clipped unfolded bundles, one actual PNG at the requested pixel
+dimensions, model/view revision conflicts and structured domain errors. The
+first MCP image is requested with no user page; a later request preserves an
+open user's camera and selection. The flow reads, renders, corrects one known
+component label and renders again, then explicitly finishes the run.
+
+Successful outputs retain the before/after PNGs, native regression screenshots
+and a measurement attachment with sample count, model size, viewport/detail and
+execution conditions. Run with `npx playwright test 16-native-render.spec.ts`;
+the default full suite includes it automatically.
+
+## Native architecture view acceptance (#82)
+
+`tests/16-native-views.spec.ts` creates an isolated project through the official
+MCP SDK and operates two saved views in Chromium against freshly built
+Compose/Nginx. It checks shared native identities, original history event IDs,
+work evidence, independent cameras/orientations and remembered selection,
+shared live renames, a live empty-scope roundtrip, boundary diagnostics, removal,
+and opaque view IDs through browser selection, deep links, query reads and reload.
+
+Run `npx playwright test 16-native-views.spec.ts` with the same isolated Compose
+settings described above. Successful runs retain `native-detail-view.png` and
+`native-complete-view.png` in the test output directory. Local camera state is
+session-only; reload assertions cover the URL view/selection and saved defaults.
+
+## Complete MCP recovery acceptance (#83)
+
+`tests/17-mcp-command-recovery.spec.ts` adds two independently initialized SDK
+clients racing one model CAS, followed by explicit reread/reconciliation. Its
+lost-response transport override sends the real request through Nginx, consumes
+and discards the committed response bytes, then throws before the SDK sees them.
+An independent model read and published SSE event establish the original commit.
+A newly initialized client retries the identical full command/key and must
+recover the original server event ID, timestamp, ownership, revisions and affected
+IDs. Retrying again after explicit run closure preserves that same receipt.
+
+A rejected node-plus-invalid-edge batch is checked against the model/head and
+single ordered SSE publication stream, plus a native browser status barrier and
+active DOM observer: no partial node can be drawn. The test registers a root and
+two workers, reports overlapping scope, status, progress and owned step completion,
+then closes the run explicitly. Observed new event types must exactly cover the
+generated command catalogue. Together with the simulator's closed legacy catalogue,
+the mandatory suite covers both generations of events.
+
+Test 15 now records Chromium's actual EventSource frames using CDP. Offline
+emulation alone does not reliably close an established stream; `Page.stopLoading`
+explicitly aborts the browser request while offline. A missed committed mutation
+must be absent before reconnect, replayed once afterward and followed by another
+live mutation. Both streams must return 200 and received positions must be gapless
+from the initial hydration snapshot through the continued live event.
+
+The documented client is also executed by the mandatory suite:
+
+```bash
+npm --prefix e2e ci
+MCP_URL=http://localhost:8080/mcp node e2e/examples/native-feedback.mjs
+```
+
+`MCP_OUTPUT_DIR` optionally selects its output directory. By default the example
+writes PNGs and matching JSON metadata under `e2e/test-results/client-example/`.
+The process creates a unique project/run, renders without a user page, corrects
+one model label, renders again and explicitly closes the run. This demonstrates
+model feedback, not automated quality judgment or a repository code change.
+
+The existing full `npm test` gate includes all MCP, native render and saved-view
+tests. Successful PNGs and client outputs are uploaded with `test-results` on every CI
+run; failure traces/videos remain included. Raw measurement attachments are
+retained in the separately uploaded HTML report. This canonical local run also
+exports named JSON files under `test-results/acceptance-evidence`. Timings use `performance.now`:
+render roundtrip samples and distinct mutation-to-observed-canvas scenarios carry
+raw values, sample count, median/range, model/viewport/detail, SDK/browser/font,
+OS/Docker and fresh-versus-reused-stack conditions. These are local observations,
+not an SLA or a repeated identical-write benchmark.
+
+Run a complete isolated source-build acceptance with a disposable project/port:
+
+```bash
+E2E_COMPOSE_PROJECT=vai-epic75-i83 FRONTEND_HTTP_PORT=18183 E2E_KEEP_STACK=1 npm --prefix e2e test
+```
+
+Leave `E2E_SKIP_COMPOSE` unset for final acceptance. This deletes only the selected
+acceptance project's volume, builds the current source and starts fresh. Never
+select a user's existing deployment project. See
+[the acceptance evidence and limits](../docs/epic-75-acceptance.md).

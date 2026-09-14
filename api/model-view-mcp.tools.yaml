@@ -1,0 +1,53 @@
+# Prospective catalogue, not a running MCP registry. Refs resolve against schema.
+contractVersion: 2.0.0
+schema: urn:visualise-ai:model-view-mcp:2.0.0
+errorSchema: '#/$defs/Error'
+tools:
+  - name: visualise_discover
+    inputSchema: '#/$defs/DiscoverInput'
+    outputSchema: '#/$defs/DiscoverResult'
+  - name: visualise_projects_list
+    inputSchema: '#/$defs/ProjectsListInput'
+    outputSchema: '#/$defs/ProjectsListResult'
+  - name: visualise_model_read
+    inputSchema: '#/$defs/ModelReadInput'
+    outputSchema: '#/$defs/ModelReadResult'
+  - name: visualise_element_get
+    inputSchema: '#/$defs/ElementGetInput'
+    outputSchema: '#/$defs/ElementGetResult'
+  - name: visualise_context_read
+    inputSchema: '#/$defs/ContextReadInput'
+    outputSchema: '#/$defs/ContextReadResult'
+  - name: visualise_context_open
+    inputSchema: '#/$defs/ContextOpenInput'
+    outputSchema: '#/$defs/Receipt'
+    eventType: context.opened
+  - name: visualise_work_report
+    inputSchema: '#/$defs/WorkReportInput'
+    outputSchema: '#/$defs/Receipt'
+    eventType: work.reported
+  - name: visualise_work_scope_set
+    inputSchema: '#/$defs/WorkScopeInput'
+    outputSchema: '#/$defs/Receipt'
+    eventType: work.scope_reported
+  - name: visualise_model_mutate
+    inputSchema: '#/$defs/ModelMutateInput'
+    outputSchema: '#/$defs/Receipt'
+    eventType: model.mutation_applied
+  - name: visualise_views_list
+    inputSchema: '#/$defs/ViewsListInput'
+    outputSchema: '#/$defs/ViewsListResult'
+  - name: visualise_view_get
+    inputSchema: '#/$defs/ViewGetInput'
+    outputSchema: '#/$defs/ViewGetResult'
+  - name: visualise_view_put
+    inputSchema: '#/$defs/ViewPutInput'
+    outputSchema: '#/$defs/Receipt'
+    eventType: view.saved
+  - name: visualise_view_remove
+    inputSchema: '#/$defs/ViewRemoveInput'
+    outputSchema: '#/$defs/Receipt'
+    eventType: view.removed
+  - name: visualise_view_render
+    inputSchema: '#/$defs/ViewRenderInput'
+    outputSchema: '#/$defs/ViewRenderResult'

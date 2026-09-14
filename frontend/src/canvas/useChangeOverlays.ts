@@ -1,4 +1,6 @@
 import { useMemo } from 'react'
+import { useQuery } from '@tanstack/react-query'
+import { agentsQuery, runQuery } from '@/api/queries'
 
 import type { ArchitectureResponse, ProjectId } from '@/api/types'
 import { selectLedgerFor, useChangeLedgerStore } from '@/state/changeLedgerStore'
@@ -26,8 +28,11 @@ import {
 export function useChangeOverlays(
   projectId: ProjectId,
   architecture: ArchitectureResponse | undefined,
+  runId?: string,
 ): ChangeOverlayModel {
   const ledger = useChangeLedgerStore((state) => selectLedgerFor(state, projectId))
+  const agents = useQuery({ ...agentsQuery(projectId, runId ?? 'current'), enabled: runId !== undefined })
+  const run = useQuery({ ...runQuery(projectId, runId ?? 'current'), enabled: runId !== undefined })
 
   return useMemo(() => {
     // Nothing loaded yet: an overlay without a model to put it on would be a
@@ -38,6 +43,9 @@ export function useChangeOverlays(
       relationships: architecture.relationships,
       activeChanges: architecture.activeChanges,
       ledger,
+      projectPosition: architecture.projectPosition,
+      agents: agents.data,
+      terminalRunId: run.data?.run.isOpen === false ? run.data.run.runId : undefined,
     })
-  }, [architecture, ledger])
+  }, [architecture, ledger, agents.data, run.data])
 }

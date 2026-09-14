@@ -14,8 +14,12 @@ import (
 func Models() []any {
 	return []any{
 		&Project{},
+		&ModelIdentity{},
+		&CommandReceipt{},
+		&ArchitectureView{},
 		&Run{},
 		&Agent{},
+		&AgentWorkScope{},
 		&Event{},
 		&EventCorrection{},
 		&EventComponent{},
@@ -45,8 +49,11 @@ func Models() []any {
 // AutoMigrate on startup is the single schema authority. A failure here must
 // keep the backend from reporting readiness.
 func Migrate(db *gorm.DB) error {
+	if err := migrateWorkStepRuns(db); err != nil {
+		return err
+	}
 	if err := db.AutoMigrate(Models()...); err != nil {
 		return fmt.Errorf("store: automigrate: %w", err)
 	}
-	return nil
+	return migrateModelTracking(db)
 }

@@ -4,6 +4,7 @@ import {
   changeSnapshot,
   type ActiveChange,
   type AgentId,
+  type AgentListResponse,
   type AppliedComponent,
   type AppliedRelationship,
   type ChangeOperation,
@@ -18,6 +19,7 @@ import type { CanvasKey } from '@/i18n'
 import {
   openWorkSteps as openWorkStepsOf,
   recentAppliedChanges,
+  contributionKey,
   type ChangeLedger,
 } from '@/state/changeLedger'
 import { resolveWorkState, WORK_STATE_BY_ID, type WorkStateId } from '@/state/workStates'
@@ -49,7 +51,7 @@ import { resolveWorkState, WORK_STATE_BY_ID, type WorkStateId } from '@/state/wo
 
 export type OverlayPresence = 'applied' | 'proposal' | 'ghost'
 
-export type ContributionSource = 'planned_change' | 'applied_change' | 'work_step'
+export type ContributionSource = 'planned_change' | 'applied_change' | 'work_step' | 'work_scope'
 
 /** One reported statement about a target, kept verbatim. */
 export interface OverlayContribution {
@@ -71,6 +73,7 @@ export interface OverlayContribution {
    * language and the reported title travels through untouched (#42).
    */
   workStepTitle: string | null
+  terminal?: boolean
 }
 
 export interface ChangeOverlay {
@@ -111,6 +114,9 @@ export const EMPTY_WORK_STATE_COUNTS: WorkStateCounts = {
 }
 
 export interface ChangeOverlayModel {
+  /** Includes retained explicit scope and ID-only removal evidence, even when
+   * no complete descriptor exists to draw a ghost. Keys are kind:id. */
+  evidence?: ReadonlyMap<string, readonly OverlayContribution[]>
   /** Overlay of an applied component, by component id. */
   components: ReadonlyMap<ComponentId, ChangeOverlay>
   /** Overlay of an applied relationship, by relationship id. */
@@ -229,10 +235,11 @@ export function overlayTitle(overlay: ChangeOverlay, t: TFunction<'canvas'>): st
 }
 
 /** One reported contribution as a sentence. Reported parts stay verbatim. */
-function contributionDetail(
+export function contributionDetail(
   contribution: OverlayContribution,
   t: TFunction<'canvas'>,
 ): string {
+  if (contribution.source === 'work_scope') return t(contribution.terminal ? 'overlay.workScopeEnded' : 'overlay.workScopeReported')
   if (contribution.source === 'work_step') {
     return t('overlay.workStepRunning', { title: contribution.workStepTitle ?? '' })
   }
@@ -246,6 +253,9 @@ function contributionDetail(
 }
 
 export interface ChangeOverlayInput {
+  projectPosition?: number
+  agents?: AgentListResponse | undefined
+  terminalRunId?: string | undefined
   components: readonly AppliedComponent[]
   relationships: readonly AppliedRelationship[]
   /** Pending proposals, as the read API returns them (state `planned` only). */
@@ -260,6 +270,7 @@ interface Draft {
   /** Newest non-work-step contribution, which decides the state. */
   latestChange: { state: 'planned' | 'applied'; operation: ChangeOperation } | null
   latestChangePosition: number
+  latestDirectMutation: boolean
   hasActiveWorkStep: boolean
   descriptor: Component | Relationship | null
 }
@@ -284,6 +295,7 @@ export function buildChangeOverlays(input: ChangeOverlayInput): ChangeOverlayMod
       contributions: [],
       latestChange: null,
       latestChangePosition: -1,
+      latestDirectMutation: false,
       hasActiveWorkStep: false,
       descriptor: null,
     }
@@ -297,11 +309,15 @@ export function buildChangeOverlays(input: ChangeOverlayInput): ChangeOverlayMod
     operation: ChangeOperation,
     position: number,
     descriptor: Component | Relationship | null,
+    directMutation = false,
   ): void => {
     if (position < draft.latestChangePosition) return
     draft.latestChange = { state: phase, operation }
     draft.latestChangePosition = position
-    if (descriptor !== null) draft.descriptor = descriptor
+    draft.latestDirectMutation = directMutation
+    // A later ID-only removal cannot borrow a pending proposal's descriptor.
+    // Unknown applied evidence stays unknown, even if a plan proposed a name.
+    draft.descriptor = descriptor
   }
 
   // ---- 1. pending proposals, straight from the read model -----------------
@@ -332,6 +348,8 @@ export function buildChangeOverlays(input: ChangeOverlayInput): ChangeOverlayMod
 
   // ---- 2. recently applied changes, from the event log --------------------
   for (const entry of recentAppliedChanges(input.ledger)) {
+    // Do not combine the future event's overlays with an older GET snapshot.
+    if (entry.directMutation && input.projectPosition !== undefined && entry.position > input.projectPosition) continue
     const draft = draftFor(entry.targetKind, entry.targetId)
     draft.contributions.push({
       source: 'applied_change',
@@ -343,11 +361,20 @@ export function buildChangeOverlays(input: ChangeOverlayInput): ChangeOverlayMod
       reference: entry.changeId,
       workStepTitle: null,
     })
-    recordChange(draft, 'applied', entry.operation, entry.position, entry.snapshot)
+    recordChange(draft, 'applied', entry.operation, entry.position, entry.snapshot, entry.directMutation)
   }
 
   // ---- 3. open work steps -------------------------------------------------
+  const isTerminal = (runId: string, agentId: string): boolean => {
+    const key = contributionKey(runId, agentId)
+    const agent = input.agents?.agents.find((one) => one.runId === runId && one.agentId === agentId)
+    const report = input.ledger.agentStatuses[key]
+    const status = report && report.position > (input.agents?.projectPosition ?? -1) ? report.status : agent?.status ?? report?.status
+    return Object.hasOwn(input.ledger.terminalAgents, key) || Object.hasOwn(input.ledger.terminalRuns, runId)
+      || input.terminalRunId === runId || Boolean(agent?.finishedOutcome) || status === 'done'
+  }
   for (const step of openWorkStepsOf(input.ledger)) {
+    if (isTerminal(step.runId, step.agentId)) continue
     for (const componentId of step.componentIds) {
       const draft = draftFor('component', componentId)
       draft.hasActiveWorkStep = true
@@ -364,16 +391,42 @@ export function buildChangeOverlays(input: ChangeOverlayInput): ChangeOverlayMod
     }
   }
 
+  // Explicit scopes coexist per (run, agent). A fetched snapshot only replaces
+  // the same agent's older report, never another agent's overlapping scope.
+  const scopes = new Map(Object.entries(input.ledger.workScopes))
+  for (const agent of input.agents?.agents ?? []) {
+    const key = contributionKey(agent.runId, agent.agentId)
+    if (agent.workScope && agent.workScopePosition != null && agent.workScopePosition >= (scopes.get(key)?.position ?? -1)) {
+      scopes.set(key, { ...agent.workScope, runId: agent.runId, agentId: agent.agentId,
+        position: agent.workScopePosition, occurredAt: '' })
+    }
+  }
+  for (const scope of scopes.values()) {
+    const terminal = isTerminal(scope.runId, scope.agentId)
+    for (const [kind, ids] of [['component', scope.componentIds], ['relationship', scope.relationshipIds]] as const) {
+      for (const id of ids) {
+        const draft = draftFor(kind, id)
+        const exists = kind === 'component' ? appliedComponentIds.has(id) : appliedRelationshipIds.has(id)
+        if (!terminal && exists) draft.hasActiveWorkStep = true
+        draft.contributions.push({ source: 'work_scope', agentId: scope.agentId, runId: scope.runId,
+          operation: null, at: scope.occurredAt, position: scope.position, reference: null,
+          workStepTitle: null, terminal })
+      }
+    }
+  }
+
   // ---- 4. resolve --------------------------------------------------------
   const components = new Map<ComponentId, ChangeOverlay>()
   const relationships = new Map<Identifier, ChangeOverlay>()
   const extraComponents: OverlayComponent[] = []
   const extraRelationships: OverlayRelationship[] = []
   const counts: WorkStateCounts = { ...EMPTY_WORK_STATE_COUNTS }
+  const evidence = new Map<string, readonly OverlayContribution[]>()
 
   for (const draft of [...drafts.values()].sort((a, b) =>
     a.targetId < b.targetId ? -1 : a.targetId > b.targetId ? 1 : 0,
   )) {
+    evidence.set(`${draft.targetKind}:${draft.targetId}`, [...draft.contributions].sort((a, b) => a.position - b.position))
     const state = resolveWorkState({
       hasActiveWorkStep: draft.hasActiveWorkStep,
       change: draft.latestChange,
@@ -384,6 +437,10 @@ export function buildChangeOverlays(input: ChangeOverlayInput): ChangeOverlayMod
       draft.targetKind === 'component'
         ? appliedComponentIds.has(draft.targetId)
         : appliedRelationshipIds.has(draft.targetId)
+
+    // During replay a newer GET may already omit an element that an older
+    // applied add/update mentions. That history cannot resurrect the model.
+    if (!inAppliedModel && draft.latestDirectMutation && draft.latestChange?.operation !== 'remove') continue
 
     const presence: OverlayPresence = inAppliedModel
       ? 'applied'
@@ -433,6 +490,7 @@ export function buildChangeOverlays(input: ChangeOverlayInput): ChangeOverlayMod
   }
 
   return {
+    evidence,
     components,
     relationships,
     extraComponents,

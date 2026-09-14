@@ -90,6 +90,7 @@ func TestComponentChangePlannedDoesNotTouchTheAppliedModel(t *testing.T) {
 func TestComponentChangeAppliedUpdatesTheModelAndClosesThePlannedChange(t *testing.T) {
 	s := newScenario(t)
 	s.startRun()
+	s.append(s.loadExample("architecture-snapshot.json"))
 	s.append(s.loadExample("component-change-planned.json"))
 	planned := s.activeChange("change-2026-08-04-0007")
 
@@ -473,6 +474,20 @@ func TestEveryCatalogueTypeIsProjected(t *testing.T) {
 		"retractsClientEventId": "`+relationshipPlanned.ClientEventID+`",
 		"reason": "Superseded by the applied change."
 	}`)
+	mutation := s.event(parent, nil, TypeModelMutationApplied, `{"expectedModelRevision":3,"operations":[{"op":"component.update","componentId":"shop-platform","set":{"name":"Shop Platform"}}]}`)
+	mutation.SchemaVersion = "2.0"
+	s.append(mutation)
+	for _, command := range []struct{ kind, payload string }{
+		{TypeContextOpened, `{"role":"subagent","displayName":"MCP worker","assignedTask":"Explicit work"}`},
+		{TypeWorkReported, `{"report":{"action":"status","status":"working"}}`},
+		{TypeWorkScopeReported, `{"scope":{"componentIds":[],"relationshipIds":[]}}`},
+		{TypeViewSaved, `{"expectedModelRevision":4,"expectedViewRevision":0,"view":{"viewId":"all-view","name":"All","kind":"architecture","selection":{"mode":"all"},"orientation":"top-down","collapsedComponentIds":[]}}`},
+		{TypeViewRemoved, `{"expectedViewRevision":1,"viewId":"all-view"}`},
+	} {
+		env := s.event("mcp-worker", subagent, command.kind, command.payload)
+		env.SchemaVersion = "2.0"
+		s.append(env)
+	}
 	s.emit("subagent-implementer", subagent, TypeAgentFinished, `{"outcome":"completed","summary":"VAT extracted."}`)
 	s.append(s.loadExample("run-finished.json"))
 
@@ -488,8 +503,8 @@ func TestEveryCatalogueTypeIsProjected(t *testing.T) {
 	}
 
 	catalogue := EventTypes()
-	if len(catalogue) != 20 {
-		t.Fatalf("the catalogue has %d types, want 20", len(catalogue))
+	if len(catalogue) != 26 {
+		t.Fatalf("the catalogue has %d types, want 26", len(catalogue))
 	}
 	for _, evType := range catalogue {
 		if !stored[evType] {

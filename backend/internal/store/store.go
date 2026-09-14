@@ -26,32 +26,38 @@ import (
 
 // Envelope is one validated event handed to the store for appending.
 type Envelope struct {
-	ProjectID     string
-	ClientEventID string
-	RunID         string
-	AgentID       string
-	ParentAgentID *string
-	Type          string
-	SchemaVersion string
-	OccurredAt    time.Time
-	Payload       json.RawMessage
+	ProjectID      string
+	ClientEventID  string
+	RunID          string
+	AgentID        string
+	ParentAgentID  *string
+	Type           string
+	SchemaVersion  string
+	OccurredAt     time.Time
+	OccurredAtText string // Original validated token for command replay identity.
+	Payload        json.RawMessage
 }
 
 // Result reports how an Append was resolved. Duplicate is true when the event
 // had already been accepted under the same clientEventId with identical
 // content; the originally assigned position is repeated unchanged.
 type Result struct {
-	ProjectID     string
-	Position      int64
-	ServerEventID string
-	ClientEventID string
-	Duplicate     bool
-	ReceivedAt    time.Time
+	RunID         string      `json:"runId"`
+	AgentID       string      `json:"agentId"`
+	ModelRevision int64       `json:"modelRevision"`
+	ViewRevision  *int64      `json:"viewRevision"`
+	Affected      AffectedIDs `json:"affected"`
+	ProjectID     string      `json:"projectId"`
+	Position      int64       `json:"projectPosition"`
+	ServerEventID string      `json:"serverEventId"`
+	ClientEventID string      `json:"clientEventId"`
+	Duplicate     bool        `json:"duplicate"`
+	ReceivedAt    time.Time   `json:"receivedAt"`
 	// Payload is the canonical form that was stored. Publishing this rather
 	// than the bytes the agent sent keeps a live SSE frame byte-identical to
 	// the same event replayed from the log, which would otherwise differ in
 	// object key order.
-	Payload json.RawMessage
+	Payload json.RawMessage `json:"-"`
 }
 
 // ErrClientEventIDConflict marks a reused idempotency key whose content differs
@@ -134,6 +140,10 @@ func (s *Store) AppendGuarded(ctx context.Context, env Envelope, guard Guard) (R
 		return Result{}, fmt.Errorf("store: canonicalising payload: %w", err)
 	}
 	hash := payloadHash(canonical)
+	identity, err := commandIdentity(env)
+	if err != nil {
+		return Result{}, err
+	}
 
 	var result Result
 	err = s.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
@@ -141,7 +151,16 @@ func (s *Store) AppendGuarded(ctx context.Context, env Envelope, guard Guard) (R
 		// concurrent request for this project queues up here, so reading
 		// last_position and writing position + 1 cannot interleave. A plain
 		// max(position) + 1 would let two transactions read the same value.
-		project, err := lockProject(tx, env.ProjectID, env.OccurredAt)
+		var project Project
+		var err error
+		if env.SchemaVersion == "2.0" && env.Type != "context.opened" {
+			err = tx.Clauses(clause.Locking{Strength: "UPDATE"}).Where("project_id = ?", env.ProjectID).Take(&project).Error
+			if errors.Is(err, gorm.ErrRecordNotFound) {
+				return domainError("project_not_found", "/projectId", "project %q does not exist", env.ProjectID)
+			}
+		} else {
+			project, err = lockProject(tx, env.ProjectID, env.OccurredAt)
+		}
 		if err != nil {
 			return err
 		}
@@ -151,7 +170,11 @@ func (s *Store) AppendGuarded(ctx context.Context, env Envelope, guard Guard) (R
 			return err
 		}
 		if existing != nil {
-			if existing.PayloadHash == hash &&
+			sameCommand, receipt, err := replayCommand(tx, existing, identity)
+			if err != nil {
+				return err
+			}
+			if sameCommand && existing.PayloadHash == hash &&
 				existing.Type == env.Type &&
 				existing.SchemaVersion == env.SchemaVersion {
 				result = Result{
@@ -163,6 +186,11 @@ func (s *Store) AppendGuarded(ctx context.Context, env Envelope, guard Guard) (R
 					ReceivedAt:    existing.ReceivedAt,
 					Payload:       json.RawMessage(existing.Payload),
 				}
+				if receipt != nil {
+					result = *receipt
+					result.Duplicate = true
+					result.Payload = json.RawMessage(existing.Payload)
+				}
 				return nil
 			}
 			return &ClientEventIDConflictError{
@@ -172,10 +200,26 @@ func (s *Store) AppendGuarded(ctx context.Context, env Envelope, guard Guard) (R
 			}
 		}
 
+		if project.ModelActivatedAtPosition == nil {
+			if err := activateModelTracking(tx, project); err != nil {
+				return err
+			}
+			project.ModelRevision = 0
+		}
 		if guard != nil {
 			if err := guard(tx, env); err != nil {
 				return err
 			}
+		}
+
+		viewRevision, err := prepareViewWrite(tx, env, project)
+		if err != nil {
+			return err
+		}
+
+		before, modelWrite, err := prepareModelWrite(tx, env, project)
+		if err != nil {
+			return err
 		}
 
 		event := &Event{
@@ -202,6 +246,12 @@ func (s *Store) AppendGuarded(ctx context.Context, env Envelope, guard Guard) (R
 		if err := s.apply(tx, event); err != nil {
 			return err
 		}
+		if modelWrite {
+			if err := finishModelWrite(tx, event, before); err != nil {
+				return err
+			}
+			project.ModelRevision++
+		}
 		if err := linkEventComponents(tx, event); err != nil {
 			return err
 		}
@@ -215,7 +265,22 @@ func (s *Store) AppendGuarded(ctx context.Context, env Envelope, guard Guard) (R
 			ReceivedAt:    event.ReceivedAt,
 			Payload:       canonical,
 		}
-		return nil
+		result.RunID = env.RunID
+		result.AgentID = env.AgentID
+		result.ModelRevision = project.ModelRevision
+		result.ViewRevision = viewRevision
+		result.Affected, err = workAffected(tx, env)
+		if err != nil {
+			return err
+		}
+		if env.Type == TypeWorkReported || env.Type == TypeWorkScopeReported {
+			for _, id := range result.Affected.ComponentIDs {
+				if err := tx.Clauses(clause.OnConflict{DoNothing: true}).Create(&EventComponent{ProjectID: env.ProjectID, Position: event.Position, ComponentID: id}).Error; err != nil {
+					return err
+				}
+			}
+		}
+		return saveReceipt(tx, env, identity, result)
 	})
 	if err != nil {
 		return Result{}, err
@@ -230,9 +295,10 @@ func lockProject(tx *gorm.DB, projectID string, seenAt time.Time) (Project, erro
 	// under concurrency: the loser of the race does nothing and then blocks on
 	// the winner's row lock below, which is exactly the intended queueing.
 	if err := tx.Clauses(clause.OnConflict{DoNothing: true}).Create(&Project{
-		ProjectID:   projectID,
-		FirstSeenAt: seenAt.UTC(),
-		LastEventAt: seenAt.UTC(),
+		ProjectID:                projectID,
+		FirstSeenAt:              seenAt.UTC(),
+		LastEventAt:              seenAt.UTC(),
+		ModelActivatedAtPosition: new(int64),
 	}).Error; err != nil {
 		return Project{}, err
 	}

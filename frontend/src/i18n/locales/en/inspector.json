@@ -57,6 +57,7 @@
     "agentProgressReported": "Progress reported",
     "agentStarted": "Agent started",
     "agentStatusReported": "Status reported",
+    "modelMutationApplied": "Model mutation applied",
     "architectureSnapshotPublished": "Architecture snapshot published",
     "componentChangeApplied": "Component change applied",
     "componentChangePlanned": "Component change planned",
@@ -72,7 +73,12 @@
     "riskReported": "Risk reported",
     "runFinished": "Run finished",
     "workStepCompleted": "Work step completed",
-    "workStepStarted": "Work step started"
+    "workStepStarted": "Work step started",
+    "contextOpened": "Work context opened",
+    "workReported": "Work reported",
+    "workScopeReported": "Work scope reported",
+    "viewSaved": "View saved",
+    "viewRemoved": "View removed"
   },
   "feedback": {
     "emptyDescription": "For this component no feedback.published was reported in this run.",
@@ -136,5 +142,9 @@
     "currentRun": "Current run",
     "history": "History",
     "label": "Evidence source"
+  },
+  "contributions": {
+    "label": "Reported contributions",
+    "note": "Model changes are applied directly. Work scope is reported separately and does not prove code changes."
   }
 }

@@ -11,7 +11,8 @@ import {
   type EventSourceLike,
   type LiveStreamHandle,
 } from './liveStream'
-import type { ProjectId, StreamedEvent } from './types'
+import type { ArchitectureResponse, ProjectId, StreamedEvent } from './types'
+import { queryKeys } from './queryKeys'
 
 /**
  * Applies one live event to the client state.
@@ -31,7 +32,7 @@ import type { ProjectId, StreamedEvent } from './types'
  *    and never enters the cache.
  */
 export function applyLiveEvent(queryClient: QueryClient, event: StreamedEvent): void {
-  ingestLiveEvent(event)
+  ingestLiveEvent(event, queryClient.getQueryData<ArchitectureResponse>(queryKeys.architecture(event.projectId)))
   for (const queryKey of affectedQueryKeys(event)) {
     void queryClient.invalidateQueries({ queryKey })
   }
@@ -60,32 +61,39 @@ export function useLiveStream(
   useEffect(() => {
     if (!projectId || !enabled) return
 
-    const { setState, recordEvent } = useLiveConnectionStore.getState()
+    const { activate, deactivate, setState, recordEvent } = useLiveConnectionStore.getState()
+    activate(projectId)
 
     // No `EventSource` (jsdom, or a browser without SSE): report the connection
     // as offline instead of throwing. The HTTP read models still work, the
     // cockpit simply stops updating by itself.
     if (!createEventSource && typeof EventSource === 'undefined') {
-      setState('offline')
-      return
+      setState(projectId, 'offline')
+      return () => deactivate(projectId)
     }
-
-    setState('connecting')
 
     const handle: LiveStreamHandle = connectLiveStream({
       projectId,
       initialPosition: useLiveConnectionStore.getState().lastEventPosition,
       onEvent: (event) => {
-        recordEvent(event.position)
         applyLiveEvent(queryClient, event)
+        recordEvent(projectId, event.position)
       },
-      onStateChange: setState,
+      onStateChange: (state) => {
+        setState(projectId, state)
+        // With no observed frame there is no replay cursor. Reconcile reads
+        // after subscribing: a cached GET may precede this live-tail stream,
+        // including a return to a previously read project that emitted nothing.
+        if (state === 'live' && useLiveConnectionStore.getState().lastEventPosition === null) {
+          void queryClient.invalidateQueries({ queryKey: queryKeys.project(projectId) })
+        }
+      },
       ...(createEventSource ? { createEventSource } : {}),
     })
 
     return () => {
       handle.close()
-      useLiveConnectionStore.getState().setState('offline')
+      deactivate(projectId)
     }
   }, [projectId, enabled, queryClient, createEventSource])
 }

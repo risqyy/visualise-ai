@@ -48,6 +48,7 @@ import { useUiStore } from '@/state/uiStore'
 import { ReportedText } from '@/i18n'
 
 import { EdgeMarkerDefs } from './RelationshipEdge'
+import { InteractiveEdgeActionsProvider } from './InteractiveEdgeActionsProvider'
 import {
   INITIAL_CAMERA_POLICY,
   isBoundsFullyVisible,
@@ -155,6 +156,7 @@ type FitMode = 'initial' | 'user'
 export interface ArchitectureCanvasProps {
   projectId: ProjectId
   model: ArchitectureModel
+  allowOrientationAutoFit?: boolean
   selectedComponentId?: ComponentId | undefined
   selectedRelationshipId?: Identifier | null | undefined
   onSelectComponent: (componentId: ComponentId | null) => void
@@ -177,12 +179,15 @@ export interface ArchitectureCanvasMetrics {
 export function ArchitectureCanvas(props: ArchitectureCanvasProps) {
   return (
     <ReactFlowProvider>
-      <ArchitectureCanvasInner {...props} />
+      <InteractiveEdgeActionsProvider>
+        <ArchitectureCanvasInner {...props} />
+      </InteractiveEdgeActionsProvider>
     </ReactFlowProvider>
   )
 }
 
 function ArchitectureCanvasInner({
+  allowOrientationAutoFit = true,
   projectId,
   model,
   selectedComponentId,
@@ -263,7 +268,17 @@ function ArchitectureCanvasInner({
   const storeApi = useStoreApi()
 
   const camera = useUiStore((state) => state.camera)
-  const setCamera = useUiStore((state) => state.setCamera)
+  const updateCamera = useUiStore((state) => state.setCamera)
+  const mountedRef = useRef(true)
+  useLayoutEffect(() => {
+    mountedRef.current = true
+    return () => { mountedRef.current = false }
+  }, [])
+  const setCamera = useCallback((viewport: Viewport) => {
+    // React Flow may finish a pending viewport transition after unmount. It
+    // must never initialize or overwrite the next view's local camera.
+    if (mountedRef.current) updateCamera(viewport)
+  }, [updateCamera])
   const nodePositions = useUiStore((state) => state.nodePositions)
   const setNodePosition = useUiStore((state) => state.setNodePosition)
   const clearNodePositions = useUiStore((state) => state.clearNodePositions)
@@ -308,7 +323,7 @@ function ArchitectureCanvasInner({
 
   const [detailLevel, setDetailLevel] = useState(() => detailLevelForZoom(camera.zoom))
   const [fitViewCount, setFitViewCount] = useState(0)
-  const policyRef = useRef<CameraPolicyState>(INITIAL_CAMERA_POLICY)
+  const policyRef = useRef<CameraPolicyState>(useUiStore.getState().cameraInitialized ? { fittedProjectId: projectId, fittedSize: null } : INITIAL_CAMERA_POLICY)
   // The drawing surface itself. Used to publish the live zoom to CSS, nothing
   // else — the camera stays React Flow's.
   const surfaceRef = useRef<HTMLDivElement | null>(null)
@@ -321,7 +336,7 @@ function ArchitectureCanvasInner({
   const ariaLabelConfig = useMemo(() => canvasAriaLabelConfig(t), [t])
   // Flipped by the first pan or zoom that came from a real input event. From
   // then on the camera is the user's and nothing but "Einpassen" touches it.
-  const userMovedCameraRef = useRef(false)
+  const userMovedCameraRef = useRef(useUiStore.getState().cameraInitialized)
   // A direction switch is an explicit user action. It invalidates local drag
   // positions and parks one fit until the direction-specific layout lands.
   const orientationRef = useRef<GraphOrientation | null>(null)
@@ -717,7 +732,7 @@ function ArchitectureCanvasInner({
     orientationRef.current = orientation
     // The first orientation is the URL/default input for the initial picture,
     // not a second explicit camera movement.
-    if (previous === null || previous === orientation) return
+    if (previous === null || previous === orientation || !allowOrientationAutoFit) return
 
     invalidatePendingSearchFocus()
     // Positions are meaningful only in the coordinate system that produced
@@ -725,7 +740,7 @@ function ArchitectureCanvasInner({
     // two direction-specific sets, while selection and disclosure stay intact.
     clearNodePositions()
     pendingFitRef.current = { mode: 'user', focusComponentId: null }
-  }, [clearNodePositions, invalidatePendingSearchFocus, orientation])
+  }, [clearNodePositions, invalidatePendingSearchFocus, orientation, allowOrientationAutoFit])
 
   /** Fits now if the graph is already the right one, otherwise after re-layout. */
   const requestFit = useCallback(
@@ -753,7 +768,7 @@ function ArchitectureCanvasInner({
   const disclosedProjectRef = useRef<ProjectId | null>(null)
   useEffect(() => {
     policyRef.current = onProjectChanged(policyRef.current, projectId)
-    clearExpandedEdges()
+    if (disclosedProjectRef.current !== null && disclosedProjectRef.current !== projectId) clearExpandedEdges()
     if (disclosedProjectRef.current !== null && disclosedProjectRef.current !== projectId) {
       setCollapsedComponentIds(null)
     }

@@ -39,6 +39,9 @@ jobs:
       # exercised. Locally the suite defaults to 8100.
       FRONTEND_HTTP_PORT: '8080'
       E2E_COMPOSE_PROJECT: vai-e2e-ci
+      # Retain containers until failure logs have been collected below.
+      # Global setup still starts from an empty database on every run.
+      E2E_KEEP_STACK: '1'
 
     steps:
       - uses: actions/checkout@v5
@@ -76,6 +79,9 @@ jobs:
         run: npm test
         working-directory: e2e
 
+      - name: Verify the backend Chromium sandbox
+        run: docker compose -p "${E2E_COMPOSE_PROJECT}" exec -T backend sh -s < backend/scripts/verify-chromium-sandbox.sh
+
       - name: Upload the Playwright report
         if: always()
         uses: actions/upload-artifact@v5
@@ -84,10 +90,10 @@ jobs:
           path: e2e/playwright-report/
           retention-days: 14
 
-      # Traces, screenshots and videos of failed tests. Only produced on
-      # failure, so the step is a no-op on a green run.
-      - name: Upload failure artefacts
-        if: failure()
+      # Keep successful PNGs/client outputs and failure traces/videos.
+      # Raw measurement attachments are retained in the HTML report above.
+      - name: Upload acceptance artefacts
+        if: always()
         uses: actions/upload-artifact@v5
         with:
           name: playwright-test-results
@@ -96,4 +102,12 @@ jobs:
 
       - name: Dump the deployment logs on failure
         if: failure()
-        run: docker compose -p "${E2E_COMPOSE_PROJECT}" logs --no-color --tail 400 || true
+        run: |
+          docker compose -p "${E2E_COMPOSE_PROJECT}" logs --no-color --tail 400 || true
+          docker info --format '{{json .SecurityOptions}}' || true
+          sysctl kernel.unprivileged_userns_clone user.max_user_namespaces kernel.apparmor_restrict_unprivileged_userns || true
+          sudo dmesg | rg -i 'apparmor|audit' | tail -n 40 || true
+
+      - name: Remove the acceptance deployment
+        if: always()
+        run: docker compose -p "${E2E_COMPOSE_PROJECT}" down -v --remove-orphans

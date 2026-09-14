@@ -8,6 +8,7 @@ import (
 	"github.com/rs/zerolog"
 
 	"github.com/risqyy/visualise-ai/backend/internal/readapi"
+	"github.com/risqyy/visualise-ai/backend/internal/store"
 )
 
 // problemBaseURI prefixes the `type` of every problem document this API serves.
@@ -31,6 +32,22 @@ func registerRead(engine *gin.Engine, service *readapi.Service, logger zerolog.L
 	group.GET("/projects", listProjectsHandler(service, logger))
 	group.GET("/projects/:projectId", getProjectHandler(service, logger))
 	group.GET("/projects/:projectId/architecture", getArchitectureHandler(service, logger))
+	group.GET("/projects/:projectId/views", func(c *gin.Context) {
+		response, err := service.Views(c.Request.Context(), c.Param("projectId"), c.Query("limit"), c.Query("cursor"))
+		if err != nil {
+			failRead(c, logger, err)
+			return
+		}
+		c.JSON(http.StatusOK, response)
+	})
+	group.GET("/projects/:projectId/view", func(c *gin.Context) {
+		response, err := service.View(c.Request.Context(), c.Param("projectId"), c.Query("viewId"))
+		if err != nil {
+			failRead(c, logger, err)
+			return
+		}
+		c.JSON(http.StatusOK, response)
+	})
 	group.GET("/projects/:projectId/runs", listRunsHandler(service, logger))
 	group.GET("/projects/:projectId/runs/:runId", getRunHandler(service, logger))
 	group.GET("/projects/:projectId/runs/:runId/agents", listAgentsHandler(service, logger))
@@ -165,7 +182,17 @@ func getComponentHistoryHandler(service *readapi.Service, logger zerolog.Logger)
 // the client.
 func failRead(c *gin.Context, logger zerolog.Logger, err error) {
 	var invalid *readapi.ValidationError
+	var domain *store.DomainError
 	switch {
+	case errors.As(err, &domain):
+		status := http.StatusBadRequest
+		if domain.Code == "view_not_found" || domain.Code == "project_not_found" {
+			status = http.StatusNotFound
+		}
+		if domain.Code == "stale_cursor" || domain.Code == "revision_conflict" {
+			status = http.StatusConflict
+		}
+		writeProblem(c, status, domain.Code, domain.Code, domain.Detail)
 	case errors.As(err, &invalid):
 		writeValidationProblem(c, invalid)
 	case errors.Is(err, readapi.ErrProjectNotFound):

@@ -83,3 +83,22 @@ func TestLoadRejectsInvalidValues(t *testing.T) {
 		})
 	}
 }
+
+func TestMCPTransportConfiguration(t *testing.T) {
+	t.Setenv("DATABASE_URL", "postgres://test")
+	t.Setenv("MCP_ALLOWED_HOSTS", "localhost:18178, 127.0.0.1:18178")
+	t.Setenv("MCP_ALLOWED_ORIGINS", "http://localhost:18178")
+	t.Setenv("MCP_REQUEST_TIMEOUT", "10s")
+	t.Setenv("MCP_SESSION_TIMEOUT", "1m")
+	cfg, err := Load()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(cfg.MCPAllowedHosts) != 2 || cfg.MCPAllowedHosts[1] != "127.0.0.1:18178" || cfg.MCPAllowedOrigins[0] != "http://localhost:18178" || cfg.MCPRequestTimeout != 10*time.Second || cfg.MCPSessionTimeout != time.Minute {
+		t.Fatalf("MCP configuration %+v", cfg)
+	}
+	t.Setenv("MCP_REQUEST_TIMEOUT", "0s")
+	if _, err := Load(); err == nil {
+		t.Fatal("accepted zero request deadline")
+	}
+}

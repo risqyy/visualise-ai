@@ -120,6 +120,7 @@ export const projectResponse: ProjectResponse = {
 }
 
 export const architectureResponse: ArchitectureResponse = {
+  modelRevision: 1,
   projectPosition: 42,
   components: [component()],
   relationships: [],
@@ -204,6 +205,7 @@ export function createFakeFetch(
       return typeof body === 'function' ? (body as () => Response)() : jsonResponse(body)
     }
 
+    if (path === `/api/v1/projects/${PROJECT_ID}/views`) return jsonResponse({ projectId: PROJECT_ID, projectPosition: 0, modelRevision: 0, items: [], nextCursor: null })
     if (path === '/api/v1/projects') return jsonResponse(projectsResponse)
     if (path === `/api/v1/projects/${PROJECT_ID}/runs/current`)
       return jsonResponse(currentRunResponse)

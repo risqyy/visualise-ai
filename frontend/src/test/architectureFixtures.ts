@@ -271,6 +271,7 @@ export const ALL_RELATIONSHIP_KINDS: readonly RelationshipKind[] = [
 ]
 
 export const nestedArchitectureResponse: ArchitectureResponse = {
+  modelRevision: 1,
   projectPosition: 42,
   components: NESTED_COMPONENTS,
   relationships: NESTED_RELATIONSHIPS,
@@ -282,6 +283,7 @@ export const nestedArchitectureResponse: ArchitectureResponse = {
  * update that really changes the architecture.
  */
 export const grownArchitectureResponse: ArchitectureResponse = {
+  modelRevision: 2,
   projectPosition: 43,
   components: [
     ...NESTED_COMPONENTS,
@@ -408,6 +410,7 @@ export const LARGE_RELATIONSHIPS: AppliedRelationship[] = LARGE_MODEL.relationsh
 )
 
 export const largeArchitectureResponse: ArchitectureResponse = {
+  modelRevision: 1,
   projectPosition: 90,
   components: LARGE_COMPONENTS,
   relationships: LARGE_RELATIONSHIPS,
@@ -416,6 +419,7 @@ export const largeArchitectureResponse: ArchitectureResponse = {
 
 /** The large model with one more leaf — a real structural live update. */
 export const largeGrownArchitectureResponse: ArchitectureResponse = {
+  modelRevision: 2,
   projectPosition: 91,
   components: [
     ...LARGE_COMPONENTS,
@@ -503,6 +507,7 @@ export function architectureWithChanges(
   overrides: Partial<ArchitectureResponse> = {},
 ): ArchitectureResponse {
   return {
+    modelRevision: 1,
     projectPosition: 60,
     components: NESTED_COMPONENTS,
     relationships: NESTED_RELATIONSHIPS,

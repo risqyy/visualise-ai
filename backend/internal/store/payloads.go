@@ -8,6 +8,7 @@ import (
 // The closed v0 event catalogue. The contract in api/openapi.yaml is the
 // authority; the store must be able to project every one of these types.
 const (
+	TypeModelMutationApplied          = "model.mutation_applied"
 	TypeAgentStarted                  = "agent.started"
 	TypeAgentStatusReported           = "agent.status_reported"
 	TypeAgentProgressReported         = "agent.progress_reported"
@@ -76,6 +77,12 @@ func EventTypes() []string {
 		TypeCorrectionIssued,
 		TypeRetractionIssued,
 		TypeRunFinished,
+		TypeModelMutationApplied,
+		TypeContextOpened,
+		TypeWorkReported,
+		TypeWorkScopeReported,
+		TypeViewSaved,
+		TypeViewRemoved,
 	}
 }
 
@@ -91,9 +98,9 @@ type componentDescriptor struct {
 	Name              string          `json:"name"`
 	Kind              string          `json:"kind"`
 	ParentComponentID *string         `json:"parentComponentId"`
-	Description       string          `json:"description"`
-	Technology        json.RawMessage `json:"technology"`
-	Tags              json.RawMessage `json:"tags"`
+	Description       string          `json:"description,omitempty"`
+	Technology        json.RawMessage `json:"technology,omitempty"`
+	Tags              json.RawMessage `json:"tags,omitempty"`
 }
 
 type relationshipDescriptor struct {
@@ -101,10 +108,10 @@ type relationshipDescriptor struct {
 	SourceComponentID string `json:"sourceComponentId"`
 	TargetComponentID string `json:"targetComponentId"`
 	Kind              string `json:"kind"`
-	Label             string `json:"label"`
-	Protocol          string `json:"protocol"`
-	Operation         string `json:"operation"`
-	Channel           string `json:"channel"`
+	Label             string `json:"label,omitempty"`
+	Protocol          string `json:"protocol,omitempty"`
+	Operation         string `json:"operation,omitempty"`
+	Channel           string `json:"channel,omitempty"`
 }
 
 type planStepDescriptor struct {

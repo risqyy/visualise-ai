@@ -15,17 +15,25 @@ import { PaneHeader } from '@/components/workspace/PaneHeader'
 import { RelationshipLegend } from '@/components/workspace/RelationshipLegend'
 import { Badge } from '@/components/ui/badge'
 import { ReportedText } from '@/i18n'
-import type { GraphOrientation } from '@/canvas/graphOrientation'
+import { DEFAULT_GRAPH_ORIENTATION, type GraphOrientation } from '@/canvas/graphOrientation'
+import { resolveArchitectureView } from '@/views/resolveArchitectureView'
+import { filterViewOverlays } from '@/views/filterViewOverlays'
+import { CanvasViewBoundary } from '@/views/CanvasViewBoundary'
+import { ViewSelector } from '@/views/ViewSelector'
+import { useView } from '@/views/queries'
 
 export interface ArchitecturePaneProps {
   projectId: ProjectId
+  runId?: string
+  viewId?: string | undefined
+  onSelectView?: (id: string | undefined) => void
   /** Selection from the URL; the canvas mirrors it, it never owns it. */
   selectedComponentId?: ComponentId | undefined
   /** Selection from the URL for one reported relationship. */
   selectedRelationshipId?: Identifier | null | undefined
   /** Writes the selection back into the `component` search param. */
   onSelectComponent: (componentId: ComponentId | null) => void
-  orientation: GraphOrientation
+  orientation?: GraphOrientation | undefined
   onOrientationChange: (orientation: GraphOrientation) => void
   /** Writes a relationship selection to the `relationship` search param. */
   onSelectRelationship: (relationshipId: Identifier | null) => void
@@ -42,6 +50,9 @@ export interface ArchitecturePaneProps {
  */
 export function ArchitecturePane({
   projectId,
+  runId,
+  viewId,
+  onSelectView,
   selectedComponentId,
   selectedRelationshipId,
   onSelectComponent,
@@ -51,10 +62,19 @@ export function ArchitecturePane({
 }: ArchitecturePaneProps) {
   const { t } = useTranslation('canvas')
   const architecture = useArchitecture(projectId)
-  const overlay = useChangeOverlays(projectId, architecture.data)
+  const globalOverlay = useChangeOverlays(projectId, architecture.data, runId)
+  const savedView = useView(projectId, viewId)
+  const resolution = useMemo(() => savedView.data && architecture.data ? resolveArchitectureView(architecture.data, savedView.data.view) : null, [architecture.data, savedView.data])
+  const overlay = useMemo(() => resolution && savedView.data ? filterViewOverlays(globalOverlay, savedView.data.view, resolution.model.components.map((c) => c.componentId), resolution.model.relationships.map((r) => r.relationshipId)) : globalOverlay, [globalOverlay, resolution, savedView.data])
+  const components = resolution?.model.components ?? architecture.data?.components
+  const relationships = resolution?.model.relationships ?? architecture.data?.relationships
+  const effectiveOrientation = orientation ?? (savedView.data?.view.orientation === 'left-to-right' ? 'left-right' : DEFAULT_GRAPH_ORIENTATION)
+  const outsideSelection = viewId !== undefined && resolution !== null && ((selectedComponentId !== undefined && !components?.some((c) => c.componentId === selectedComponentId)) || (selectedRelationshipId != null && !relationships?.some((r) => r.relationshipId === selectedRelationshipId)))
+  const missingCount = (resolution?.missingReferences.componentIds.length ?? 0) + (resolution?.missingReferences.relationshipIds.length ?? 0)
+  const boundaryCount = resolution?.boundaryRelationshipIds.length ?? 0
 
-  const componentCount = architecture.data?.components.length ?? 0
-  const relationshipCount = architecture.data?.relationships.length ?? 0
+  const componentCount = components?.length ?? 0
+  const relationshipCount = relationships?.length ?? 0
   const proposalComponentCount = overlay.extraComponents.filter(
     (entry) => entry.overlay.presence === 'proposal',
   ).length
@@ -81,8 +101,8 @@ export function ArchitecturePane({
   // reported. Deriving it here keeps the legend and the canvas reading from the
   // same model instead of from the contract's full catalogue.
   const presentKinds = useMemo(
-    () => [...new Set((architecture.data?.relationships ?? []).map((r) => r.kind))],
-    [architecture.data?.relationships],
+    () => [...new Set((relationships ?? []).map((r) => r.kind))],
+    [relationships],
   )
 
   // Kept stable across refetches: TanStack Query's structural sharing returns
@@ -91,11 +111,11 @@ export function ArchitecturePane({
   // proposal must not turn into a component of the reported architecture.
   const model = useMemo(
     () => ({
-      components: architecture.data?.components ?? [],
-      relationships: architecture.data?.relationships ?? [],
+      components: components ?? [],
+      relationships: relationships ?? [],
       overlay,
     }),
-    [architecture.data?.components, architecture.data?.relationships, overlay],
+    [components, relationships, overlay],
   )
 
   return (
@@ -168,19 +188,26 @@ export function ArchitecturePane({
         }
       />
 
+      {onSelectView && <ViewSelector projectId={projectId} viewId={viewId} onSelectView={onSelectView} />}
+      {viewId !== undefined && savedView.isError && <p role="status" className="px-3 py-2 text-xs">{t('views.unavailable')}</p>}
+      {(missingCount > 0 || boundaryCount > 0 || outsideSelection) && <div role="status" className="border-border border-b px-3 py-2 text-xs" data-testid="view-diagnostics">
+        {missingCount > 0 && <p>{t('views.missing', { count: missingCount })}</p>}
+        {boundaryCount > 0 && <p>{t('views.boundary', { count: boundaryCount })}</p>}
+        {outsideSelection && <p>{t('views.selectionOutside')}</p>}
+      </div>}
       {/* The canvas region owns its own overflow: a wide graph pans inside the
           React Flow viewport, the page itself never gets a scrollbar. */}
       <div className="relative min-h-0 min-w-0 flex-1 overflow-hidden">
-        {architecture.isPending || architecture.isError || componentCount === 0 ? (
+        {architecture.isPending || architecture.isError || (viewId !== undefined && (!savedView.data || savedView.isError)) || componentCount === 0 ? (
           <div className="flex h-full items-center justify-center p-4">
             <AsyncState
-              isPending={architecture.isPending}
-              isError={architecture.isError}
-              error={architecture.error}
+              isPending={architecture.isPending || (viewId !== undefined && savedView.isPending)}
+              isError={architecture.isError || (viewId !== undefined && savedView.isError)}
+              error={architecture.error ?? savedView.error}
               isEmpty={componentCount === 0}
               emptyTitle={t('pane.emptyTitle')}
               emptyDescription={t('pane.emptyDescription')}
-              onRetry={() => void architecture.refetch()}
+              onRetry={() => { void architecture.refetch(); if (viewId !== undefined) void savedView.refetch() }}
               skeletonRows={5}
               className="w-full max-w-2xl"
             >
@@ -188,17 +215,20 @@ export function ArchitecturePane({
             </AsyncState>
           </div>
         ) : (
+          <CanvasViewBoundary key={JSON.stringify([projectId, viewId ?? null])} projectId={projectId} viewId={viewId ?? null} collapsedDefaults={resolution?.collapsedComponentIds}>
           <ArchitectureCanvas
             projectId={projectId}
             model={model}
             selectedComponentId={selectedComponentId}
             selectedRelationshipId={selectedRelationshipId}
             onSelectComponent={onSelectComponent}
-            orientation={orientation}
+            orientation={effectiveOrientation}
+            allowOrientationAutoFit={orientation !== undefined}
             onOrientationChange={onOrientationChange}
             onSelectRelationship={onSelectRelationship}
             onMetricsChange={onCanvasMetricsChange}
           />
+          </CanvasViewBoundary>
         )}
       </div>
 

@@ -1,27 +1,38 @@
 # Event contract
 
+The implemented [model/view/MCP contract](../docs/model-view-mcp-contract.md)
+uses `model-view-mcp.schema.yaml` and `model-view-mcp.tools.yaml` as its frozen
+structural authority. Source-built Compose exposes all 14 tools, including
+native PNG rendering. `npm test` checks generated REST/MCP schemas, examples,
+closed objects and rejection boundaries. Runtime evidence and coverage limits
+are recorded in [local acceptance](../docs/epic-75-acceptance.md).
+
 `openapi.yaml` is the single, versioned contract between the reporting agents, the Visualise
 AI cockpit and its UI. Everything the cockpit shows arrives through it; nothing is inferred.
 
 * **Document version** — `info.version` (`1.1.0`), OpenAPI 3.1.0.
-* **Payload version** — `schemaVersion` inside every event envelope. v0 accepts `1.0` only.
+* **Payload version** — `schemaVersion` inside every event envelope. the 20 legacy types require `1.0`; the six command types below require `2.0`.
+* **MCP domain version** — tool inputs carry `contractVersion: "2.0.0"`, independently of the negotiated MCP transport version.
 
 ## Surface
 
 | Endpoint | Purpose |
 | --- | --- |
-| `POST /api/v1/events` | Single-event ingestion, idempotent on `clientEventId`. |
+| `/mcp` | Official SDK Streamable HTTP; model, work, views and native PNG tools. |
+| `POST /api/v1/events` | One event or atomic command envelope, idempotent on `clientEventId`. |
 | `GET /api/v1/projects/{projectId}/stream` | Server-Sent Events: replay from a position, then live. |
 | `GET /api/v1/projects` | Every known project. |
 | `GET /api/v1/projects/{projectId}` | One project with the sizes of its read models. |
 | `GET /api/v1/projects/{projectId}/architecture` | Applied components and relationships plus pending proposals. |
+| `GET /api/v1/projects/{projectId}/views` | Saved view summaries, paged. |
+| `GET /api/v1/projects/{projectId}/view?viewId=…` | One saved view and current diagnostics; encode the opaque ID as a query value. |
 | `GET /api/v1/projects/{projectId}/runs` | Current and historical runs, paged. |
 | `GET /api/v1/projects/{projectId}/runs/{runId}` | One run; `current` resolves to the current one. |
 | `GET /api/v1/projects/{projectId}/runs/{runId}/agents` | Flat agent tree of one run. |
 | `GET /api/v1/projects/{projectId}/runs/{runId}/plans` | Every plan of one run with all revisions. |
 | `GET /api/v1/projects/{projectId}/components/{componentId}` | Component inspector for exactly one run. |
 | `GET /api/v1/projects/{projectId}/components/{componentId}/history` | Run spanning component history, paged. |
-| `GET /healthz`, `GET /readyz` | Internal probes on the Go backend container. |
+| `GET /healthz`, `GET /readyz` | Backend liveness/readiness probes, also published through Nginx. |
 
 ## Read models
 
@@ -42,9 +53,9 @@ log surfaces is the component history, and there as a paged, component filtered 
 * **`activeChanges` means pending.** Only changes in state `planned` are listed: an applied
   change *is* the model, a retracted one was withdrawn.
 * **Pagination.** `limit` defaults to 50 and maxes out at 200; a value outside that range is a
-  `400`, never a silently clamped page. `cursor` is opaque and echoed back unchanged. Runs, the
+  `400`, never a silently clamped page. `cursor` is opaque and echoed back unchanged. Runs, saved views, the
   component history and the inspector's unified diffs (`diffLimit`, `diffCursor`,
-  `nextDiffCursor`) are paged; every other collection is complete.
+  `nextDiffCursor`) are paged; the remaining legacy REST collections are complete. MCP collections are separately bounded and paged.
 * **Errors follow RFC 9457** as on the write path, with the additional codes `run_not_found`,
   `current_run_not_found`, `component_not_found` and `invalid_query_parameter`. A project whose
   runs were never opened by a root orchestrator has no current run, and
@@ -66,7 +77,7 @@ event.
 `StreamedEvent` is the same union plus the server-assigned `position`, `serverEventId` and
 `receivedAt`, and is what a single SSE `data:` line carries.
 
-## Event catalogue (v0)
+## Event catalogue
 
 | Group | Types |
 | --- | --- |
@@ -82,6 +93,13 @@ event.
 | Correction | `correction.issued`, `retraction.issued` |
 | Run | `run.finished` |
 
+The table above contains the 20 legacy `schemaVersion: "1.0"` types. Six
+`schemaVersion: "2.0"` command events extend the same closed ingestion/stream
+catalogue: `model.mutation_applied`, `context.opened`, `work.reported`,
+`work.scope_reported`, `view.saved` and `view.removed`. Each is one event and one
+project position; a mutation contains 1–100 atomic operations. Model revision
+advances only for model writes; view revision advances independently.
+
 Low-level tool calls, terminal commands, file reads and token usage are deliberately absent.
 
 ## Rules worth knowing before implementing against it
@@ -95,13 +113,20 @@ Low-level tool calls, terminal commands, file reads and token usage are delibera
   Absolute paths and `..` segments are rejected by the `filePath` pattern.
 * **Every NATS topic is its own relationship** (`kind: nats_topic`, topic name in `channel`,
   own `relationshipId`). Topics are never merged into one aggregated edge.
-* **`architecture.snapshot_published` replaces the applied model entirely**; incremental
-  updates use the `component.change_*` and `relationship.change_*` events.
+* **`architecture.snapshot_published` replaces the applied model entirely**; valid legacy incremental
+  updates use `component.change_applied` and `relationship.change_applied`. Atomic
+  typed updates use `model.mutation_applied`; planned changes remain proposals.
 * **Idempotency.** `clientEventId` is the key: `201` on first delivery, `200` with
   `duplicate: true` on a byte-identical retry, `409` when the id is reused with different
-  content.
-* **Size limit.** 2 MiB (2097152 bytes) by default, configurable server-side via
-  `MAX_EVENT_BYTES`; violations return `413` with code `event_too_large`.
+  content. New commands compare the full command identity and preserve the original
+  receipt, including counters, even after closure. Legacy retry comparison remains
+  compatible; JSON key order/whitespace are canonicalized, numeric token spelling
+  remains significant. An uncertain result requires retrying the original input/key.
+* **Size limit.** Legacy REST events allow 2 MiB (2097152 bytes) by default, configurable server-side via
+  `MAX_EVENT_BYTES`; violations return `413` with code `event_too_large`. Typed
+  REST commands additionally have the fixed 1 MiB command cap. MCP has a
+  separate fixed 1 MiB request/structured-output budget and a 4 MiB decoded PNG
+  budget. A proxy-level MCP 413 is plain HTTP, not a domain error receipt.
 * **Errors follow RFC 9457** (`application/problem+json`). `400` uses `ValidationProblem`,
   which adds `errors[]` with a JSON Pointer `field`, a `code` and a `message`.
 
@@ -137,7 +162,7 @@ Low-level tool calls, terminal commands, file reads and token usage are delibera
 | File | Proves |
 | --- | --- |
 | `unknown-event-type.json` | A tool-call event is not representable — no free-form fallback |
-| `unsupported-schema-version.json` | `schemaVersion: "2.0"` is refused |
+| `unsupported-schema-version.json` | Legacy `agent.started` cannot use `schemaVersion: "2.0"`; typed 2.0 command events remain valid |
 | `unknown-payload-field.json` | Raw terminal output cannot be smuggled into a payload |
 | `diff-with-absolute-path.json` | `filePath` must be repository relative |
 | `progress-out-of-range.json` | `percent` stays within `0..100` |

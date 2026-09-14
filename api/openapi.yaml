@@ -164,7 +164,9 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/EventAccepted'
+                oneOf:
+                  - $ref: '#/components/schemas/EventAccepted'
+                  - $ref: '#/components/schemas/MV_Receipt'
               examples:
                 idempotentRetry:
                   summary: Retry of an already accepted event
@@ -174,7 +176,9 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/EventAccepted'
+                oneOf:
+                  - $ref: '#/components/schemas/EventAccepted'
+                  - $ref: '#/components/schemas/MV_Receipt'
               examples:
                 accepted:
                   summary: First delivery of an event
@@ -775,6 +779,57 @@ paths:
                     detail: The event store is not reachable.
                     code: not_ready
 
+  /api/v1/projects/{projectId}/views:
+    get:
+      operationId: listViews
+      summary: List saved native architecture views
+      description: Pages contain shared-model view summaries and bind projectPosition; restart on stale_cursor.
+      tags: [Read models]
+      parameters:
+        - $ref: '#/components/parameters/ProjectIdPath'
+        - name: limit
+          in: query
+          schema: { type: integer, minimum: 1, maximum: 200, default: 50 }
+        - name: cursor
+          in: query
+          schema: { type: string, maxLength: 2048 }
+      responses:
+        '200':
+          description: One consistent page of saved views.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/MV_ViewsListResult' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '404': { $ref: '#/components/responses/ProjectNotFound' }
+        '409':
+          description: The cursor snapshot changed; restart pagination.
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/Problem' }
+  /api/v1/projects/{projectId}/view:
+    get:
+      operationId: getView
+      summary: Read a saved native architecture view
+      description: References are resolved against one model snapshot; missing and boundary references remain explicit diagnostics.
+      tags: [Read models]
+      parameters:
+        - $ref: '#/components/parameters/ProjectIdPath'
+        - name: viewId
+          in: query
+          required: true
+          schema: { $ref: '#/components/schemas/Identifier' }
+      responses:
+        '200':
+          description: The saved definition and current reference diagnostics.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/MV_ViewGetResult' }
+        '404':
+          description: The project or view does not exist, or the view was removed.
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/Problem' }
+
 components:
 
   parameters:
@@ -1160,10 +1215,11 @@ components:
     SchemaVersion:
       type: string
       description: |
-        Version of the payload schema of the reported event type. v0 accepts `1.0` only; any
-        other value is rejected with `400` and code `unsupported_schema_version`.
+        Version of the reported event. Legacy events accept `1.0`; model mutation commands
+        accept `2.0`. Other values are rejected with `unsupported_schema_version`.
       enum:
         - '1.0'
+        - '2.0'
 
     RepositoryFilePath:
       type: string
@@ -1204,6 +1260,12 @@ components:
         - correction.issued
         - retraction.issued
         - run.finished
+        - model.mutation_applied
+        - view.removed
+        - view.saved
+        - work.scope_reported
+        - work.reported
+        - context.opened
 
     ChangeOperation:
       type: string
@@ -1832,7 +1894,7 @@ components:
           description: Why the original event was wrong.
           minLength: 1
         correctedType:
-          $ref: '#/components/schemas/EventType'
+          $ref: '#/components/schemas/LegacyEventType'
         correctedPayload:
           type: object
           description: |
@@ -1895,7 +1957,9 @@ components:
         rejected for every event type.
       properties:
         schemaVersion:
-          $ref: '#/components/schemas/SchemaVersion'
+          allOf:
+            - $ref: '#/components/schemas/SchemaVersion'
+            - const: '1.0'
         clientEventId:
           description: |
             Agent-assigned idempotency key, unique per project. Retries must reuse the same
@@ -2207,6 +2271,12 @@ components:
         - $ref: '#/components/schemas/CorrectionIssuedEvent'
         - $ref: '#/components/schemas/RetractionIssuedEvent'
         - $ref: '#/components/schemas/RunFinishedEvent'
+        - $ref: '#/components/schemas/ModelMutationAppliedEvent'
+        - $ref: '#/components/schemas/ViewRemovedEvent'
+        - $ref: '#/components/schemas/ViewSavedEvent'
+        - $ref: '#/components/schemas/WorkScopeReportedEvent'
+        - $ref: '#/components/schemas/WorkReportedEvent'
+        - $ref: '#/components/schemas/ContextOpenedEvent'
       discriminator:
         propertyName: type
         mapping:
@@ -2230,6 +2300,12 @@ components:
           correction.issued: '#/components/schemas/CorrectionIssuedEvent'
           retraction.issued: '#/components/schemas/RetractionIssuedEvent'
           run.finished: '#/components/schemas/RunFinishedEvent'
+          model.mutation_applied: '#/components/schemas/ModelMutationAppliedEvent'
+          view.removed: '#/components/schemas/ViewRemovedEvent'
+          view.saved: '#/components/schemas/ViewSavedEvent'
+          work.scope_reported: '#/components/schemas/WorkScopeReportedEvent'
+          work.reported: '#/components/schemas/WorkReportedEvent'
+          context.opened: '#/components/schemas/ContextOpenedEvent'
 
     # ---------------------------------------------------------------------------
     # Streaming envelopes
@@ -2243,7 +2319,9 @@ components:
         event schemas narrow `type` and `payload`.
       properties:
         schemaVersion:
-          $ref: '#/components/schemas/SchemaVersion'
+          allOf:
+            - $ref: '#/components/schemas/SchemaVersion'
+            - const: '1.0'
         clientEventId:
           description: Idempotency key as reported by the agent.
           allOf:
@@ -2563,6 +2641,12 @@ components:
         - $ref: '#/components/schemas/StreamedCorrectionIssuedEvent'
         - $ref: '#/components/schemas/StreamedRetractionIssuedEvent'
         - $ref: '#/components/schemas/StreamedRunFinishedEvent'
+        - $ref: '#/components/schemas/StreamedModelMutationAppliedEvent'
+        - $ref: '#/components/schemas/StreamedViewRemovedEvent'
+        - $ref: '#/components/schemas/StreamedViewSavedEvent'
+        - $ref: '#/components/schemas/StreamedWorkScopeReportedEvent'
+        - $ref: '#/components/schemas/StreamedWorkReportedEvent'
+        - $ref: '#/components/schemas/StreamedContextOpenedEvent'
       discriminator:
         propertyName: type
         mapping:
@@ -2586,6 +2670,12 @@ components:
           correction.issued: '#/components/schemas/StreamedCorrectionIssuedEvent'
           retraction.issued: '#/components/schemas/StreamedRetractionIssuedEvent'
           run.finished: '#/components/schemas/StreamedRunFinishedEvent'
+          model.mutation_applied: '#/components/schemas/StreamedModelMutationAppliedEvent'
+          view.removed: '#/components/schemas/StreamedViewRemovedEvent'
+          view.saved: '#/components/schemas/StreamedViewSavedEvent'
+          work.scope_reported: '#/components/schemas/StreamedWorkScopeReportedEvent'
+          work.reported: '#/components/schemas/StreamedWorkReportedEvent'
+          context.opened: '#/components/schemas/StreamedContextOpenedEvent'
 
     # ---------------------------------------------------------------------------
     # Responses
@@ -2638,6 +2728,19 @@ components:
         stable, machine-readable discriminator that clients should branch on; `type`, `title`
         and `detail` are for humans.
       properties:
+        errors:
+          type: array
+          minItems: 1
+          items:
+            $ref: '#/components/schemas/ValidationError'
+        currentViewRevision:
+          type: integer
+          minimum: 0
+          maximum: 9007199254740991
+        currentModelRevision:
+          type: integer
+          minimum: 0
+          maximum: 9007199254740991
         type:
           type: string
           format: uri
@@ -2710,6 +2813,14 @@ components:
         RFC 9457 problem extended with structured field errors. Returned for `400` responses
         with codes `invalid_field`, `unsupported_event_type` or `unsupported_schema_version`.
       properties:
+        currentViewRevision:
+          type: integer
+          minimum: 0
+          maximum: 9007199254740991
+        currentModelRevision:
+          type: integer
+          minimum: 0
+          maximum: 9007199254740991
         type:
           type: string
           format: uri
@@ -3123,6 +3234,9 @@ components:
         proposals that are still pending. A planned change never appears in `components` or
         `relationships`.
       properties:
+        modelRevision:
+          type: integer
+          minimum: 0
         projectPosition:
           $ref: '#/components/schemas/ProjectPosition'
         components:
@@ -3141,6 +3255,7 @@ components:
           items:
             $ref: '#/components/schemas/ActiveChange'
       required:
+        - modelRevision
         - projectPosition
         - components
         - relationships
@@ -3345,6 +3460,16 @@ components:
         `progress` stays `null` until the agent reported a number, and `finishedOutcome` stays
         `null` until `agent.finished`. Silence changes nothing.
       properties:
+        workScope:
+          oneOf:
+            - $ref: '#/components/schemas/MV_Scope'
+            - type: 'null'
+        workScopePosition:
+          oneOf:
+            - $ref: '#/components/schemas/MV_Revision'
+            - type: 'null'
+        missingScopeReferences:
+          $ref: '#/components/schemas/MV_Scope'
         agentId:
           $ref: '#/components/schemas/AgentId'
         runId:
@@ -3422,6 +3547,8 @@ components:
         Body of `GET /api/v1/projects/{projectId}/runs/{runId}/agents`. Flat, ordered so a
         parent precedes the subagents it spawned.
       properties:
+        modelRevision:
+          $ref: '#/components/schemas/MV_Revision'
         projectPosition:
           $ref: '#/components/schemas/ProjectPosition'
         agents:
@@ -3854,7 +3981,9 @@ components:
         type:
           $ref: '#/components/schemas/EventType'
         schemaVersion:
-          $ref: '#/components/schemas/SchemaVersion'
+          allOf:
+            - $ref: '#/components/schemas/SchemaVersion'
+            - const: '1.0'
         occurredAt:
           description: When the reported step happened, as observed by the agent.
           allOf:
@@ -3931,3 +4060,1842 @@ components:
       required:
         - status
       additionalProperties: false
+
+    # GENERATED MODEL COMMAND SCHEMAS — npm run generate:model-contract
+    MV_Version:
+      type: string
+      const: 2.0.0
+    MV_ProjectId:
+      $ref: "#/components/schemas/ProjectId"
+    MV_RunId:
+      $ref: "#/components/schemas/RunId"
+    MV_AgentId:
+      $ref: "#/components/schemas/AgentId"
+    MV_ComponentId:
+      $ref: "#/components/schemas/ComponentId"
+    MV_Identifier:
+      $ref: "#/components/schemas/Identifier"
+    MV_Uuid:
+      type: string
+      format: uuid
+    MV_Timestamp:
+      type: string
+      format: date-time
+      pattern: Z$
+    MV_Revision:
+      type: integer
+      minimum: 0
+      maximum: 9007199254740991
+    MV_Cursor:
+      type: string
+      minLength: 1
+      maxLength: 2048
+    MV_NextCursor:
+      oneOf:
+        - $ref: "#/components/schemas/MV_Cursor"
+        - type: "null"
+    MV_Component:
+      $ref: "#/components/schemas/Component"
+    MV_Relationship:
+      $ref: "#/components/schemas/Relationship"
+    MV_AddedComponent:
+      allOf:
+        - $ref: "#/components/schemas/MV_Component"
+      type: object
+      properties:
+        description:
+          type: string
+          maxLength: 16000
+        tags:
+          type: array
+          maxItems: 100
+    MV_AddedRelationship:
+      allOf:
+        - $ref: "#/components/schemas/MV_Relationship"
+      type: object
+      properties:
+        label:
+          type: string
+          maxLength: 16000
+        protocol:
+          type: string
+          maxLength: 16000
+        operation:
+          type: string
+          maxLength: 16000
+        channel:
+          type: string
+          maxLength: 16000
+    MV_ComponentIds:
+      type: array
+      maxItems: 200
+      uniqueItems: true
+      items:
+        $ref: "#/components/schemas/MV_ComponentId"
+    MV_RelationshipIds:
+      type: array
+      maxItems: 200
+      uniqueItems: true
+      items:
+        $ref: "#/components/schemas/MV_Identifier"
+    MV_Scope:
+      type: object
+      required:
+        - componentIds
+        - relationshipIds
+      additionalProperties: false
+      properties:
+        componentIds:
+          $ref: "#/components/schemas/MV_ComponentIds"
+        relationshipIds:
+          $ref: "#/components/schemas/MV_RelationshipIds"
+    MV_MissingViewReferences:
+      description: Union of up to 200 selected and 200 collapsed component IDs.
+      type: object
+      required:
+        - componentIds
+        - relationshipIds
+      additionalProperties: false
+      properties:
+        componentIds:
+          type: array
+          maxItems: 400
+          uniqueItems: true
+          items:
+            $ref: "#/components/schemas/MV_ComponentId"
+        relationshipIds:
+          $ref: "#/components/schemas/MV_RelationshipIds"
+    MV_Target:
+      oneOf:
+        - type: object
+          required:
+            - type
+            - id
+          additionalProperties: false
+          properties:
+            type:
+              const: component
+            id:
+              $ref: "#/components/schemas/MV_ComponentId"
+        - type: object
+          required:
+            - type
+            - id
+          additionalProperties: false
+          properties:
+            type:
+              const: relationship
+            id:
+              $ref: "#/components/schemas/MV_Identifier"
+    MV_Element:
+      oneOf:
+        - type: object
+          required:
+            - type
+            - value
+          additionalProperties: false
+          properties:
+            type:
+              const: component
+            value:
+              $ref: "#/components/schemas/MV_Component"
+        - type: object
+          required:
+            - type
+            - value
+          additionalProperties: false
+          properties:
+            type:
+              const: relationship
+            value:
+              $ref: "#/components/schemas/MV_Relationship"
+    MV_Diagnostics:
+      description: Bounded diagnostics; diagnosticOverflow signals more issues exist.
+      type: array
+      maxItems: 200
+      items:
+        type: object
+        required:
+          - code
+          - target
+          - message
+        additionalProperties: false
+        properties:
+          code:
+            enum:
+              - missing_reference
+              - hierarchy_cycle
+              - historical_id_reuse
+          target:
+            $ref: "#/components/schemas/MV_Target"
+          message:
+            type: string
+            minLength: 1
+            maxLength: 1000
+    MV_ReadIdentity:
+      type: object
+      required:
+        - contractVersion
+        - projectId
+      properties:
+        contractVersion:
+          $ref: "#/components/schemas/MV_Version"
+        projectId:
+          $ref: "#/components/schemas/MV_ProjectId"
+    MV_Page:
+      type: object
+      properties:
+        limit:
+          type: integer
+          minimum: 1
+          maximum: 200
+          default: 50
+        cursor:
+          $ref: "#/components/schemas/MV_Cursor"
+    MV_Counters:
+      type: object
+      required:
+        - projectId
+        - modelRevision
+        - projectPosition
+      properties:
+        projectId:
+          $ref: "#/components/schemas/MV_ProjectId"
+        modelRevision:
+          $ref: "#/components/schemas/MV_Revision"
+        projectPosition:
+          $ref: "#/components/schemas/MV_Revision"
+    MV_WriteIdentity:
+      allOf:
+        - $ref: "#/components/schemas/MV_ReadIdentity"
+      type: object
+      required:
+        - clientEventId
+        - runId
+        - agentId
+        - parentAgentId
+        - occurredAt
+      properties:
+        clientEventId:
+          $ref: "#/components/schemas/MV_Uuid"
+        runId:
+          $ref: "#/components/schemas/MV_RunId"
+        agentId:
+          $ref: "#/components/schemas/MV_AgentId"
+        parentAgentId:
+          oneOf:
+            - $ref: "#/components/schemas/MV_AgentId"
+            - type: "null"
+        occurredAt:
+          $ref: "#/components/schemas/MV_Timestamp"
+    MV_Receipt:
+      allOf:
+        - $ref: "#/components/schemas/MV_Counters"
+      type: object
+      required:
+        - clientEventId
+        - serverEventId
+        - receivedAt
+        - duplicate
+        - viewRevision
+        - runId
+        - agentId
+        - affected
+      unevaluatedProperties: false
+      properties:
+        clientEventId:
+          $ref: "#/components/schemas/MV_Uuid"
+        serverEventId:
+          $ref: "#/components/schemas/MV_Uuid"
+        receivedAt:
+          $ref: "#/components/schemas/MV_Timestamp"
+        duplicate:
+          type: boolean
+        viewRevision:
+          oneOf:
+            - $ref: "#/components/schemas/MV_Revision"
+            - type: "null"
+        runId:
+          $ref: "#/components/schemas/MV_RunId"
+        agentId:
+          $ref: "#/components/schemas/MV_AgentId"
+        affected:
+          $ref: "#/components/schemas/MV_Scope"
+    MV_ComponentSet:
+      type: object
+      minProperties: 1
+      additionalProperties: false
+      properties:
+        name:
+          type: string
+          description: Human-readable display name shown on the architecture canvas.
+          minLength: 1
+          maxLength: 200
+        kind:
+          type: string
+          description: |
+            Structural role of the component. `topic` models a single message topic as its own
+            node so that topic-level relationships stay visible.
+          enum:
+            - system
+            - service
+            - module
+            - datastore
+            - queue
+            - topic
+            - ui
+            - external
+            - library
+        parentComponentId:
+          oneOf:
+            - $ref: "#/components/schemas/MV_ComponentId"
+            - type: "null"
+        description:
+          type:
+            - string
+            - "null"
+          maxLength: 16000
+        technology:
+          oneOf:
+            - $ref: "#/components/schemas/Technology"
+            - type: "null"
+        tags:
+          oneOf:
+            - allOf:
+                - type: array
+                  description: Free-form labels for filtering and grouping on the canvas.
+                  items:
+                    type: string
+                    minLength: 1
+                    maxLength: 64
+              maxItems: 100
+            - type: "null"
+    MV_RelationshipSet:
+      type: object
+      minProperties: 1
+      additionalProperties: false
+      properties:
+        sourceComponentId:
+          $ref: "#/components/schemas/MV_ComponentId"
+        targetComponentId:
+          $ref: "#/components/schemas/MV_ComponentId"
+        kind:
+          type: string
+          description: |
+            Interaction type of the edge. `nats_topic` denotes exactly one topic, named in
+            `channel`.
+          enum:
+            - http
+            - grpc
+            - data
+            - async
+            - nats_topic
+            - dependency
+        label:
+          type:
+            - string
+            - "null"
+          maxLength: 16000
+        protocol:
+          type:
+            - string
+            - "null"
+          maxLength: 16000
+        operation:
+          type:
+            - string
+            - "null"
+          maxLength: 16000
+        channel:
+          type:
+            - string
+            - "null"
+          maxLength: 16000
+    MV_Operation:
+      oneOf:
+        - type: object
+          required:
+            - op
+            - component
+          additionalProperties: false
+          properties:
+            op:
+              const: component.add
+            component:
+              $ref: "#/components/schemas/MV_AddedComponent"
+        - type: object
+          required:
+            - op
+            - componentId
+            - set
+          additionalProperties: false
+          properties:
+            op:
+              const: component.update
+            componentId:
+              $ref: "#/components/schemas/MV_ComponentId"
+            set:
+              $ref: "#/components/schemas/MV_ComponentSet"
+        - type: object
+          required:
+            - op
+            - componentId
+          additionalProperties: false
+          properties:
+            op:
+              const: component.remove
+            componentId:
+              $ref: "#/components/schemas/MV_ComponentId"
+        - type: object
+          required:
+            - op
+            - relationship
+          additionalProperties: false
+          properties:
+            op:
+              const: relationship.add
+            relationship:
+              $ref: "#/components/schemas/MV_AddedRelationship"
+        - type: object
+          required:
+            - op
+            - relationshipId
+            - set
+          additionalProperties: false
+          properties:
+            op:
+              const: relationship.update
+            relationshipId:
+              $ref: "#/components/schemas/MV_Identifier"
+            set:
+              $ref: "#/components/schemas/MV_RelationshipSet"
+        - type: object
+          required:
+            - op
+            - relationshipId
+          additionalProperties: false
+          properties:
+            op:
+              const: relationship.remove
+            relationshipId:
+              $ref: "#/components/schemas/MV_Identifier"
+    MV_ModelMutationPayload:
+      type: object
+      required:
+        - expectedModelRevision
+        - operations
+      additionalProperties: false
+      properties:
+        expectedModelRevision:
+          $ref: "#/components/schemas/MV_Revision"
+        operations:
+          type: array
+          minItems: 1
+          maxItems: 100
+          items:
+            $ref: "#/components/schemas/MV_Operation"
+    MV_ModelMutateInput:
+      type: object
+      allOf:
+        - $ref: "#/components/schemas/MV_WriteIdentity"
+        - $ref: "#/components/schemas/MV_ModelMutationFields"
+      unevaluatedProperties: false
+    MV_ModelMutationFields:
+      description: Open composition of the closed wire payload, without duplicated field shapes.
+      type: object
+      required:
+        - expectedModelRevision
+        - operations
+      properties:
+        expectedModelRevision:
+          $ref: "#/components/schemas/MV_Revision"
+        operations:
+          type: array
+          minItems: 1
+          maxItems: 100
+          items:
+            $ref: "#/components/schemas/MV_Operation"
+    MV_ModelReadInput:
+      allOf:
+        - $ref: "#/components/schemas/MV_ReadIdentity"
+        - $ref: "#/components/schemas/MV_Page"
+      type: object
+      unevaluatedProperties: false
+      properties:
+        expectedModelRevision:
+          $ref: "#/components/schemas/MV_Revision"
+    MV_ModelReadResult:
+      allOf:
+        - $ref: "#/components/schemas/MV_Counters"
+      type: object
+      required:
+        - items
+        - nextCursor
+        - diagnostics
+        - diagnosticOverflow
+      unevaluatedProperties: false
+      properties:
+        items:
+          type: array
+          maxItems: 200
+          items:
+            $ref: "#/components/schemas/MV_Element"
+        nextCursor:
+          $ref: "#/components/schemas/MV_NextCursor"
+        diagnostics:
+          $ref: "#/components/schemas/MV_Diagnostics"
+        diagnosticOverflow:
+          type: boolean
+    MV_ElementGetInput:
+      allOf:
+        - $ref: "#/components/schemas/MV_ReadIdentity"
+      type: object
+      required:
+        - target
+      unevaluatedProperties: false
+      properties:
+        target:
+          $ref: "#/components/schemas/MV_Target"
+        expectedModelRevision:
+          $ref: "#/components/schemas/MV_Revision"
+    MV_ElementGetResult:
+      allOf:
+        - $ref: "#/components/schemas/MV_Counters"
+      type: object
+      required:
+        - element
+      unevaluatedProperties: false
+      properties:
+        element:
+          $ref: "#/components/schemas/MV_Element"
+    MV_ContextOpenInput:
+      allOf:
+        - $ref: "#/components/schemas/MV_WriteIdentity"
+      type: object
+      required:
+        - role
+        - displayName
+        - assignedTask
+      unevaluatedProperties: false
+      properties:
+        role:
+          enum:
+            - orchestrator
+            - subagent
+        displayName:
+          type: string
+          minLength: 1
+          maxLength: 200
+        assignedTask:
+          type: string
+          minLength: 1
+          maxLength: 4000
+    MV_WorkReport:
+      oneOf:
+        - type: object
+          required:
+            - action
+            - workStepId
+            - title
+            - componentIds
+          additionalProperties: false
+          properties:
+            action:
+              const: step_start
+            workStepId:
+              $ref: "#/components/schemas/MV_Identifier"
+            title:
+              type: string
+              minLength: 1
+              maxLength: 300
+            componentIds:
+              $ref: "#/components/schemas/MV_ComponentIds"
+        - type: object
+          required:
+            - action
+            - workStepId
+            - summary
+          additionalProperties: false
+          properties:
+            action:
+              const: step_complete
+            workStepId:
+              $ref: "#/components/schemas/MV_Identifier"
+            summary:
+              type: string
+              minLength: 1
+              maxLength: 4000
+        - type: object
+          required:
+            - action
+            - status
+          additionalProperties: false
+          properties:
+            action:
+              const: status
+            status:
+              type: string
+              description: Status as stated by the agent itself.
+              enum:
+                - working
+                - waiting
+                - blocked
+                - idle
+                - done
+            note:
+              type: string
+              maxLength: 4000
+        - type: object
+          required:
+            - action
+            - percent
+            - scope
+            - basis
+          additionalProperties: false
+          properties:
+            action:
+              const: progress
+            percent:
+              type: integer
+              minimum: 0
+              maximum: 100
+            scope:
+              type: string
+              description: |
+                What the percentage refers to: the agent's own assigned task, or the agent's
+                estimate for the overall run.
+              enum:
+                - own_task
+                - overall_estimate
+            basis:
+              type: string
+              description: |
+                How the number was derived: a free estimate by the agent, or the ratio of completed
+                plan or work steps.
+              enum:
+                - reported_estimate
+                - completed_steps
+            note:
+              type: string
+              maxLength: 4000
+        - type: object
+          required:
+            - action
+            - outcome
+            - summary
+          additionalProperties: false
+          properties:
+            action:
+              const: agent_finish
+            outcome:
+              $ref: "#/components/schemas/Outcome"
+            summary:
+              type: string
+              minLength: 1
+              maxLength: 4000
+        - type: object
+          required:
+            - action
+            - outcome
+            - summary
+          additionalProperties: false
+          properties:
+            action:
+              const: run_finish
+            outcome:
+              $ref: "#/components/schemas/Outcome"
+            summary:
+              type: string
+              minLength: 1
+              maxLength: 4000
+    MV_WorkReportInput:
+      allOf:
+        - $ref: "#/components/schemas/MV_WriteIdentity"
+      type: object
+      required:
+        - report
+      unevaluatedProperties: false
+      properties:
+        report:
+          $ref: "#/components/schemas/MV_WorkReport"
+    MV_BoundaryRelationships:
+      description: Existing selected edges omitted because an endpoint is outside the resolved selection.
+      type: array
+      maxItems: 200
+      uniqueItems: true
+      items:
+        $ref: "#/components/schemas/MV_Identifier"
+    MV_VisibleIds:
+      description: At most 200 visible IDs per kind; overflow is reported through clipped.
+      additionalProperties: false
+      type: object
+      required:
+        - componentIds
+        - relationshipIds
+      properties:
+        componentIds:
+          $ref: "#/components/schemas/MV_ComponentIds"
+        relationshipIds:
+          $ref: "#/components/schemas/MV_RelationshipIds"
+    MV_WorkScopeInput:
+      allOf:
+        - $ref: "#/components/schemas/MV_WriteIdentity"
+      type: object
+      required:
+        - scope
+      unevaluatedProperties: false
+      properties:
+        scope:
+          $ref: "#/components/schemas/MV_Scope"
+    MV_ContextReadInput:
+      allOf:
+        - $ref: "#/components/schemas/MV_ReadIdentity"
+        - $ref: "#/components/schemas/MV_Page"
+      type: object
+      required:
+        - runId
+      unevaluatedProperties: false
+      properties:
+        runId:
+          $ref: "#/components/schemas/MV_RunId"
+    MV_ContextReadResult:
+      allOf:
+        - $ref: "#/components/schemas/MV_Counters"
+      type: object
+      required:
+        - runId
+        - isOpen
+        - items
+        - nextCursor
+      unevaluatedProperties: false
+      properties:
+        runId:
+          $ref: "#/components/schemas/MV_RunId"
+        isOpen:
+          type: boolean
+        nextCursor:
+          $ref: "#/components/schemas/MV_NextCursor"
+        items:
+          type: array
+          maxItems: 200
+          items:
+            type: object
+            required:
+              - agent
+              - scope
+              - scopePosition
+              - missingReferences
+            additionalProperties: false
+            properties:
+              agent:
+                $ref: "#/components/schemas/RunAgent"
+              scope:
+                oneOf:
+                  - $ref: "#/components/schemas/MV_Scope"
+                  - type: "null"
+              scopePosition:
+                oneOf:
+                  - $ref: "#/components/schemas/MV_Revision"
+                  - type: "null"
+              missingReferences:
+                $ref: "#/components/schemas/MV_Scope"
+    MV_View:
+      type: object
+      required:
+        - viewId
+        - name
+        - kind
+        - selection
+        - orientation
+        - collapsedComponentIds
+      additionalProperties: false
+      properties:
+        viewId:
+          $ref: "#/components/schemas/MV_Identifier"
+        name:
+          type: string
+          minLength: 1
+          maxLength: 200
+        kind:
+          const: architecture
+        selection:
+          oneOf:
+            - type: object
+              required:
+                - mode
+              additionalProperties: false
+              properties:
+                mode:
+                  const: all
+            - type: object
+              required:
+                - mode
+                - scope
+              additionalProperties: false
+              properties:
+                mode:
+                  const: explicit
+                scope:
+                  $ref: "#/components/schemas/MV_Scope"
+        orientation:
+          enum:
+            - top-down
+            - left-to-right
+        collapsedComponentIds:
+          $ref: "#/components/schemas/MV_ComponentIds"
+    MV_ViewsListInput:
+      type: object
+      allOf:
+        - $ref: "#/components/schemas/MV_ReadIdentity"
+        - $ref: "#/components/schemas/MV_Page"
+      unevaluatedProperties: false
+    MV_ViewsListResult:
+      allOf:
+        - $ref: "#/components/schemas/MV_Counters"
+      type: object
+      required:
+        - items
+        - nextCursor
+      unevaluatedProperties: false
+      properties:
+        nextCursor:
+          $ref: "#/components/schemas/MV_NextCursor"
+        items:
+          type: array
+          maxItems: 200
+          items:
+            type: object
+            required:
+              - viewId
+              - name
+              - kind
+              - viewRevision
+            additionalProperties: false
+            properties:
+              viewId:
+                $ref: "#/components/schemas/MV_Identifier"
+              name:
+                type: string
+                minLength: 1
+                maxLength: 200
+              kind:
+                const: architecture
+              viewRevision:
+                $ref: "#/components/schemas/MV_Revision"
+    MV_ViewGetInput:
+      allOf:
+        - $ref: "#/components/schemas/MV_ReadIdentity"
+      type: object
+      required:
+        - viewId
+      unevaluatedProperties: false
+      properties:
+        viewId:
+          $ref: "#/components/schemas/MV_Identifier"
+    MV_ViewGetResult:
+      allOf:
+        - $ref: "#/components/schemas/MV_Counters"
+      type: object
+      required:
+        - view
+        - viewRevision
+        - missingReferences
+        - boundaryRelationshipIds
+      unevaluatedProperties: false
+      properties:
+        view:
+          $ref: "#/components/schemas/MV_View"
+        viewRevision:
+          $ref: "#/components/schemas/MV_Revision"
+        missingReferences:
+          $ref: "#/components/schemas/MV_MissingViewReferences"
+        boundaryRelationshipIds:
+          $ref: "#/components/schemas/MV_BoundaryRelationships"
+    MV_ViewPutInput:
+      allOf:
+        - $ref: "#/components/schemas/MV_WriteIdentity"
+      type: object
+      required:
+        - expectedModelRevision
+        - expectedViewRevision
+        - view
+      unevaluatedProperties: false
+      properties:
+        expectedModelRevision:
+          $ref: "#/components/schemas/MV_Revision"
+        expectedViewRevision:
+          $ref: "#/components/schemas/MV_Revision"
+        view:
+          $ref: "#/components/schemas/MV_View"
+    MV_ViewRemoveInput:
+      allOf:
+        - $ref: "#/components/schemas/MV_WriteIdentity"
+      type: object
+      required:
+        - expectedViewRevision
+        - viewId
+      unevaluatedProperties: false
+      properties:
+        expectedViewRevision:
+          $ref: "#/components/schemas/MV_Revision"
+        viewId:
+          $ref: "#/components/schemas/MV_Identifier"
+    MV_Viewport:
+      type: object
+      required:
+        - width
+        - height
+        - pixelRatio
+      additionalProperties: false
+      properties:
+        width:
+          type: integer
+          minimum: 320
+          maximum: 3840
+        height:
+          type: integer
+          minimum: 240
+          maximum: 2160
+        pixelRatio:
+          enum:
+            - 1
+            - 2
+    MV_ViewRenderInput:
+      allOf:
+        - $ref: "#/components/schemas/MV_ReadIdentity"
+      type: object
+      required:
+        - viewId
+        - expectedModelRevision
+        - expectedViewRevision
+        - viewport
+        - detailLevel
+      unevaluatedProperties: false
+      properties:
+        viewId:
+          $ref: "#/components/schemas/MV_Identifier"
+        expectedModelRevision:
+          $ref: "#/components/schemas/MV_Revision"
+        expectedViewRevision:
+          $ref: "#/components/schemas/MV_Revision"
+        viewport:
+          $ref: "#/components/schemas/MV_Viewport"
+        detailLevel:
+          enum:
+            - map
+            - readable
+            - standard
+            - full
+    MV_ViewRenderResult:
+      description: Metadata for exactly one PNG MCP image content block; not the image bytes.
+      allOf:
+        - $ref: "#/components/schemas/MV_Counters"
+      type: object
+      required:
+        - viewId
+        - viewRevision
+        - renderedAt
+        - viewport
+        - detailLevel
+        - mimeType
+        - byteLength
+        - missingReferences
+        - boundaryRelationshipIds
+        - visibleIds
+        - clipped
+      unevaluatedProperties: false
+      properties:
+        viewId:
+          $ref: "#/components/schemas/MV_Identifier"
+        viewRevision:
+          $ref: "#/components/schemas/MV_Revision"
+        renderedAt:
+          $ref: "#/components/schemas/MV_Timestamp"
+        viewport:
+          $ref: "#/components/schemas/MV_Viewport"
+        mimeType:
+          const: image/png
+        byteLength:
+          type: integer
+          minimum: 1
+          maximum: 4194304
+        missingReferences:
+          $ref: "#/components/schemas/MV_MissingViewReferences"
+        boundaryRelationshipIds:
+          $ref: "#/components/schemas/MV_BoundaryRelationships"
+        detailLevel:
+          enum:
+            - map
+            - readable
+            - standard
+            - full
+        visibleIds:
+          $ref: "#/components/schemas/MV_VisibleIds"
+        clipped:
+          type: boolean
+    MV_ProjectsListInput:
+      allOf:
+        - $ref: "#/components/schemas/MV_Page"
+      type: object
+      required:
+        - contractVersion
+      unevaluatedProperties: false
+      properties:
+        contractVersion:
+          $ref: "#/components/schemas/MV_Version"
+    MV_ProjectsListResult:
+      type: object
+      required:
+        - items
+        - nextCursor
+      additionalProperties: false
+      properties:
+        items:
+          type: array
+          maxItems: 200
+          uniqueItems: true
+          items:
+            $ref: "#/components/schemas/MV_ProjectId"
+        nextCursor:
+          $ref: "#/components/schemas/MV_NextCursor"
+    MV_DiscoverInput:
+      type: object
+      additionalProperties: false
+    MV_DiscoverResult:
+      type: object
+      required:
+        - contractVersion
+        - tools
+        - viewKinds
+        - limits
+      additionalProperties: false
+      properties:
+        contractVersion:
+          $ref: "#/components/schemas/MV_Version"
+        tools:
+          type: array
+          maxItems: 14
+          uniqueItems: true
+          items:
+            type: string
+            pattern: ^visualise_[a-z_]+$
+            maxLength: 64
+        viewKinds:
+          type: array
+          maxItems: 1
+          uniqueItems: true
+          items:
+            const: architecture
+        limits:
+          type: object
+          required:
+            - maxOperations
+            - maxPageSize
+            - maxRequestBytes
+            - maxStructuredResponseBytes
+            - maxImageBytes
+          additionalProperties: false
+          properties:
+            maxOperations:
+              const: 100
+            maxPageSize:
+              const: 200
+            maxRequestBytes:
+              const: 1048576
+            maxStructuredResponseBytes:
+              const: 1048576
+            maxImageBytes:
+              const: 4194304
+    MV_Error:
+      type: object
+      required:
+        - code
+        - message
+        - fields
+      additionalProperties: false
+      properties:
+        code:
+          enum:
+            - invalid_input
+            - unsupported_contract_version
+            - project_not_found
+            - run_not_found
+            - element_not_found
+            - element_exists
+            - view_not_found
+            - reference_invalid
+            - revision_conflict
+            - stale_cursor
+            - client_event_id_conflict
+            - run_not_started
+            - run_already_finished
+            - unknown_agent
+            - parent_agent_unknown
+            - agent_already_started
+            - run_already_started
+            - terminal_event_not_allowed
+            - correction_target_unknown
+            - response_too_large
+            - render_failed
+            - render_timeout
+            - cancelled
+            - work_step_not_started
+            - work_step_already_started
+            - internal_error
+        message:
+          type: string
+          minLength: 1
+          maxLength: 2000
+        fields:
+          type: array
+          maxItems: 100
+          items:
+            type: object
+            required:
+              - pointer
+              - message
+            additionalProperties: false
+            properties:
+              pointer:
+                type: string
+                pattern: ^(/([^~/]|~[01])*)*$
+                maxLength: 2048
+              message:
+                type: string
+                minLength: 1
+                maxLength: 1000
+        currentModelRevision:
+          $ref: "#/components/schemas/MV_Revision"
+        currentViewRevision:
+          $ref: "#/components/schemas/MV_Revision"
+        existingProjectPosition:
+          $ref: "#/components/schemas/MV_Revision"
+    MV_CommandEvent:
+      description: Future REST ingestion envelope. Generate the concrete branches from this definition;
+        never add these names to current server capabilities before implementation.
+      type: object
+      required:
+        - schemaVersion
+        - clientEventId
+        - projectId
+        - runId
+        - agentId
+        - parentAgentId
+        - occurredAt
+        - type
+        - payload
+      additionalProperties: false
+      properties:
+        schemaVersion:
+          const: "2.0"
+        clientEventId:
+          $ref: "#/components/schemas/MV_Uuid"
+        projectId:
+          $ref: "#/components/schemas/MV_ProjectId"
+        runId:
+          $ref: "#/components/schemas/MV_RunId"
+        agentId:
+          $ref: "#/components/schemas/MV_AgentId"
+        parentAgentId:
+          oneOf:
+            - $ref: "#/components/schemas/MV_AgentId"
+            - type: "null"
+        occurredAt:
+          $ref: "#/components/schemas/MV_Timestamp"
+        type:
+          enum:
+            - context.opened
+            - work.reported
+            - model.mutation_applied
+            - work.scope_reported
+            - view.saved
+            - view.removed
+        payload:
+          type: object
+      oneOf:
+        - properties:
+            type:
+              const: context.opened
+            payload:
+              type: object
+              required:
+                - role
+                - displayName
+                - assignedTask
+              additionalProperties: false
+              properties:
+                role:
+                  enum:
+                    - orchestrator
+                    - subagent
+                displayName:
+                  type: string
+                  minLength: 1
+                  maxLength: 200
+                assignedTask:
+                  type: string
+                  minLength: 1
+                  maxLength: 4000
+        - properties:
+            type:
+              const: work.reported
+            payload:
+              type: object
+              required:
+                - report
+              additionalProperties: false
+              properties:
+                report:
+                  $ref: "#/components/schemas/MV_WorkReport"
+        - properties:
+            type:
+              const: model.mutation_applied
+            payload:
+              $ref: "#/components/schemas/MV_ModelMutationPayload"
+        - properties:
+            type:
+              const: work.scope_reported
+            payload:
+              type: object
+              required:
+                - scope
+              additionalProperties: false
+              properties:
+                scope:
+                  $ref: "#/components/schemas/MV_Scope"
+        - properties:
+            type:
+              const: view.saved
+            payload:
+              type: object
+              required:
+                - expectedModelRevision
+                - expectedViewRevision
+                - view
+              additionalProperties: false
+              properties:
+                expectedModelRevision:
+                  $ref: "#/components/schemas/MV_Revision"
+                expectedViewRevision:
+                  $ref: "#/components/schemas/MV_Revision"
+                view:
+                  $ref: "#/components/schemas/MV_View"
+        - properties:
+            type:
+              const: view.removed
+            payload:
+              type: object
+              required:
+                - expectedViewRevision
+                - viewId
+              additionalProperties: false
+              properties:
+                expectedViewRevision:
+                  $ref: "#/components/schemas/MV_Revision"
+                viewId:
+                  $ref: "#/components/schemas/MV_Identifier"
+    LegacyEventType:
+      type: string
+      enum:
+        - agent.started
+        - agent.status_reported
+        - agent.progress_reported
+        - agent.finished
+        - plan.published
+        - plan.step_updated
+        - work.step_started
+        - work.step_completed
+        - feedback.published
+        - architecture.snapshot_published
+        - component.change_planned
+        - component.change_applied
+        - relationship.change_planned
+        - relationship.change_applied
+        - diff.reported
+        - risk.reported
+        - problem.reported
+        - correction.issued
+        - retraction.issued
+        - run.finished
+    ModelMutationAppliedEvent:
+      description: model.mutation_applied command, generated from contract 2.0.0.
+      type: object
+      required:
+        - schemaVersion
+        - clientEventId
+        - projectId
+        - runId
+        - agentId
+        - parentAgentId
+        - occurredAt
+        - type
+        - payload
+      additionalProperties: false
+      properties:
+        schemaVersion:
+          const: "2.0"
+        clientEventId:
+          $ref: "#/components/schemas/MV_Uuid"
+        projectId:
+          $ref: "#/components/schemas/MV_ProjectId"
+        runId:
+          $ref: "#/components/schemas/MV_RunId"
+        agentId:
+          $ref: "#/components/schemas/MV_AgentId"
+        parentAgentId:
+          oneOf:
+            - $ref: "#/components/schemas/MV_AgentId"
+            - type: "null"
+        occurredAt:
+          $ref: "#/components/schemas/MV_Timestamp"
+        type:
+          const: model.mutation_applied
+        payload:
+          $ref: "#/components/schemas/MV_ModelMutationPayload"
+    StreamedModelMutationAppliedEvent:
+      description: model.mutation_applied command, generated from contract 2.0.0.
+      type: object
+      required:
+        - schemaVersion
+        - clientEventId
+        - projectId
+        - runId
+        - agentId
+        - parentAgentId
+        - occurredAt
+        - type
+        - payload
+        - position
+        - serverEventId
+        - receivedAt
+      additionalProperties: false
+      properties:
+        schemaVersion:
+          const: "2.0"
+        clientEventId:
+          $ref: "#/components/schemas/MV_Uuid"
+        projectId:
+          $ref: "#/components/schemas/MV_ProjectId"
+        runId:
+          $ref: "#/components/schemas/MV_RunId"
+        agentId:
+          $ref: "#/components/schemas/MV_AgentId"
+        parentAgentId:
+          oneOf:
+            - $ref: "#/components/schemas/MV_AgentId"
+            - type: "null"
+        occurredAt:
+          $ref: "#/components/schemas/MV_Timestamp"
+        type:
+          const: model.mutation_applied
+        payload:
+          $ref: "#/components/schemas/MV_ModelMutationPayload"
+        position:
+          type: integer
+          minimum: 1
+        serverEventId:
+          $ref: "#/components/schemas/Uuid"
+        receivedAt:
+          $ref: "#/components/schemas/Timestamp"
+    ContextOpenedEvent:
+      description: context.opened command, generated from contract 2.0.0.
+      type: object
+      required:
+        - schemaVersion
+        - clientEventId
+        - projectId
+        - runId
+        - agentId
+        - parentAgentId
+        - occurredAt
+        - type
+        - payload
+      additionalProperties: false
+      properties:
+        schemaVersion:
+          const: "2.0"
+        clientEventId:
+          $ref: "#/components/schemas/MV_Uuid"
+        projectId:
+          $ref: "#/components/schemas/MV_ProjectId"
+        runId:
+          $ref: "#/components/schemas/MV_RunId"
+        agentId:
+          $ref: "#/components/schemas/MV_AgentId"
+        parentAgentId:
+          oneOf:
+            - $ref: "#/components/schemas/MV_AgentId"
+            - type: "null"
+        occurredAt:
+          $ref: "#/components/schemas/MV_Timestamp"
+        type:
+          const: context.opened
+        payload:
+          type: object
+          required:
+            - role
+            - displayName
+            - assignedTask
+          additionalProperties: false
+          properties:
+            role:
+              enum:
+                - orchestrator
+                - subagent
+            displayName:
+              type: string
+              minLength: 1
+              maxLength: 200
+            assignedTask:
+              type: string
+              minLength: 1
+              maxLength: 4000
+    StreamedContextOpenedEvent:
+      description: context.opened command, generated from contract 2.0.0.
+      type: object
+      required:
+        - schemaVersion
+        - clientEventId
+        - projectId
+        - runId
+        - agentId
+        - parentAgentId
+        - occurredAt
+        - type
+        - payload
+        - position
+        - serverEventId
+        - receivedAt
+      additionalProperties: false
+      properties:
+        schemaVersion:
+          const: "2.0"
+        clientEventId:
+          $ref: "#/components/schemas/MV_Uuid"
+        projectId:
+          $ref: "#/components/schemas/MV_ProjectId"
+        runId:
+          $ref: "#/components/schemas/MV_RunId"
+        agentId:
+          $ref: "#/components/schemas/MV_AgentId"
+        parentAgentId:
+          oneOf:
+            - $ref: "#/components/schemas/MV_AgentId"
+            - type: "null"
+        occurredAt:
+          $ref: "#/components/schemas/MV_Timestamp"
+        type:
+          const: context.opened
+        payload:
+          type: object
+          required:
+            - role
+            - displayName
+            - assignedTask
+          additionalProperties: false
+          properties:
+            role:
+              enum:
+                - orchestrator
+                - subagent
+            displayName:
+              type: string
+              minLength: 1
+              maxLength: 200
+            assignedTask:
+              type: string
+              minLength: 1
+              maxLength: 4000
+        position:
+          type: integer
+          minimum: 1
+        serverEventId:
+          $ref: "#/components/schemas/Uuid"
+        receivedAt:
+          $ref: "#/components/schemas/Timestamp"
+    WorkReportedEvent:
+      description: work.reported command, generated from contract 2.0.0.
+      type: object
+      required:
+        - schemaVersion
+        - clientEventId
+        - projectId
+        - runId
+        - agentId
+        - parentAgentId
+        - occurredAt
+        - type
+        - payload
+      additionalProperties: false
+      properties:
+        schemaVersion:
+          const: "2.0"
+        clientEventId:
+          $ref: "#/components/schemas/MV_Uuid"
+        projectId:
+          $ref: "#/components/schemas/MV_ProjectId"
+        runId:
+          $ref: "#/components/schemas/MV_RunId"
+        agentId:
+          $ref: "#/components/schemas/MV_AgentId"
+        parentAgentId:
+          oneOf:
+            - $ref: "#/components/schemas/MV_AgentId"
+            - type: "null"
+        occurredAt:
+          $ref: "#/components/schemas/MV_Timestamp"
+        type:
+          const: work.reported
+        payload:
+          type: object
+          required:
+            - report
+          additionalProperties: false
+          properties:
+            report:
+              $ref: "#/components/schemas/MV_WorkReport"
+    StreamedWorkReportedEvent:
+      description: work.reported command, generated from contract 2.0.0.
+      type: object
+      required:
+        - schemaVersion
+        - clientEventId
+        - projectId
+        - runId
+        - agentId
+        - parentAgentId
+        - occurredAt
+        - type
+        - payload
+        - position
+        - serverEventId
+        - receivedAt
+      additionalProperties: false
+      properties:
+        schemaVersion:
+          const: "2.0"
+        clientEventId:
+          $ref: "#/components/schemas/MV_Uuid"
+        projectId:
+          $ref: "#/components/schemas/MV_ProjectId"
+        runId:
+          $ref: "#/components/schemas/MV_RunId"
+        agentId:
+          $ref: "#/components/schemas/MV_AgentId"
+        parentAgentId:
+          oneOf:
+            - $ref: "#/components/schemas/MV_AgentId"
+            - type: "null"
+        occurredAt:
+          $ref: "#/components/schemas/MV_Timestamp"
+        type:
+          const: work.reported
+        payload:
+          type: object
+          required:
+            - report
+          additionalProperties: false
+          properties:
+            report:
+              $ref: "#/components/schemas/MV_WorkReport"
+        position:
+          type: integer
+          minimum: 1
+        serverEventId:
+          $ref: "#/components/schemas/Uuid"
+        receivedAt:
+          $ref: "#/components/schemas/Timestamp"
+    WorkScopeReportedEvent:
+      description: work.scope_reported command, generated from contract 2.0.0.
+      type: object
+      required:
+        - schemaVersion
+        - clientEventId
+        - projectId
+        - runId
+        - agentId
+        - parentAgentId
+        - occurredAt
+        - type
+        - payload
+      additionalProperties: false
+      properties:
+        schemaVersion:
+          const: "2.0"
+        clientEventId:
+          $ref: "#/components/schemas/MV_Uuid"
+        projectId:
+          $ref: "#/components/schemas/MV_ProjectId"
+        runId:
+          $ref: "#/components/schemas/MV_RunId"
+        agentId:
+          $ref: "#/components/schemas/MV_AgentId"
+        parentAgentId:
+          oneOf:
+            - $ref: "#/components/schemas/MV_AgentId"
+            - type: "null"
+        occurredAt:
+          $ref: "#/components/schemas/MV_Timestamp"
+        type:
+          const: work.scope_reported
+        payload:
+          type: object
+          required:
+            - scope
+          additionalProperties: false
+          properties:
+            scope:
+              $ref: "#/components/schemas/MV_Scope"
+    StreamedWorkScopeReportedEvent:
+      description: work.scope_reported command, generated from contract 2.0.0.
+      type: object
+      required:
+        - schemaVersion
+        - clientEventId
+        - projectId
+        - runId
+        - agentId
+        - parentAgentId
+        - occurredAt
+        - type
+        - payload
+        - position
+        - serverEventId
+        - receivedAt
+      additionalProperties: false
+      properties:
+        schemaVersion:
+          const: "2.0"
+        clientEventId:
+          $ref: "#/components/schemas/MV_Uuid"
+        projectId:
+          $ref: "#/components/schemas/MV_ProjectId"
+        runId:
+          $ref: "#/components/schemas/MV_RunId"
+        agentId:
+          $ref: "#/components/schemas/MV_AgentId"
+        parentAgentId:
+          oneOf:
+            - $ref: "#/components/schemas/MV_AgentId"
+            - type: "null"
+        occurredAt:
+          $ref: "#/components/schemas/MV_Timestamp"
+        type:
+          const: work.scope_reported
+        payload:
+          type: object
+          required:
+            - scope
+          additionalProperties: false
+          properties:
+            scope:
+              $ref: "#/components/schemas/MV_Scope"
+        position:
+          type: integer
+          minimum: 1
+        serverEventId:
+          $ref: "#/components/schemas/Uuid"
+        receivedAt:
+          $ref: "#/components/schemas/Timestamp"
+    ViewSavedEvent:
+      description: view.saved command, generated from contract 2.0.0.
+      type: object
+      required:
+        - schemaVersion
+        - clientEventId
+        - projectId
+        - runId
+        - agentId
+        - parentAgentId
+        - occurredAt
+        - type
+        - payload
+      additionalProperties: false
+      properties:
+        schemaVersion:
+          const: "2.0"
+        clientEventId:
+          $ref: "#/components/schemas/MV_Uuid"
+        projectId:
+          $ref: "#/components/schemas/MV_ProjectId"
+        runId:
+          $ref: "#/components/schemas/MV_RunId"
+        agentId:
+          $ref: "#/components/schemas/MV_AgentId"
+        parentAgentId:
+          oneOf:
+            - $ref: "#/components/schemas/MV_AgentId"
+            - type: "null"
+        occurredAt:
+          $ref: "#/components/schemas/MV_Timestamp"
+        type:
+          const: view.saved
+        payload:
+          type: object
+          required:
+            - expectedModelRevision
+            - expectedViewRevision
+            - view
+          additionalProperties: false
+          properties:
+            expectedModelRevision:
+              $ref: "#/components/schemas/MV_Revision"
+            expectedViewRevision:
+              $ref: "#/components/schemas/MV_Revision"
+            view:
+              $ref: "#/components/schemas/MV_View"
+    StreamedViewSavedEvent:
+      description: view.saved command, generated from contract 2.0.0.
+      type: object
+      required:
+        - schemaVersion
+        - clientEventId
+        - projectId
+        - runId
+        - agentId
+        - parentAgentId
+        - occurredAt
+        - type
+        - payload
+        - position
+        - serverEventId
+        - receivedAt
+      additionalProperties: false
+      properties:
+        schemaVersion:
+          const: "2.0"
+        clientEventId:
+          $ref: "#/components/schemas/MV_Uuid"
+        projectId:
+          $ref: "#/components/schemas/MV_ProjectId"
+        runId:
+          $ref: "#/components/schemas/MV_RunId"
+        agentId:
+          $ref: "#/components/schemas/MV_AgentId"
+        parentAgentId:
+          oneOf:
+            - $ref: "#/components/schemas/MV_AgentId"
+            - type: "null"
+        occurredAt:
+          $ref: "#/components/schemas/MV_Timestamp"
+        type:
+          const: view.saved
+        payload:
+          type: object
+          required:
+            - expectedModelRevision
+            - expectedViewRevision
+            - view
+          additionalProperties: false
+          properties:
+            expectedModelRevision:
+              $ref: "#/components/schemas/MV_Revision"
+            expectedViewRevision:
+              $ref: "#/components/schemas/MV_Revision"
+            view:
+              $ref: "#/components/schemas/MV_View"
+        position:
+          type: integer
+          minimum: 1
+        serverEventId:
+          $ref: "#/components/schemas/Uuid"
+        receivedAt:
+          $ref: "#/components/schemas/Timestamp"
+    ViewRemovedEvent:
+      description: view.removed command, generated from contract 2.0.0.
+      type: object
+      required:
+        - schemaVersion
+        - clientEventId
+        - projectId
+        - runId
+        - agentId
+        - parentAgentId
+        - occurredAt
+        - type
+        - payload
+      additionalProperties: false
+      properties:
+        schemaVersion:
+          const: "2.0"
+        clientEventId:
+          $ref: "#/components/schemas/MV_Uuid"
+        projectId:
+          $ref: "#/components/schemas/MV_ProjectId"
+        runId:
+          $ref: "#/components/schemas/MV_RunId"
+        agentId:
+          $ref: "#/components/schemas/MV_AgentId"
+        parentAgentId:
+          oneOf:
+            - $ref: "#/components/schemas/MV_AgentId"
+            - type: "null"
+        occurredAt:
+          $ref: "#/components/schemas/MV_Timestamp"
+        type:
+          const: view.removed
+        payload:
+          type: object
+          required:
+            - expectedViewRevision
+            - viewId
+          additionalProperties: false
+          properties:
+            expectedViewRevision:
+              $ref: "#/components/schemas/MV_Revision"
+            viewId:
+              $ref: "#/components/schemas/MV_Identifier"
+    StreamedViewRemovedEvent:
+      description: view.removed command, generated from contract 2.0.0.
+      type: object
+      required:
+        - schemaVersion
+        - clientEventId
+        - projectId
+        - runId
+        - agentId
+        - parentAgentId
+        - occurredAt
+        - type
+        - payload
+        - position
+        - serverEventId
+        - receivedAt
+      additionalProperties: false
+      properties:
+        schemaVersion:
+          const: "2.0"
+        clientEventId:
+          $ref: "#/components/schemas/MV_Uuid"
+        projectId:
+          $ref: "#/components/schemas/MV_ProjectId"
+        runId:
+          $ref: "#/components/schemas/MV_RunId"
+        agentId:
+          $ref: "#/components/schemas/MV_AgentId"
+        parentAgentId:
+          oneOf:
+            - $ref: "#/components/schemas/MV_AgentId"
+            - type: "null"
+        occurredAt:
+          $ref: "#/components/schemas/MV_Timestamp"
+        type:
+          const: view.removed
+        payload:
+          type: object
+          required:
+            - expectedViewRevision
+            - viewId
+          additionalProperties: false
+          properties:
+            expectedViewRevision:
+              $ref: "#/components/schemas/MV_Revision"
+            viewId:
+              $ref: "#/components/schemas/MV_Identifier"
+        position:
+          type: integer
+          minimum: 1
+        serverEventId:
+          $ref: "#/components/schemas/Uuid"
+        receivedAt:
+          $ref: "#/components/schemas/Timestamp"

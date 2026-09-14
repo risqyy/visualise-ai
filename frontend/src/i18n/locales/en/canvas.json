@@ -98,7 +98,9 @@
       "remove": "remove"
     },
     "proposalNote": "Proposal: not part of the applied architecture model.",
-    "workStepRunning": "Work step running: {{title}}"
+    "workStepRunning": "Work step running: {{title}}",
+    "workScopeReported": "Explicitly reported work scope",
+    "workScopeEnded": "Retained work scope · agent or run ended"
   },
   "pane": {
     "emptyDescription": "The model appears as soon as an agent sends architecture.snapshot_published.",
@@ -165,8 +167,8 @@
     "exitArchitectureFocusHint": "Restore the run and inspector panes exactly as they were before architecture focus.",
     "focusArchitecture": "Focus architecture",
     "focusArchitectureHint": "Fold both side panes and fit the visible architecture. Selection, disclosure and inspector context stay unchanged.",
-    "fitWholeModel": "Whole-model map",
-    "fitWholeModelHint": "Expands every container and shows the complete model as a spatial map. With many components the picture deliberately becomes small; it is for orientation, not reading. Search, selection and the inspector remain available. Otherwise the camera only moves on the first load — never because events arrive.",
+    "fitWholeModel": "Whole-view map",
+    "fitWholeModelHint": "Expands every container and shows all elements in the current view as a spatial map. With many components the picture deliberately becomes small; it is for orientation, not reading. Search, selection and the inspector remain available. Otherwise the camera only moves on the first load — never because events arrive.",
     "hideMinimap": "Hide the overview map",
     "layoutLeftRight": "Left to right",
     "layoutOrientation": "Graph orientation",
@@ -199,5 +201,17 @@
       "description": "The agent reported that this element was removed. It is only shown as evidence.",
       "label": "removed"
     }
+  },
+  "views": {
+    "label": "View",
+    "overview": "Complete overview",
+    "more": "More views",
+    "retry": "Reload views",
+    "unavailable": "This saved view is unavailable. Choose another view or the complete overview.",
+    "missing_one": "{{count}} reference is missing from the current model.",
+    "missing_other": "{{count}} references are missing from the current model.",
+    "boundary_one": "{{count}} relationship is outside this view.",
+    "boundary_other": "{{count}} relationships are outside this view.",
+    "selectionOutside": "The selected element is outside this view. Its shared history remains available in the inspector."
   }
 }

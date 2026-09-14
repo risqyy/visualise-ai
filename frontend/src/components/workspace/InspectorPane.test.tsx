@@ -142,6 +142,7 @@ const BUNDLED_APPLIED_RELATIONSHIP = appliedRelationship({
   label: 'Read cancellations',
 })
 const RELATIONSHIP_ARCHITECTURE: ArchitectureResponse = {
+  modelRevision: 1,
   projectPosition: 42,
   components: [
     appliedComponent({

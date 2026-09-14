@@ -37,6 +37,8 @@ type Options struct {
 	// Stream serves the project SSE endpoint. Nil leaves the route
 	// unregistered, so a router without a broker stays usable in tests.
 	Stream *sse.Handler
+	// MCP serves the official Streamable HTTP transport at /mcp.
+	MCP http.Handler
 }
 
 // New builds the Gin engine.
@@ -45,7 +47,7 @@ func New(opts Options) *gin.Engine {
 
 	engine := gin.New()
 	engine.RedirectTrailingSlash = false
-	engine.Use(RequestLogger(opts.Logger), Recovery(opts.Logger))
+	engine.Use(RequestLogger(opts.Logger), Recovery(opts.Logger), requireBootstrap(opts.Health))
 
 	engine.GET("/healthz", liveHandler(opts.Version))
 	engine.GET("/readyz", readyHandler(opts.Health, opts.Version))
@@ -57,10 +59,28 @@ func New(opts Options) *gin.Engine {
 	registerIngestRoutes(engine, opts.Ingest)
 	registerRead(engine, opts.Read, opts.Logger)
 	registerStream(engine, opts.Stream)
+	if opts.MCP != nil {
+		engine.Any("/mcp", gin.WrapH(opts.MCP))
+	}
 
 	engine.NoRoute(notFoundHandler())
 
 	return engine
+}
+
+// requireBootstrap is shared by every application route, including MCP and
+// long-lived SSE requests. Probes stay available while migration is running.
+// Nginx may already be forwarding requests after a backend-only restart.
+func requireBootstrap(checker *health.Checker) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		if c.Request.Method == http.MethodGet && (c.FullPath() == "/healthz" || c.FullPath() == "/readyz") {
+			return
+		}
+		if !checker.Bootstrapped() {
+			writeProblem(c, http.StatusServiceUnavailable, "backend_unavailable", "Service Unavailable",
+				"The backend is starting or shutting down.")
+		}
+	}
 }
 
 func liveHandler(version string) gin.HandlerFunc {

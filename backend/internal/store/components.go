@@ -28,6 +28,8 @@ func linkEventComponents(tx *gorm.DB, ev *Event) error {
 // descriptor. Relationships contribute both of their endpoints.
 func eventComponentIDs(evType string, payload []byte) ([]string, error) {
 	switch evType {
+	case TypeModelMutationApplied:
+		return affectedIDs(evType, payload).ComponentIDs, nil
 	case TypeWorkStepStarted:
 		var p workStepStartedPayload
 		if err := decodePayload(payload, &p); err != nil {
