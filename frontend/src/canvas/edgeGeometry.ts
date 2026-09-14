@@ -263,6 +263,21 @@ export function fanOffset(index: number, total: number): number {
   return (index - (total - 1) / 2) * BUNDLE_FAN_SPACING
 }
 
+/** Self-loop members nest outside the node instead of translating through it. */
+export function bundleMemberRoute(
+  points: readonly LayoutPoint[],
+  index: number,
+  total: number,
+  orientation: GraphOrientation = DEFAULT_GRAPH_ORIENTATION,
+  selfLoopSize?: { width: number; height: number },
+): LayoutPoint[] {
+  if (!selfLoopSize || points.length < 2) return fanRoute(points, fanOffset(index, total), orientation)
+  // All lanes fit the 12px header padding; wider symmetric fans cut into nodes.
+  // Retain at least 4px for stroke and rounded-corner clearance.
+  return selfLoopRoute(points[0]!, points[points.length - 1]!, orientation,
+    selfLoopSize, 4 + 6 * (index + 1) / Math.max(total, 1))
+}
+
 /** Point at a given ratio of the polyline's length. Used to place labels. */
 export function pointAtRatio(
   points: readonly LayoutPoint[],
@@ -332,9 +347,9 @@ export function selfLoopRoute(
   target: LayoutPoint,
   orientation: GraphOrientation = 'left-right',
   size: { width: number; height: number } = { width: 228, height: 96 },
+  clearance = 10,
 ): LayoutPoint[] {
   // Fit inside both the sibling gap (36px) and compound header padding (12px).
-  const clearance = 10
   if (orientation === 'top-down') {
     const bottom = Math.max(source.y, target.y) + clearance
     const top = Math.min(source.y, target.y) - clearance

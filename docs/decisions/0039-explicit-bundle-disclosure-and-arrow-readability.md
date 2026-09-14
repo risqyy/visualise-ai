@@ -26,6 +26,9 @@ leaders of ADR 0038. Label positions remain shared between both renderers.
 
 Self-loops respect orientation and measured node dimensions, staying within the
 minimum sibling gap. Neither disclosure nor selection moves graph nodes.
+Parallel self-relations use nested exterior lanes within the header padding;
+symmetric translation would move inward members through the component. These
+lanes remain close together, with individual labels providing selection access.
 
 ## Trade-offs and validation
 

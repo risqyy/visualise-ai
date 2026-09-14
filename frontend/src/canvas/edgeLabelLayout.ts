@@ -1,5 +1,5 @@
 import type { DetailLevel } from './detailLevel'
-import { fallbackRoute, fanOffset, fanRoute, pointAtRatio, selfLoopRoute } from './edgeGeometry'
+import { bundleMemberRoute, fallbackRoute, pointAtRatio, selfLoopRoute } from './edgeGeometry'
 import { attachmentCrossesObstacle, nearestPointOnRoute } from './edgeLabelAttachment'
 import type { LayoutPoint } from './elkLayout'
 import {
@@ -131,7 +131,11 @@ export function placeEdgeLabels(
     if (unfolded) {
       for (const [index, entry] of resolved.entries()) {
         const relationshipId = entry.relationship.relationshipId
-        const fanned = fanRoute(route, fanOffset(index, resolved.length), edge.data.fallbackOrientation)
+        const sourceBox = boxes.get(edge.source)
+        const fanned = bundleMemberRoute(route, index, resolved.length, edge.data.fallbackOrientation,
+          edge.source === edge.target && sourceBox
+            ? { width: sourceBox.right - sourceBox.left, height: sourceBox.bottom - sourceBox.top }
+            : undefined)
         add(`relationship:${relationshipId}`, fanned, edge.data.labelRatio ?? 0.5)
         if (edge.data.overlays[relationshipId]) add(`overlay:${relationshipId}`, fanned, 0.74)
       }

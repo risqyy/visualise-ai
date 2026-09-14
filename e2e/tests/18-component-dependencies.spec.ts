@@ -162,8 +162,8 @@ async function assertNoLabelCollisions(page: Page, label: string) {
  * around its component, including its rounded bends, in either orientation.
  * Only the small endpoint/handle contact is exempt from this check.
  */
-async function assertSelfLoopOutsideNode(page: Page, componentId: string) {
-  const loop = page.getByTestId(`edge-path-rel:${componentId}~>${componentId}`)
+async function assertSelfLoopOutsideNode(page: Page, componentId: string, relationshipId?: string) {
+  const loop = page.getByTestId(`edge-path-${relationshipId ?? `rel:${componentId}~>${componentId}`}`)
   await expect(loop).toBeAttached()
   const geometry = await loop.evaluate((element, id) => {
     const path = element as SVGPathElement
@@ -443,6 +443,7 @@ for (const orientation of ['top-down', 'left-to-right'] as const) {
       ...Array.from({ length: 6 }, (_, index) => relationship(`native-bundle-${index}`, 'native-hub', 'native-consumer')),
       relationship('native-incoming', 'native-upstream', 'native-hub'),
       relationship('native-self', 'native-hub', 'native-hub'),
+      relationship('native-self-second', 'native-hub', 'native-hub'),
       relationship('native-downstream', 'native-consumer', 'native-other'),
       relationship('native-crossing', 'native-upstream', 'native-other'),
     ]
@@ -464,7 +465,8 @@ for (const orientation of ['top-down', 'left-to-right'] as const) {
     await expect(mainPaths(page)).toHaveCount(relationships.length)
     await expect(page.getByTestId('edge-label-native-bundle-5')).toBeAttached()
     await assertNoLabelCollisions(page, `native full-detail ${orientation}`)
-    await assertSelfLoopOutsideNode(page, 'native-hub')
+    await assertSelfLoopOutsideNode(page, 'native-hub', 'native-self')
+    await assertSelfLoopOutsideNode(page, 'native-hub', 'native-self-second')
     await assertLabelAnnotations(page, relationships)
     await assertBoundedBadgeText(page)
     await page.screenshot({ path: testInfo.outputPath(`native-dependencies-${orientation}.png`) })

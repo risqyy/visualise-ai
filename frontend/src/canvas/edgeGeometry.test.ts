@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 
 import {
   BUNDLE_FAN_SPACING,
+  bundleMemberRoute,
   EDGE_LABEL_STAGGER_END,
   EDGE_LABEL_STAGGER_START,
   fallbackRoute,
@@ -222,7 +223,11 @@ describe('edge geometry', () => {
     const target = topDown
       ? { x: left + width / 2, y: top }
       : { x: left, y: top + height / 2 }
-    const route = selfLoopRoute(source, target, orientation, { width, height })
+    const baseRoute = selfLoopRoute(source, target, orientation, { width, height })
+    const routes = [baseRoute, ...[2, 6].flatMap((total) => Array.from({ length: total }, (_, index) =>
+      bundleMemberRoute(baseRoute, index, total, orientation, { width, height })))]
+    expect(new Set(routes.slice(-6).map((route) => JSON.stringify(route))).size).toBe(6)
+    for (const route of routes) {
 
     // A sibling may start just 36px beyond any side of this node.
     for (const point of route) {
@@ -263,6 +268,7 @@ describe('edge geometry', () => {
         : from.y > top && from.y < bottom &&
           Math.max(from.x, to.x) > left && Math.min(from.x, to.x) < right
       expect(crossesInterior).toBe(false)
+    }
     }
   })
 })

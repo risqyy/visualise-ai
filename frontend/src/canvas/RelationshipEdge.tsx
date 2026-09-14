@@ -14,8 +14,7 @@ import { dominantOverlay, type ChangeOverlay } from './changeOverlays'
 import { nearestPointOnRoute } from './edgeLabelAttachment'
 import {
   fallbackRoute,
-  fanOffset,
-  fanRoute,
+  bundleMemberRoute,
   pointAtRatio,
   roundedPolylinePath,
   selfLoopRoute,
@@ -415,6 +414,10 @@ export const RelationshipEdge = memo(function RelationshipEdge({
   const labelPoint = (key: string, preferred: LayoutPoint) => data.labelPositions?.[key] ?? preferred
   const labelAnchor = (key: string, ownRoute: LayoutPoint[], preferred: LayoutPoint) =>
     nearestPointOnRoute(labelPoint(key, preferred), ownRoute)
+  const memberRoute = (index: number, total: number) => bundleMemberRoute(
+    route, index, total, data.fallbackOrientation,
+    source === target ? { width: sourceWidth, height: sourceHeight } : undefined,
+  )
 
   if (!bundled || !unfolded) {
     const edgeOverlay = dominantOverlay(Object.values(overlays))
@@ -546,11 +549,7 @@ export const RelationshipEdge = memo(function RelationshipEdge({
     <>
       {resolved.map((entry) => {
         const style = RELATIONSHIP_KIND_STYLE_BY_ID[entry.relationship.kind]
-        const fanned = fanRoute(
-          route,
-          fanOffset(entry.index, entry.total),
-          data.fallbackOrientation,
-        )
+        const fanned = memberRoute(entry.index, entry.total)
         const emphasised = entry.relationship.relationshipId === selectedRelationshipId
         const entryDimmed = hasSelection && !emphasised && !componentRelated
         return (
@@ -573,11 +572,7 @@ export const RelationshipEdge = memo(function RelationshipEdge({
         {resolved.map((entry) => {
           const overlay = overlays[entry.relationship.relationshipId]
           if (!overlay) return null
-          const fanned = fanRoute(
-            route,
-            fanOffset(entry.index, entry.total),
-            data.fallbackOrientation,
-          )
+          const fanned = memberRoute(entry.index, entry.total)
           return (
             <EdgeOverlayMark
               key={`state-${entry.relationship.relationshipId}`}
@@ -591,11 +586,7 @@ export const RelationshipEdge = memo(function RelationshipEdge({
         })}
         {resolved.map((entry) => {
           const style = RELATIONSHIP_KIND_STYLE_BY_ID[entry.relationship.kind]
-          const fanned = fanRoute(
-            route,
-            fanOffset(entry.index, entry.total),
-            data.fallbackOrientation,
-          )
+          const fanned = memberRoute(entry.index, entry.total)
           const emphasised = entry.relationship.relationshipId === selectedRelationshipId
           const entryDimmed = hasSelection && !emphasised && !componentRelated
           const discriminator = entry.discriminator
