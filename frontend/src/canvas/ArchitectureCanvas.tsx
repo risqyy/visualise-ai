@@ -76,6 +76,7 @@ import {
   detailLevelForZoom,
 } from './detailLevel'
 import { staggeredLabelRatios } from './edgeGeometry'
+import { placeEdgeLabels } from './edgeLabelLayout'
 import { ARCHITECTURE_EDGE_TYPES, ARCHITECTURE_NODE_TYPES } from './flowRegistry'
 import {
   COMPOUND_NODE_TYPE,
@@ -287,6 +288,7 @@ function ArchitectureCanvasInner({
   const architectureFocus = useUiStore((state) => state.architectureFocus)
   const toggleArchitectureFocus = useUiStore((state) => state.toggleArchitectureFocus)
   const clearExpandedEdges = useUiStore((state) => state.clearExpandedEdges)
+  const expandedEdgeIds = useUiStore((state) => state.expandedEdgeIds)
   const toggleEdgeExpanded = useUiStore((state) => state.toggleEdgeExpanded)
   const storedSelectedRelationshipId = useUiStore((state) => state.selectedRelationshipId)
   const setStoredSelectedRelationshipId = useUiStore(
@@ -906,8 +908,11 @@ function ArchitectureCanvasInner({
   // nearest *visible* ancestor, so every endpoint of every drawn edge is a node
   // of `graph.nodes` and no name can fall back to an id.
   const nodeNames = useMemo(() => componentNamesById(graph.nodes), [graph.nodes])
+  const visualSelectedComponentId = selectedComponentId && visibleNodeIds.has(selectedComponentId)
+    ? selectedComponentId : null
 
-  const edges = useMemo<ArchitectureEdge[]>(() => {
+  // Geometry depends on disclosure, zoom and positions, never on selection.
+  const positionedEdges = useMemo<ArchitectureEdge[]>(() => {
     const invalidated = routesInvalidatedByDrag(graph.edges, nodePositions)
     const routed = graph.edges.map((edge) => {
       const route = invalidated.has(edge.id) ? undefined : graph.routes[edge.id]
@@ -933,8 +938,18 @@ function ArchitectureCanvasInner({
       if (!edge.data || labelRatio === undefined) return edge
       return { ...edge, data: { ...edge.data, labelRatio } }
     })
+    const labelPositions = placeEdgeLabels(
+      positioned, applyTemporaryPositions(graph.nodes, nodePositions, null),
+      { detailLevel, expandedEdgeIds, zoom: camera.zoom },
+    )
+    return positioned.map((edge) => edge.data ? {
+      ...edge, data: { ...edge.data, labelPositions: labelPositions.get(edge.id) ?? {} },
+    } : edge)
+  }, [graph.edges, graph.nodes, graph.routes, nodePositions, detailLevel, expandedEdgeIds, camera.zoom])
+
+  const edges = useMemo<ArchitectureEdge[]>(() => {
     return withEdgeAccessibility(
-      positioned,
+      positionedEdges,
       nodeNames,
       voice,
       visualSelectedRelationshipId,
@@ -945,6 +960,7 @@ function ArchitectureCanvasInner({
             data: {
               ...edge.data,
               selectedRelationshipId: visualSelectedRelationshipId,
+              selectedComponentId: visualSelectedComponentId,
               onSelectRelationship:
                 onSelectRelationship ?? setStoredSelectedRelationshipId,
             },
@@ -952,13 +968,12 @@ function ArchitectureCanvasInner({
         : {}),
     }))
   }, [
-    graph.edges,
-    graph.routes,
-    nodePositions,
+    positionedEdges,
     nodeNames,
     onSelectRelationship,
     setStoredSelectedRelationshipId,
     visualSelectedRelationshipId,
+    visualSelectedComponentId,
     voice,
   ])
 

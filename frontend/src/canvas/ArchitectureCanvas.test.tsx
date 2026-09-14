@@ -8,6 +8,8 @@ import { applyLiveEvent } from '@/api/useLiveStream'
 import { DEFAULT_CAMERA, resetUiStore, useUiStore } from '@/state/uiStore'
 import {
   BUNDLED_TOPIC_CHANNELS,
+  activeChange,
+  architectureWithChanges,
   NESTED_COMPONENTS,
   NESTED_RELATIONSHIPS,
   grownArchitectureResponse,
@@ -515,6 +517,63 @@ describe('architecture canvas — edge bundling stays resolvable', () => {
 })
 
 describe('architecture canvas — selection', () => {
+  it('keeps reported work-state and relationship-kind markers when highlighting dependencies', async () => {
+    const user = userEvent.setup()
+    const relationship = NESTED_RELATIONSHIPS.find((entry) => entry.relationshipId === 'r-03')!
+    renderCanvas(WORKSPACE_URL, architectureWithChanges([activeChange({
+      targetKind: 'relationship', targetId: relationship.relationshipId,
+      operation: 'modify', snapshot: { ...relationship },
+    })]))
+    await waitForCanvas()
+    const path = screen.getByTestId('edge-path-rel:platform.core.orders~>platform.db')
+    const statePath = screen.getByTestId('edge-path-rel:platform.core.orders~>platform.db-state')
+    const kindPattern = path.getAttribute('data-dasharray')
+    const statePattern = statePath.getAttribute('data-state-dasharray')
+    const stateColour = statePath.getAttribute('stroke')
+    await user.click(screen.getByTestId('canvas-node-platform.core.orders'))
+    expect(path).toHaveAttribute('data-component-related', 'true')
+    expect(path).toHaveClass('text-ring')
+    expect(path).toHaveAttribute('data-dasharray', kindPattern)
+    expect(statePath).toHaveAttribute('stroke', stateColour)
+    expect(statePath).toHaveAttribute('data-state-dasharray', statePattern)
+    expect(screen.getByTestId('overlay-mark-relationship-r-03')).toHaveAttribute('data-work-state', 'planned')
+  }, CANVAS_TIMEOUT)
+
+  it('highlights every incident relationship without moving the camera or selecting a bundle member', async () => {
+    const user = userEvent.setup()
+    const { router } = renderCanvas()
+    await waitForCanvas()
+    await waitForCameraSettled()
+    const cameraBefore = viewportTransform()
+    const incoming = screen.getByTestId('edge-path-rel:platform.api.http.router~>platform.core.orders')
+    const outgoing = screen.getByTestId('edge-path-rel:platform.core.orders~>platform.db')
+    const unrelated = screen.getByTestId('edge-path-rel:platform.core.billing~>external.payments')
+    await user.click(screen.getByTestId('canvas-node-platform.core.orders'))
+    expect(incoming).toHaveAttribute('data-component-related', 'true')
+    expect(outgoing).toHaveAttribute('data-component-related', 'true')
+    expect(unrelated).toHaveClass('opacity-25')
+    expect(viewportTransform()).toBe(cameraBefore)
+    await user.click(screen.getByTestId(`edge-bundle-${BUNDLE_EDGE_ID}`))
+    for (const id of ['r-05', 'r-06', 'r-07']) {
+      expect(screen.getByTestId(`edge-path-${id}`)).toHaveAttribute('data-component-related', 'true')
+      expect(screen.getByTestId(`edge-label-${id}`)).not.toHaveAttribute('aria-current')
+    }
+    expect(router.state.location.search).toEqual({ component: 'platform.core.orders' })
+    await user.click(screen.getByTestId('canvas-node-platform.core.orders'))
+    expect(incoming).not.toHaveAttribute('data-component-related')
+    expect(unrelated).not.toHaveClass('opacity-25')
+    expect(viewportTransform()).toBe(cameraBefore)
+  }, CANVAS_TIMEOUT)
+
+  it('does not dim the canvas for a missing component selection', async () => {
+    renderCanvas(`${WORKSPACE_URL}?component=missing-component`)
+    await waitForCanvas()
+    for (const path of document.querySelectorAll('path[data-relationship-kind]')) {
+      expect(path).not.toHaveClass('opacity-25')
+      expect(path).not.toHaveAttribute('data-component-related')
+    }
+  }, CANVAS_TIMEOUT)
+
   it(
     'searches name, kind, technology, tags and id, then selects the result',
     async () => {

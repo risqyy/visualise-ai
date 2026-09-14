@@ -1,7 +1,7 @@
 import { EdgeLabelRenderer, useStore, type EdgeProps } from '@xyflow/react'
 import type { TFunction } from 'i18next'
 import { Layers2 } from 'lucide-react'
-import { memo, useState, type ReactNode } from 'react'
+import { memo, type ReactNode } from 'react'
 import { useTranslation } from 'react-i18next'
 
 import type { Relationship } from '@/api/types'
@@ -46,7 +46,8 @@ import { useDetailLevel } from './useDetailLevel'
  * * unfolded (high zoom, or after a click on the badge): one line per
  *   relationship, each labelled with a bounded identifier — the topic name for
  *   a NATS topic, the operation for a call. Full reported text stays on the
- *   title, focus state, selection and relationship inspector.
+ *   accessible name, title and relationship inspector. Focusing or selecting a
+ *   label never changes its footprint.
  *
  * That is what makes the bundling reversible: no zoom level and no interaction
  * can make a single reported topic unreachable.
@@ -57,6 +58,7 @@ interface EdgeRouteProps {
   strokeDasharray: string
   marker: 'arrow' | 'arrowclosed'
   emphasised: boolean
+  componentRelated?: boolean
   interactive: boolean
   testId?: string
   kind?: string
@@ -81,6 +83,7 @@ function EdgeRoute({
   strokeDasharray,
   marker,
   emphasised,
+  componentRelated = false,
   interactive,
   testId,
   kind,
@@ -127,17 +130,18 @@ function EdgeRoute({
       <path
         d={path}
         fill="none"
-        stroke={state ? `var(${state.colorVar})` : 'currentColor'}
+        stroke={state && !emphasised ? `var(${state.colorVar})` : 'currentColor'}
         strokeWidth={emphasised ? 2.25 : 1.5}
         strokeDasharray={strokeDasharray === '0' ? undefined : strokeDasharray}
         strokeLinecap="round"
         markerEnd={markerUrl(marker, emphasised)}
         className={cn(
           'transition-colors duration-150',
-          !state && (emphasised ? 'text-ring' : 'text-muted-foreground'),
+          (emphasised || !state) && (emphasised ? 'text-ring' : 'text-muted-foreground'),
           dimmed && 'opacity-25',
         )}
         data-testid={testId}
+        data-component-related={componentRelated ? 'true' : undefined}
         data-relationship-kind={kind}
         data-dasharray={strokeDasharray}
         data-work-state={overlay?.state}
@@ -148,8 +152,25 @@ function EdgeRoute({
 }
 
 /** HTML badge anchored to a point in flow coordinates. */
+function LabelLeader({ point, anchor, zIndex }: {
+  point: LayoutPoint
+  anchor?: LayoutPoint
+  zIndex: number
+}) {
+  if (!anchor || Math.hypot(point.x - anchor.x, point.y - anchor.y) < 8) return null
+  return (
+    <svg width={1} height={1} aria-hidden="true"
+      className="pointer-events-none absolute overflow-visible text-muted-foreground"
+      style={{ left: 0, top: 0, zIndex }}>
+      <line x1={anchor.x} y1={anchor.y} x2={point.x} y2={point.y}
+        stroke="currentColor" strokeWidth={1} strokeOpacity={0.4} strokeDasharray="2 3" />
+    </svg>
+  )
+}
+
 function EdgeBadge({
   point,
+  anchor,
   children,
   zIndex,
   onClick,
@@ -157,6 +178,7 @@ function EdgeBadge({
   ariaLabel,
   testId,
   emphasised,
+  componentRelated = false,
   iconOnly = false,
   detail,
   shortDetail,
@@ -164,6 +186,7 @@ function EdgeBadge({
   onEscape,
 }: {
   point: LayoutPoint
+  anchor?: LayoutPoint
   children: ReactNode
   /** Keep this label above the SVG edge that owns it, including sub-flows. */
   zIndex: number
@@ -172,9 +195,10 @@ function EdgeBadge({
   ariaLabel?: string | undefined
   testId?: string
   emphasised?: boolean
+  componentRelated?: boolean
   /** Render an icon-only action when the camera is below the text floor. */
   iconOnly?: boolean
-  /** Full reported discriminator, shown on focus and selection. */
+  /** Full reported discriminator, retained in the accessible name. */
   detail?: string | null
   /** Bounded discriminator shown in the normal canvas state. */
   shortDetail?: string | null
@@ -183,13 +207,12 @@ function EdgeBadge({
   /** Clear selection without moving keyboard focus away from the badge. */
   onEscape?: () => void
 }) {
-  const [focused, setFocused] = useState(false)
   const className = cn(
     // Relationship badges are secondary text. An 11 px base keeps their
     // effective size above 10 px in the readable overview (zoom 0.93).
     'pointer-events-auto rounded-sm border px-1 py-px font-mono text-[11px] leading-tight whitespace-nowrap',
     iconOnly && 'size-7 justify-center p-1',
-    emphasised
+    emphasised || componentRelated
       ? 'border-ring/70 bg-popover text-foreground'
       : 'border-border bg-popover/95 text-muted-foreground',
     onClick && 'hover:border-muted-foreground cursor-pointer',
@@ -204,13 +227,16 @@ function EdgeBadge({
   const interactiveStyle = {
     ...style,
     // Edge labels live in React Flow's transformed viewport. Scaling the
-    // target by the reciprocal zoom keeps its pointer box in screen pixels;
-    // the nested visual span is scaled back to the graph's normal detail.
+    // target by the reciprocal zoom keeps its minimum pointer box in screen
+    // pixels. The nested text uses CSS zoom so its painted size contributes to
+    // the button's layout, keeping the background and hit box around the text.
     transform: `${style.transform} scale(var(--vai-canvas-zoom-inverse, 1))`,
   }
 
   if (onClick) {
     return (
+      <>
+      <LabelLeader point={point} {...(anchor ? { anchor } : {})} zIndex={zIndex} />
       <button
         type="button"
         style={interactiveStyle}
@@ -220,8 +246,6 @@ function EdgeBadge({
           event.stopPropagation()
           onClick()
         }}
-        onFocus={() => setFocused(true)}
-        onBlur={() => setFocused(false)}
         onKeyDown={(event) => {
           if (event.key !== 'Escape' || !onEscape) return
           event.preventDefault()
@@ -240,12 +264,15 @@ function EdgeBadge({
         }
         data-testid={testId}
       >
-        <span className="canvas-flow-hit-area-visual">
+        <span className="canvas-flow-hit-area-visual" style={{
+          display: 'block', maxWidth: 220, overflow: 'hidden', textOverflow: 'ellipsis',
+          transform: 'none', zoom: 'var(--vai-canvas-zoom, 1)',
+        }}>
           {children}
-          {detail &&
-            (focused || emphasised ? ` · ${detail}` : shortDetail ? ` · ${shortDetail}` : '')}
+          {(shortDetail ?? detail) ? ` · ${shortDetail ?? detail}` : ''}
         </span>
       </button>
+      </>
     )
   }
 
@@ -264,12 +291,14 @@ function EdgeBadge({
  */
 function EdgeOverlayMark({
   point,
+  anchor,
   overlay,
   zIndex,
   dimmed = false,
   compact = false,
 }: {
   point: LayoutPoint
+  anchor?: LayoutPoint
   overlay: ChangeOverlay
   /** Keep the visual mark above its edge without intercepting edge input. */
   zIndex: number
@@ -277,16 +306,20 @@ function EdgeOverlayMark({
   compact?: boolean
 }) {
   return (
+    <>
+    <LabelLeader point={point} {...(anchor ? { anchor } : {})} zIndex={zIndex} />
     <span
       style={{
         position: 'absolute',
         zIndex,
+        maxWidth: 220,
         transform: `translate(-50%, -50%) translate(${point.x}px, ${point.y}px)`,
       }}
       className={cn('pointer-events-none', dimmed && 'opacity-25')}
     >
       <ChangeOverlayMark overlay={overlay} compact={compact} />
     </span>
+    </>
   )
 }
 
@@ -369,10 +402,13 @@ export const RelationshipEdge = memo(function RelationshipEdge({
     (entry) => entry.relationship.relationshipId === selectedRelationshipId,
   )
   const related = selectedEntry !== undefined
-  const hasSelection = selectedRelationshipId !== null
-  const dimmed = hasSelection && !related
+  const componentRelated = data.selectedComponentId != null &&
+    (source === data.selectedComponentId || target === data.selectedComponentId)
+  const hasSelection = selectedRelationshipId !== null || data.selectedComponentId != null
+  const dimmed = hasSelection && !related && !componentRelated
   const selectRelationship = data.onSelectRelationship ?? setSelectedRelationshipId
   const labelRatio = data.labelRatio ?? 0.5
+  const labelPoint = (key: string, preferred: LayoutPoint) => data.labelPositions?.[key] ?? preferred
 
   if (!bundled || !unfolded) {
     const edgeOverlay = dominantOverlay(Object.values(overlays))
@@ -403,7 +439,8 @@ export const RelationshipEdge = memo(function RelationshipEdge({
           points={route}
           strokeDasharray={style?.strokeDasharray ?? '3 3'}
           marker={style?.marker ?? 'arrow'}
-          emphasised={emphasised}
+          emphasised={emphasised || componentRelated}
+          componentRelated={componentRelated}
           interactive
           testId={`edge-path-${id}`}
           overlay={edgeOverlay}
@@ -413,7 +450,8 @@ export const RelationshipEdge = memo(function RelationshipEdge({
         <EdgeLabelRenderer>
           {edgeOverlay && (
             <EdgeOverlayMark
-              point={pointAtRatio(route, 0.74)}
+              point={labelPoint('overlay', pointAtRatio(route, 0.74))}
+              anchor={pointAtRatio(route, 0.74)}
               overlay={edgeOverlay}
               zIndex={edgeLabelZIndex}
               dimmed={dimmed}
@@ -422,7 +460,8 @@ export const RelationshipEdge = memo(function RelationshipEdge({
           )}
           {bundled ? (
             <EdgeBadge
-              point={badgePoint}
+              point={labelPoint('badge', badgePoint)}
+              anchor={badgePoint}
               zIndex={edgeLabelZIndex}
               onClick={() => {
                 if (level === 'minimal') {
@@ -454,8 +493,9 @@ export const RelationshipEdge = memo(function RelationshipEdge({
               }
               testId={`edge-bundle-${id}`}
               iconOnly={level === 'minimal'}
+              componentRelated={componentRelated}
               dimmed={dimmed}
-              {...(hasSelection ? { onEscape: () => selectRelationship(null) } : {})}
+              {...(selectedRelationshipId !== null ? { onEscape: () => selectRelationship(null) } : {})}
             >
               {level === 'minimal' ? (
                 <Layers2 className="size-4" aria-hidden="true" />
@@ -467,7 +507,8 @@ export const RelationshipEdge = memo(function RelationshipEdge({
             (level === 'standard' || level === 'full') &&
             single && (
               <EdgeBadge
-                point={badgePoint}
+                point={labelPoint('badge', badgePoint)}
+                anchor={badgePoint}
                 zIndex={edgeLabelZIndex}
                 onClick={() =>
                   selectRelationship(
@@ -477,6 +518,7 @@ export const RelationshipEdge = memo(function RelationshipEdge({
                 title={relationshipTitle(single.relationship, t)}
                 testId={`edge-label-${single.relationship.relationshipId}`}
                 {...(emphasised ? { emphasised: true } : {})}
+                componentRelated={componentRelated}
                 detail={discriminator}
                 shortDetail={shortDiscriminator}
                 dimmed={dimmed}
@@ -504,14 +546,15 @@ export const RelationshipEdge = memo(function RelationshipEdge({
           data.fallbackOrientation,
         )
         const emphasised = entry.relationship.relationshipId === selectedRelationshipId
-        const entryDimmed = hasSelection && !emphasised
+        const entryDimmed = hasSelection && !emphasised && !componentRelated
         return (
           <EdgeRoute
             key={entry.relationship.relationshipId}
             points={fanned}
             strokeDasharray={style?.strokeDasharray ?? '3 3'}
             marker={style?.marker ?? 'arrow'}
-            emphasised={emphasised}
+            emphasised={emphasised || componentRelated}
+            componentRelated={componentRelated}
             interactive={false}
             testId={`edge-path-${entry.relationship.relationshipId}`}
             kind={entry.relationship.kind}
@@ -532,10 +575,11 @@ export const RelationshipEdge = memo(function RelationshipEdge({
           return (
             <EdgeOverlayMark
               key={`state-${entry.relationship.relationshipId}`}
-              point={pointAtRatio(fanned, 0.74)}
+              point={labelPoint(`overlay:${entry.relationship.relationshipId}`, pointAtRatio(fanned, 0.74))}
+              anchor={pointAtRatio(fanned, 0.74)}
               overlay={overlay}
               zIndex={edgeLabelZIndex}
-              dimmed={hasSelection && entry.relationship.relationshipId !== selectedRelationshipId}
+              dimmed={hasSelection && entry.relationship.relationshipId !== selectedRelationshipId && !componentRelated}
             />
           )
         })}
@@ -547,13 +591,14 @@ export const RelationshipEdge = memo(function RelationshipEdge({
             data.fallbackOrientation,
           )
           const emphasised = entry.relationship.relationshipId === selectedRelationshipId
-          const entryDimmed = hasSelection && !emphasised
+          const entryDimmed = hasSelection && !emphasised && !componentRelated
           const discriminator = entry.discriminator
           const shortDiscriminator = shortRelationshipDiscriminator(entry.relationship)
           return (
             <EdgeBadge
               key={entry.relationship.relationshipId}
-              point={pointAtRatio(fanned, labelRatio)}
+              point={labelPoint(`relationship:${entry.relationship.relationshipId}`, pointAtRatio(fanned, labelRatio))}
+              anchor={pointAtRatio(fanned, labelRatio)}
               zIndex={edgeLabelZIndex}
               onClick={() =>
                 selectRelationship(
@@ -563,10 +608,11 @@ export const RelationshipEdge = memo(function RelationshipEdge({
               title={relationshipTitle(entry.relationship, t)}
               testId={`edge-label-${entry.relationship.relationshipId}`}
               {...(emphasised ? { emphasised: true } : {})}
+              componentRelated={componentRelated}
               detail={discriminator}
               shortDetail={shortDiscriminator}
               dimmed={entryDimmed}
-              {...(hasSelection
+              {...(selectedRelationshipId !== null
                 ? { onEscape: () => selectRelationship(null) }
                 : {})}
             >
@@ -575,7 +621,8 @@ export const RelationshipEdge = memo(function RelationshipEdge({
           )
         })}
         <EdgeBadge
-          point={pointAtRatio(route, 0.12)}
+          point={labelPoint('collapse', pointAtRatio(route, 0.12))}
+          anchor={pointAtRatio(route, 0.12)}
           zIndex={edgeLabelZIndex}
           onClick={() => toggleEdgeExpanded(id)}
           title={t('edge.bundleCollapse')}
