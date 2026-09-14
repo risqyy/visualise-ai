@@ -1,20 +1,20 @@
-# End-to-End-Abnahme
+# End-to-end acceptance
 
-Der verpflichtende Abnahmetest des v0-Epics (#14). Er startet das echte
-Compose-System aus einer leeren PostgreSQL-Datenbank, fährt den vollständigen
-v0-Nutzerpfad in **Chromium bei 1920 × 1080** ausschließlich über Nginx ab und
-räumt danach wieder auf.
+The mandatory acceptance test introduced by the v0 epic (#14). It starts the
+real Compose system with an empty PostgreSQL database, exercises the complete
+v0 user journey in **Chromium at 1920 × 1080** exclusively through Nginx, and
+cleans up afterward.
 
-**Ein Fehlschlag blockiert die v0-Freigabe.**
+**A failure blocks the v0 release.**
 
-Warum der Test so gebaut ist — nur ein Browser, gegen das echte System statt
-gegen Mocks, Live-Zustände live beobachtet, Vakuum-Guards im Replay-Test —
-steht in
+The rationale for the test design — one browser, the real system rather than
+mocks, observing live states as they happen, and guards against vacuous passes
+in replay tests — is documented in
 [`docs/decisions/0013-mandatory-end-to-end-acceptance.md`](../docs/decisions/0013-mandatory-end-to-end-acceptance.md).
 
-## Ausführen
+## Running the suite
 
-Aus einem leeren Checkout, mit laufendem Docker:
+From a fresh checkout, with Docker running:
 
 ```bash
 cd e2e
@@ -23,123 +23,121 @@ npx playwright install chromium
 npm test
 ```
 
-Mehr braucht es nicht. Der Test erledigt selbst:
+That is all you need. The test handles:
 
-1. `docker compose -p vai-e2e down -v` — Start aus leerer Datenbank,
+1. `docker compose -p vai-e2e down -v` — start with an empty database,
 2. `docker compose -p vai-e2e up --build -d`,
-3. Warten auf `/readyz` **über Nginx**,
-4. die Abnahme,
+3. waiting for `/readyz` **through Nginx**,
+4. acceptance testing,
 5. `docker compose -p vai-e2e down -v`.
 
-Fehlen die Abhängigkeiten des Simulators, installiert der Test sie vorher
-(`npm ci` in `simulator/`) — ohne den Simulator gibt es keine Sequenz, die
-abgenommen werden könnte.
+If simulator dependencies are missing, the test installs them first
+(`npm ci` in `simulator/`). Without the simulator, there is no sequence to test.
 
-Der HTML-Report liegt danach in `playwright-report/`:
+The HTML report is then available in `playwright-report/`:
 
 ```bash
 npm run report
 ```
 
-## Konfiguration
+## Configuration
 
-| Variable | Default | Bedeutung |
+| Variable | Default | Meaning |
 | --- | --- | --- |
-| `FRONTEND_HTTP_PORT` | `8100` | Host-Port des Nginx-Frontends |
-| `E2E_COMPOSE_PROJECT` | `vai-e2e` | Compose-Projektname des Abnahme-Stacks |
-| `E2E_BASE_URL` | `http://localhost:<port>` | Einstiegspunkt, falls nicht localhost |
-| `E2E_SKIP_COMPOSE` | aus | Nutzt einen bereits laufenden Stack |
-| `E2E_KEEP_STACK` | aus | Lässt den Stack nach dem Lauf stehen |
+| `FRONTEND_HTTP_PORT` | `8100` | Host port for the Nginx frontend |
+| `E2E_COMPOSE_PROJECT` | `vai-e2e` | Compose project name for the acceptance stack |
+| `E2E_BASE_URL` | `http://localhost:<port>` | Entry point when not using localhost |
+| `E2E_SKIP_COMPOSE` | off | Use an already running stack |
+| `E2E_KEEP_STACK` | off | Leave the stack running after the test |
 
-Der Default-Port ist bewusst **8100** und nicht 8080: 8080–8083 sind auf
-Entwicklungsrechnern häufig belegt, und ein Freigabe-Gate, das an einer fremden
-Portbelegung scheitert, wird ignoriert. CI setzt `FRONTEND_HTTP_PORT=8080` und
-hält damit auch den dokumentierten Standardport unter Test.
+The default port is deliberately **8100**, not 8080: ports 8080–8083 are often
+occupied on development machines, and a release gate that fails because another
+application owns a port tends to be ignored. CI sets `FRONTEND_HTTP_PORT=8080`
+to keep the documented default port under test too.
 
-Der eigene Compose-Projektname ist wichtiger als der Port: ohne ihn würde
-`down -v` Container, Netzwerk und Volume eines aus derselben
-`docker-compose.yml` gestarteten Entwicklungs-Stacks löschen.
+The dedicated Compose project name matters more than the port: without it,
+`down -v` would delete the containers, network, and volume of a development
+stack started from the same `docker-compose.yml`.
 
-`E2E_SKIP_COMPOSE` und `E2E_KEEP_STACK` sind reine Debug-Hilfen. Sie werden in
-CI nie gesetzt und scheitern sicher: die Simulator-Szenarien erwarten `201
-created`, gegen eine gefüllte Datenbank bricht der Lauf also laut ab.
+`E2E_SKIP_COMPOSE` and `E2E_KEEP_STACK` are debugging aids only. They are never
+set in CI and fail safely: simulator scenarios expect `201 created`, so a run
+against a populated database fails visibly.
 
-## Aufbau
+## Structure
 
-| Pfad | Inhalt |
+| Path | Contents |
 | --- | --- |
-| `playwright.config.ts` | Ein Projekt: Chromium, 1920 × 1080, ein Worker, `retries: 0` |
-| `src/config.ts` | Ports, Compose-Projektname, Projekt- und Run-Ids |
-| `src/compose.ts` | Lebenszyklus des Systems unter Test |
-| `src/globalSetup.ts` / `src/globalTeardown.ts` | `down -v` → `up --build` → `/readyz`, und zurück |
-| `src/simulator.ts` | Startet den Simulator und liest dessen `--json`-Zusammenfassung |
-| `src/sse.ts` | Roher SSE-Leser — er besitzt den Socket, damit der Abbruch erzwungen werden kann |
-| `src/liveObserver.ts` | Wird vor dem App-Start injiziert und zeichnet die Live-Zustände auf |
-| `src/controls.ts` | Sichtbarkeit und Überdeckung über `elementFromPoint` |
-| `src/layout.ts` | Seitenüberlauf und abgeschnittener Text — als Funktion der Fensterbreite |
-| `src/pseudoLocale.ts` | Verlängert im Browser jeden Text, der dem Cockpit gehört, um 35 % |
-| `tests/` | Die zwölf Prüfdateien, in Ausführungsreihenfolge nummeriert |
+| `playwright.config.ts` | One project: Chromium, 1920 × 1080, one worker, `retries: 0` |
+| `src/config.ts` | Ports, Compose project name, project and run IDs |
+| `src/compose.ts` | Lifecycle of the system under test |
+| `src/globalSetup.ts` / `src/globalTeardown.ts` | `down -v` → `up --build` → `/readyz`, then cleanup |
+| `src/simulator.ts` | Starts the simulator and reads its `--json` summary |
+| `src/sse.ts` | Raw SSE reader that owns the socket so disconnection can be forced |
+| `src/liveObserver.ts` | Injected before application startup to record live states |
+| `src/controls.ts` | Visibility and occlusion checks using `elementFromPoint` |
+| `src/layout.ts` | Page overflow and clipped text as a function of viewport width |
+| `src/pseudoLocale.ts` | Expands every cockpit-owned text in the browser by 35% |
+| `tests/` | Test files numbered in execution order; the initial twelve and later MCP additions are described below |
 
-## Die zwölf Prüfdateien
+## The initial twelve test files
 
-| Datei | Prüfung |
+| File | Checks |
 | --- | --- |
-| `01-ingestion.spec.ts` | Eventvalidierung, Idempotenz und beobachtbare Projektionen |
-| `02-live-updates.spec.ts` | Live-SSE-Aktualisierungen für geplant, aktiv, angewandt und entfernt |
-| `03-architecture.spec.ts` | Vollständiger Architekturcanvas mit Hierarchie und typisierten Beziehungen |
-| `04-run-agents.spec.ts` | Run-/Agentbaum mit parallelen Subagents und getrennten Fortschrittsformen |
-| `05-inspector.spec.ts` | Komponentenklick: Agent, Aufgabe, Markdown-Feedback, gruppierte Diffs |
-| `06-run-history-focus.spec.ts` | Trennung von aktuellem Run und Historie, Deep-Focus-Grundverhalten |
-| `07-sse-replay.spec.ts` | Erzwungener SSE-Abbruch und lückenloser, geordneter Replay |
-| `08-viewport.spec.ts` | Keine horizontale Seitenscrollbar, keine verdeckte Primärsteuerung |
-| `09-i18n-layout.spec.ts` | Layout in Deutsch, Englisch und Pseudo-Locale bei 1920, 1440 und 1280 |
-| `10-architecture-focus.spec.ts` | Architektur-Fokus, exakte Pane-Wiederherstellung und Overlay-Geometrie in Deutsch und Englisch |
-| `11-canvas-hit-areas.spec.ts` | Screen-space Hit-Areas bei mehreren Zoomstufen und Fine/Coarse Pointer |
-| `12-spatial-keyboard-navigation.spec.ts` | Vollständiger Arrow-only Keyboard-Walk, Pan ohne Zoom und Fokus-Fallback |
+| `01-ingestion.spec.ts` | Event validation, idempotency, and observable projections |
+| `02-live-updates.spec.ts` | Live SSE updates for planned, active, applied, and removed states |
+| `03-architecture.spec.ts` | Complete architecture canvas with hierarchy and typed relationships |
+| `04-run-agents.spec.ts` | Run/agent tree with parallel subagents and distinct progress forms |
+| `05-inspector.spec.ts` | Component click: agent, task, Markdown feedback, grouped diffs |
+| `06-run-history-focus.spec.ts` | Current run/history separation and basic deep-focus behavior |
+| `07-sse-replay.spec.ts` | Forced SSE disconnect and gapless, ordered replay |
+| `08-viewport.spec.ts` | No horizontal page scrollbar or obscured primary controls |
+| `09-i18n-layout.spec.ts` | German, English, and pseudo-locale layouts at widths of 1920, 1440, and 1280 |
+| `10-architecture-focus.spec.ts` | Architecture focus, exact pane restoration, and overlay geometry in German and English |
+| `11-canvas-hit-areas.spec.ts` | Screen-space hit areas at multiple zoom levels with fine/coarse pointers |
+| `12-spatial-keyboard-navigation.spec.ts` | Complete arrow-only keyboard traversal, panning without zoom, and focus fallback |
 
-`01`–`08` sind die verbindlichen Prüfungen des v0-Epics (#14) und bleiben
-unverändert: dieselben Assertions, dieselben 1920 × 1080, dieselbe Sprache.
-`09` kommt aus dem i18n-Epic (#37), läuft danach und fügt drei Achsen hinzu —
-zwei weitere Breiten, die zweite Sprache und eine künstlich um 35 % verlängerte
-dritte. Alle Selektoren in `09` sind sprachunabhängig; eine Prüfliste mit
-deutschen `aria-label`s findet im englischen Lauf nichts und meldet dann
-„nichts abgeschnitten" über einen Bildschirm, den sie nie angesehen hat.
+`01`–`08` are the mandatory v0 epic (#14) checks and retain the same assertions,
+1920 × 1080 viewport, and language. `09` comes from the i18n epic (#37), runs
+afterward, and adds three axes: two more widths, the second language, and an
+artificial third locale with text expanded by 35%. All selectors in `09` are
+language-independent. A checklist using German `aria-label` values would find
+nothing in an English run and report "nothing clipped" for a screen it never
+actually inspected.
 
-### Screenshots sind Belege, keine Baseline
+### Screenshots are evidence, not a baseline
 
-`09` hängt neun Screenshots an den Report (drei Breiten × Deutsch, Englisch,
-Pseudo-Locale). Verglichen wird **nichts** gegen ein eingechecktes Bild.
-`toHaveScreenshot()` vergleicht gerenderte Pixel, und die hängen an
-Schriftrendering und Subpixel-Positionierung: eine im Linux-Container
-aufgenommene Baseline widerspricht demselben Build auf einem Windows-Rechner
-über Text, der völlig korrekt ist. Was das Issue tatsächlich verlangt — keine
-abgeschnittenen Pane-Titel, Buttons, Legenden oder Statuswerte — wird stattdessen
-gemessen: `scrollWidth` gegen `clientWidth` bei einem `overflow`, das den Rest
-verbirgt. Die Begründung steht in
+`09` attaches nine screenshots to the report (three widths × German, English,
+pseudo-locale). **Nothing** is compared against a checked-in image.
+`toHaveScreenshot()` compares rendered pixels, which depend on font rendering
+and subpixel positioning: a baseline captured in a Linux container differs
+from the same build on Windows even when the text is entirely correct.
+Instead, the test measures what the issue actually requires: no clipped pane
+titles, buttons, legends, or status values. It compares `scrollWidth` with
+`clientWidth` when `overflow` hides the remaining content. The rationale is in
 [ADR 0022](../docs/decisions/0022-translation-test-suite-pseudo-locale-and-a-suite-that-can-be-believed.md).
 
-`02-live-updates.spec.ts` sendet die repräsentative Sequenz und ist die einzige
-Datei, die das darf: das Szenario `full` erwartet ein leeres Projekt. Die
-Dateien danach lesen den Zustand, den es hinterlassen hat — deshalb ein Worker,
-keine Parallelität und nummerierte Dateinamen.
+`02-live-updates.spec.ts` sends the representative sequence and is the only file
+allowed to do so: the `full` scenario expects an empty project. Subsequent files
+read the state it leaves behind, hence one worker, no parallelism, and numbered
+filenames.
 
-## Determinismus
+## Determinism
 
-`retries: 0`. Ein Gate, das im zweiten Anlauf grün wird, meldet „flaky" als
-„bestanden".
+`retries: 0`. A gate that turns green on its second attempt reports "flaky" as
+"passed".
 
-Es gibt keine festen Wartezeiten als Synchronisationsmittel. Gewartet wird mit
-Playwright-Erwartungen, `expect.poll` oder auf einen Wert, den das System selbst
-veröffentlicht: die `--json`-Zusammenfassung des Simulators, ein
-`data-*`-Attribut, das Verbindungs-Badge. Der Simulator ist geseedet, deshalb
-nennen die Assertions exakte Zahlen — 17 Komponenten, 11 Beziehungen, drei
-Beziehungen auf `orders.order.created`, drei Dateien unter einer `changeId`.
+There are no fixed sleeps for synchronization. The tests wait using Playwright
+expectations, `expect.poll`, or a value published by the system itself: the
+simulator's `--json` summary, a `data-*` attribute, or the connection badge.
+The simulator is seeded, so assertions use exact counts: 17 components,
+11 relationships, three relationships on `orders.order.created`, and three
+files under one `changeId`.
 
 ## CI
 
-`.github/workflows/e2e.yml` fährt denselben Lauf auf einem Ubuntu-Runner mit
-`FRONTEND_HTTP_PORT=8080` und lädt den Playwright-Report als Artefakt hoch. Die
-schnellen Suiten laufen getrennt in `.github/workflows/ci.yml`.
+`.github/workflows/e2e.yml` runs the same suite on an Ubuntu runner with
+`FRONTEND_HTTP_PORT=8080` and uploads the Playwright report as an artifact.
+The fast suites run separately in `.github/workflows/ci.yml`.
 
 ## MCP live Canvas acceptance (#80)
 

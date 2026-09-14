@@ -72,7 +72,8 @@ rather than in a config array.
 
 ### The live states have to be watched live, and the observer lives in the page
 
-Three of the four work states — `aktiv`, `kürzlich angewandt`, `entfernt` — do
+Three of the four work states — `aktiv`, `kürzlich angewandt`, `entfernt`
+("active", "recently applied", "removed") — do
 not exist in the read API. `activeChanges` is filtered to `state = planned`
 server side, a started-and-not-completed work step has no representation there
 at all, and a removed component is precisely the one the response no longer

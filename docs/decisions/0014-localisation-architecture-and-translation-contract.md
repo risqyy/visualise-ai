@@ -225,7 +225,8 @@ in a diff nobody can review.
   `src/api/problem.ts` is not a component and cannot call `useTranslation`. Most
   of what it returns is reported data — the backend's problem title and its
   stable code — and stays as it is; its two generic fallbacks ("Backend nicht
-  erreichbar", "Unbekannter Fehler") are ours and need the `t` function threaded
+  erreichbar", "Unbekannter Fehler" — "Backend unreachable", "Unknown error")
+  are ours and need the `t` function threaded
   in. Left alone here rather than half-solved.
 - **`src/lib/plural.ts` survives this issue unchanged** and is replaced by the
   locale-aware formatting service in #40. Rewriting it here would have meant
