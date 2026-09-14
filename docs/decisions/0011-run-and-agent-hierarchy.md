@@ -41,7 +41,7 @@ The pane has exactly two renderings for a number, and they share no geometry:
 | Shape | a row of discrete segments, filled from the left | no track, no fill at all |
 | Semantics | `role="progressbar"` with `aria-valuenow`/`aria-valuemax` | plain text, no ARIA value |
 | Marker | — | a leading `≈` that is part of the value |
-| Attribution | — | "Gemeldete Selbsteinschätzung von *Agent*" |
+| Attribution | — | "Gemeldete Selbsteinschätzung von *Agent*" ("Self-assessment reported by *Agent*") |
 | Used for | `scope: own_task` **and** `basis: completed_steps`; completed plan steps of one revision | everything else |
 
 The segments are the point. A counted quantity is drawn as something the reader
@@ -78,7 +78,7 @@ claims about agent work.
 `lastEventAt` is rendered as a timestamp and compared against nothing. There is
 no timeout, no "no events for n minutes", no inferred `blocked`, and no visual
 decay of an old row. A run without `run.finished` is described as *"offen — kein
-Terminalereignis gemeldet"*, which is a statement about the log, not about the
+Terminalereignis gemeldet"* ("open — no terminal event reported"), which is a statement about the log, not about the
 agent.
 
 This is not caution, it is correctness. A long silence is indistinguishable from
@@ -91,7 +91,8 @@ definition (#1).
 
 Concretely, `src/components/workspace/runAgents/reporting.ts` contains no time
 arithmetic at all, every "nothing was reported" case has its own explicit label
-("kein Status gemeldet", "kein Abschluss gemeldet", "kein Ende gemeldet"), and a
+("kein Status gemeldet", "kein Abschluss gemeldet", "kein Ende gemeldet" —
+"no status reported", "no completion reported", "no end reported"), and a
 test asserts that the rendered pane contains none of the derived-verdict
 vocabulary.
 

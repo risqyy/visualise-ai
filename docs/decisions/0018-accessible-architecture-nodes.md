@@ -105,7 +105,8 @@ that `aria-allowed-attr` flags. What the node carries instead is the *state* in
 words: a closed container announces that it is closed and how many components
 are behind it, the same number the closed box prints.
 
-The name is built as *identity* + *disclosure* + *state*:
+The name is built as *identity* + *disclosure* + *state*. This German UI example
+reads "Router, module, in HTTP Layer, planned · add":
 
 ```
 Router, Modul, in HTTP Layer, geplant · hinzufügen
@@ -123,13 +124,15 @@ already unambiguous does not drag its hierarchy along.
 The **work state and the disclosure are deliberately not part of the identity**.
 Both change while the user watches; an identity that moved with them would not
 be an identity. They are appended afterwards, and when nothing was reported the
-name says so explicitly — `kein Änderungsstatus gemeldet`. A screen reader must
+name says so explicitly — `kein Änderungsstatus gemeldet` ("no change status
+reported"). A screen reader must
 be able to tell "no state" from "state not conveyed", which is exactly the
 distinction the drawn box makes by carrying no mark.
 
 Two things the closed containers of ADR 0017 add to that:
 
-- a closed container says `eingeklappt, 3 Komponenten verborgen`, the same
+- a closed container says `eingeklappt, 3 Komponenten verborgen` ("collapsed,
+  3 components hidden"), the same
   number its box prints, so the picture and the announcement agree on what is
   missing;
 - when the state on a closed container was rolled up from something *inside* it

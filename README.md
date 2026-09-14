@@ -1,50 +1,50 @@
 # Visualise AI — Agent Project Cockpit
 
-Beobachtungs-Cockpit für Agentenarbeit an einem Softwareprojekt. Es zeigt die
-gesamte Anwendungsarchitektur, die laufenden Agents und Subagents, deren
-gemeldete Arbeitsschritte, komponentenbezogenes KI-Feedback und Unified Diffs.
+An observation cockpit for agent work on a software project. It shows the
+complete application architecture, running agents and subagents, their
+reported work steps, component-specific AI feedback, and unified diffs.
 
-Das Cockpit **beobachtet**; es steuert den Agenten nie. Nutzer können aus der
-Anwendung heraus nicht prompten, und das System bewertet nie, ob die Arbeit des
-Agenten richtig ist.
+The cockpit **observes**; it never controls the agent. Users cannot send prompts
+from the application, and the system never judges whether the agent's work
+is correct.
 
-> **Vertrauensgrenze:** v0 ist für einen lokalen Rechner oder ein privates
-> Netzwerk gedacht. Es gibt keine Authentifizierung, keine Autorisierung und
-> keine Multi-Tenancy. **Nicht ins öffentliche Internet stellen.**
-> Details und die vollständigen Produktgrenzen:
+> **Trust boundary:** v0 is intended for a local machine or a private
+> network. It has no authentication, authorization, or multi-tenancy.
+> **Do not expose it to the public internet.**
+> For details and the complete product boundaries, see
 > [`docs/security-and-boundaries.md`](docs/security-and-boundaries.md).
 
-## Dokumentation
+## Documentation
 
-| Dokument | Inhalt |
+| Document | Contents |
 | --- | --- |
-| [`docs/operations.md`](docs/operations.md) | Voraussetzungen, Compose-Start, alle Umgebungsvariablen, Healthchecks, Datenpersistenz, Simulator, End-to-End-Test |
-| [`docs/mcp-domain-tools.md`](docs/mcp-domain-tools.md) | Geprüfter SDK-Client: lesen, atomar ändern, View speichern, natives PNG prüfen |
-| [`docs/epic-75-acceptance.md`](docs/epic-75-acceptance.md) | Lokale Abnahmen, Messbedingungen und verbleibende Grenzen |
-| [`docs/agent-integration.md`](docs/agent-integration.md) | Eventvertrag in der Praxis: Lifecycle, Idempotenz, Fehlercodes, SSE-Reconnect, eine minimale gültige Sequenz |
-| [`docs/security-and-boundaries.md`](docs/security-and-boundaries.md) | Vertrauensgrenze, Angriffsfläche, v0-Ausschlüsse, `RepositoryProvider`-Grenze |
-| [`api/README.md`](api/README.md) | Der Vertrag selbst: Schemata, Beispiele, Ablehnungs-Fixtures |
-| [`api/openapi.yaml`](api/openapi.yaml) | OpenAPI 3.1 — die maßgebliche Quelle für alle Feldnamen und Formate |
-| [`simulator/README.md`](simulator/README.md) | Flags und Szenarien des Simulators |
-| [`docs/decisions/`](docs/decisions/) | Architecture Decision Records (englisch) |
+| [`docs/operations.md`](docs/operations.md) | Prerequisites, Compose startup, all environment variables, health checks, persistence, simulator, end-to-end tests |
+| [`docs/mcp-domain-tools.md`](docs/mcp-domain-tools.md) | Verified SDK client: read, mutate atomically, save a view, inspect a native PNG |
+| [`docs/epic-75-acceptance.md`](docs/epic-75-acceptance.md) | Local acceptance results, measurement conditions, and remaining limits |
+| [`docs/agent-integration.md`](docs/agent-integration.md) | The event contract in practice: lifecycle, idempotency, error codes, SSE reconnect, and a minimal valid sequence |
+| [`docs/security-and-boundaries.md`](docs/security-and-boundaries.md) | Trust boundary, attack surface, v0 exclusions, and the `RepositoryProvider` boundary |
+| [`api/README.md`](api/README.md) | The contract itself: schemas, examples, and rejection fixtures |
+| [`api/openapi.yaml`](api/openapi.yaml) | OpenAPI 3.1 — the authoritative source for all field names and formats |
+| [`simulator/README.md`](simulator/README.md) | Simulator flags and scenarios |
+| [`docs/decisions/`](docs/decisions/) | Architecture Decision Records |
 
 ## Quick Start
 
-Voraussetzung ist ausschließlich Docker mit Compose v2 (siehe
-[`docs/operations.md`](docs/operations.md#voraussetzungen)).
+Docker with Compose v2 is the only prerequisite (see
+[`docs/operations.md`](docs/operations.md#prerequisites)).
 
 ```bash
-cp .env.example .env   # optional, die Defaults funktionieren unverändert
+cp .env.example .env   # optional; the defaults work without changes
 docker compose up --build
 ```
 
-Danach <http://localhost:8080> öffnen. Ist Port 8080 belegt, setze
-`FRONTEND_HTTP_PORT` — siehe
-[Portkonflikte](docs/operations.md#portkonflikte).
+Then open <http://localhost:8080>. If port 8080 is occupied, set
+`FRONTEND_HTTP_PORT` — see
+[port conflicts](docs/operations.md#port-conflicts).
 
-Eine frische Datenbank ist leer, das Cockpit hat also nichts zu zeigen, bis ein
-Agent etwas meldet. Der mitgelieferte Simulator füllt sie deterministisch über
-die öffentliche Route:
+A fresh database is empty, so the cockpit has nothing to show until an agent
+reports something. The included simulator populates it deterministically through
+the public route:
 
 ```bash
 cd simulator
@@ -52,54 +52,52 @@ npm install
 npm run simulate
 ```
 
-Danach zeigt <http://localhost:8080/projects/visualise-ai> den vollständigen
-Demo-Run. Details:
-[Demo ausführen](docs/operations.md#demo-ausfuehren).
+Then <http://localhost:8080/projects/visualise-ai> shows the complete demo run.
+For details, see
+[running the demo](docs/operations.md#running-the-demo).
 
-## MCP: Modell lesen, ändern und als Bild prüfen
+## MCP: read, update, and inspect the model as an image
 
-Der aktuelle Quell-Build stellt unter `http://localhost:8080/mcp` **14 Tools**
-bereit. Ein MCP-Client mit Streamable HTTP und Bildunterstützung kann einen
-Kontext explizit öffnen, das gemeinsame Projektmodell lesen und atomar ändern,
-Ansichten speichern und ein natives PNG bei exakten Modell-/Ansichtsrevisionen
-abrufen. Dafür muss kein Nutzerbrowser geöffnet sein. Modelländerungen sind
-keine Repository-Codeänderungen; Fortschritt und Arbeit werden separat gemeldet.
+The current source build exposes **14 tools** at `http://localhost:8080/mcp`.
+An MCP client with Streamable HTTP and image support can explicitly open a
+context, read and atomically update the shared project model, save views, and
+retrieve a native PNG at exact model/view revisions. No user browser needs to
+be open. Model changes are not repository code changes; progress and work are
+reported separately.
 
-Die [MCP-Anleitung](docs/mcp-domain-tools.md) enthält den vollständigen Ablauf
-und ein ausführbares SDK-Beispiel. [Betrieb](docs/operations.md) beschreibt
-Konfiguration, Migration und Grenzen. Diese Fähigkeiten gehören zum Quell-Build;
-ältere veröffentlichte Images enthalten sie nicht automatisch.
+The [MCP guide](docs/mcp-domain-tools.md) includes the complete workflow and an
+executable SDK example. [Operations](docs/operations.md) covers configuration,
+migration, and limits. These capabilities belong to the source build; older
+published images do not automatically include them.
 
-## Veröffentlichte Docker-Hub-Images
+## Published Docker Hub images
 
-Der Workflow
-[`release-dockerhub.yml`](.github/workflows/release-dockerhub.yml) veröffentlicht
-beide Anwendungsimages ausschließlich bei gültigen Release-Tags im Format
-`v<major>.<minor>.<patch>`; ein optionaler Prerelease-Suffix ist erlaubt, zum
-Beispiel `v1.2.3-rc.1`. Vor dem Push müssen die Vertrags-, Backend-, Frontend-,
-Simulator- und E2E-Prüfungen sowie der Compose-Build erfolgreich sein.
+The
+[`release-dockerhub.yml`](.github/workflows/release-dockerhub.yml) workflow publishes
+both application images only for valid release tags in the format
+`v<major>.<minor>.<patch>`, with an optional prerelease suffix such as
+`v1.2.3-rc.1`. Contract, backend, frontend, simulator, and E2E checks, along with
+the Compose build, must succeed before images are pushed.
 
-In den Repository-Einstellungen werden dafür die Variable
-`DOCKERHUB_NAMESPACE` und die Secrets `DOCKERHUB_USERNAME` und
-`DOCKERHUB_TOKEN` hinterlegt. Kein Secret wird in einen Build-Arg, ein Image
-oder ein Log geschrieben. Die beiden getrennten Docker-Hub-Repositories sind:
+Configure the `DOCKERHUB_NAMESPACE` variable and the `DOCKERHUB_USERNAME` and
+`DOCKERHUB_TOKEN` secrets in the repository settings. No secret is written to
+a build argument, image, or log. The two separate Docker Hub repositories are:
 
 - `risqy3d/visualise-ai-backend`
 - `risqy3d/visualise-ai-frontend`
 
-Ein stabiles Tag wie `v1.2.3` erzeugt `1.2.3`, `1.2`, `1` und `latest`. Ein
-Prerelease wie `v1.2.3-rc.1` erzeugt ausschließlich `1.2.3-rc.1`; stabile Tags
-und `latest` bleiben dabei unverändert.
+A stable tag such as `v1.2.3` produces `1.2.3`, `1.2`, `1`, and `latest`. A
+prerelease such as `v1.2.3-rc.1` produces only `1.2.3-rc.1`; stable tags and
+`latest` remain unchanged.
 
-Ein veröffentlichtes Image kann direkt gezogen werden:
+You can pull a published image directly:
 
 ```bash
 docker pull "risqy3d/visualise-ai-backend:1.2.3"
 docker pull "risqy3d/visualise-ai-frontend:1.2.3"
 ```
 
-Für einen Compose-Start mit den veröffentlichten Images statt mit lokalen
-Quell-Builds:
+To start Compose using the published images instead of local source builds:
 
 ```bash
 IMAGE_TAG=1.2.3 \
@@ -108,25 +106,25 @@ IMAGE_TAG=1.2.3 \
   docker compose -f docker-compose.yml -f docker-compose.images.yml up -d --no-build
 ```
 
-Das Release veröffentlicht nur Backend und Frontend. PostgreSQL bleibt der
-interne, unveränderte `postgres:17-alpine`-Service aus der Compose-Datei und
-wird nicht als Visualise-AI-Image veröffentlicht.
+The release publishes only the backend and frontend. PostgreSQL remains the
+unchanged internal `postgres:17-alpine` service from the Compose file and is
+not published as a Visualise AI image.
 
-## Repository-Struktur
+## Repository structure
 
-| Pfad | Inhalt |
+| Path | Contents |
 | --- | --- |
-| `api/` | OpenAPI-Vertrag, Beispiel-Payloads, Ablehnungs-Fixtures |
-| `backend/` | Go-Modul: Gin-HTTP-Oberfläche, zerolog, GORM/PostgreSQL |
-| `frontend/` | React- und TypeScript-Anwendung, gebaut mit Vite |
-| `frontend/nginx/` | Nginx-Site-Konfiguration — der einzige externe Einstiegspunkt |
-| `simulator/` | Node/TypeScript-Eventsimulator — der deterministische Demo-Client |
-| `e2e/` | Playwright-Abnahmetest gegen das echte Compose-System |
-| `docker-compose.yml` | Die Services `frontend`, `backend` und `postgres` |
-| `docker-compose.images.yml` | Optionaler Compose-Override für veröffentlichte Images |
-| `docs/` | Betriebs- und Integrationsdokumentation, Decision Records |
+| `api/` | OpenAPI contract, example payloads, rejection fixtures |
+| `backend/` | Go module: Gin HTTP surface, zerolog, GORM/PostgreSQL |
+| `frontend/` | React and TypeScript application built with Vite |
+| `frontend/nginx/` | Nginx site configuration — the only external entry point |
+| `simulator/` | Node/TypeScript event simulator — the deterministic demo client |
+| `e2e/` | Playwright acceptance tests against the real Compose system |
+| `docker-compose.yml` | The `frontend`, `backend`, and `postgres` services |
+| `docker-compose.images.yml` | Optional Compose override for published images |
+| `docs/` | Operations and integration documentation, decision records |
 
-## Netzwerktopologie
+## Network topology
 
 ```
 Host :8080
@@ -135,41 +133,41 @@ Host :8080
 ┌──────────────┐        ┌─────────────┐        ┌──────────────┐
 │  frontend    │ ─────▶ │  backend    │ ─────▶ │  postgres    │
 │  (nginx)     │        │  (go/gin)   │        │              │
-│  published   │        │  intern     │        │  intern      │
+│  published   │        │  internal   │        │  internal    │
 └──────────────┘        └─────────────┘        └──────────────┘
 ```
 
-Nginx liefert das Produktions-Bundle aus und proxyt diese Arten von Verkehr an
-das Backend:
+Nginx serves the production bundle and proxies the following traffic to
+the backend:
 
-| Route | Zweck |
+| Route | Purpose |
 | --- | --- |
-| `/mcp` | Streamable HTTP: Modell, Arbeit, Ansichten und PNG-Feedback |
-| `POST /api/v1/events` | Kompatible Event- und Command-Ingestion |
-| `GET /api/v1/…` | Read Models für die Oberfläche |
-| `GET /api/v1/projects/{id}/stream` | SSE-Livestream, **ungepuffert** geproxyt |
-| `GET /healthz`, `GET /readyz` | Backend-Probes |
+| `/mcp` | Streamable HTTP: model, work, views, and PNG feedback |
+| `POST /api/v1/events` | Compatible event and command ingestion |
+| `GET /api/v1/…` | Read models for the UI |
+| `GET /api/v1/projects/{id}/stream` | Live SSE stream, proxied **without buffering** |
+| `GET /healthz`, `GET /readyz` | Backend probes |
 
-Weder `backend` noch `postgres` veröffentlichen einen Host-Port. Warum das eine
-Sicherheitseigenschaft und keine Bequemlichkeit ist, steht in
-[`docs/security-and-boundaries.md`](docs/security-and-boundaries.md#nginx-ist-der-einzige-einstiegspunkt).
+Neither `backend` nor `postgres` publishes a host port. For why this is a
+security property rather than a convenience, see
+[`docs/security-and-boundaries.md`](docs/security-and-boundaries.md#nginx-is-the-only-entry-point).
 
-## Lokale Entwicklung
+## Local development
 
-Nur nötig, wenn du am Code arbeitest; für den reinen Betrieb genügt Docker.
+Only needed when working on the code; Docker is enough to run the application.
 
-Voraussetzungen: Bash (unter Windows zum Beispiel Git Bash), Go gemäß
-[`backend/go.mod`](backend/go.mod) (aktuell 1.25.7), Node 24 mit npm wie in
-der [CI](.github/workflows/ci.yml) sowie laufendes Docker mit Compose v2
-für Datenbank- und E2E-Tests. Der Frontend-Container baut separat mit Node 22.
+Prerequisites: Bash (for example, Git Bash on Windows), Go as specified in
+[`backend/go.mod`](backend/go.mod) (currently 1.25.7), Node 24 with npm as used in
+[CI](.github/workflows/ci.yml), and running Docker with Compose v2 for database
+and E2E tests. The frontend container builds separately with Node 22.
 
-**Backend:** Die [Backend-Testanleitung](backend/README.md) führt vom
-Repository-Root durch Build, Vet und die vollständige Testsuite mit einer
-separaten PostgreSQL-17-Testdatenbank. Ohne `TEST_DATABASE_URL` überspringt
-`go test ./...` die Datenbanktests.
+**Backend:** The [backend testing guide](backend/README.md) covers building,
+vetting, and running the full test suite from the repository root with a
+separate PostgreSQL 17 test database. Without `TEST_DATABASE_URL`,
+`go test ./...` skips the database tests.
 
-Die weiteren Prüfungen ebenfalls im Repository-Root starten. Jede Klammer
-öffnet eine Subshell; danach bleibt das Arbeitsverzeichnis der Repository-Root.
+Start the remaining checks from the repository root too. Each pair of
+parentheses opens a subshell, leaving your working directory at the repository root.
 
 ```bash
 # Frontend
@@ -186,14 +184,14 @@ Die weiteren Prüfungen ebenfalls im Repository-Root starten. Jede Klammer
   npm run lint && npm run typecheck && npm test
 )
 
-# Vertrag
+# Contract
 (
   cd api &&
   npm ci &&
   npm test
 )
 
-# End-to-End-Abnahme (Details: e2e/README.md)
+# End-to-end acceptance (details: e2e/README.md)
 (
   cd e2e &&
   npm ci && npx playwright install --with-deps chromium &&
@@ -201,13 +199,13 @@ Die weiteren Prüfungen ebenfalls im Repository-Root starten. Jede Klammer
 )
 ```
 
-`npm run dev` im `frontend/` startet Vite auf Port 5173 und proxyt `/api`,
-`/healthz` und `/readyz` an ein Backend auf `localhost:8080`, sodass die Pfade
-denen der Compose-Bereitstellung entsprechen.
+`npm run dev` in `frontend/` starts Vite on port 5173 and proxies `/api`,
+`/healthz`, and `/readyz` to a backend at `localhost:8080`, matching the paths
+used in the Compose deployment.
 
-## Lizenz
+## License
 
-Visualise AI steht unter der [MIT-Lizenz](LICENSE).
-Drittquellen behalten ihre jeweiligen Lizenzen; für das Chromium-Seccomp-Profil
-gelten die separaten Lizenz- und Herkunftshinweise in
+Visualise AI is licensed under the [MIT License](LICENSE).
+Third-party sources retain their respective licenses; the Chromium seccomp
+profile has separate license and attribution notices in
 [`deploy/chromium/`](deploy/chromium/).

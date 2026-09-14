@@ -212,13 +212,14 @@ for them: the agent tree paints `working` as "arbeitet" / "working", and the
 legend paints the work state `planned` as "geplant" / "planned". Mapping a
 closed contract value onto a display word is not a change to the value. The
 badge above shows the value itself, and the sentence next to it — "Schweregrad:
-mittel (vom Agenten eingeschätzt)" — is ours and is translated.
+mittel (vom Agenten eingeschätzt)" ("Severity: medium, assessed by the agent") —
+is ours and is translated.
 
 ### Identifiers of the contract, quoted as themselves
 
 | term | where |
 | ---- | ----- |
-| `changeId` | "Ohne `changeId` gemeldet …" in the diff group header. A `<Trans>` slot, listed in `TECHNICAL_TERMS` in `scripts/check-ui-strings.mjs`. |
+| `changeId` | "Ohne `changeId` gemeldet …" ("Reported without `changeId` …") in the diff group header. A `<Trans>` slot, listed in `TECHNICAL_TERMS` in `scripts/check-ui-strings.mjs`. |
 | `?component=` | the empty state of the inspector, which names the search parameter a selection is shareable through |
 | `/api/v1/events` | the empty state of the project list |
 | `architecture.snapshot_published`, `agent.started`, `plan.published`, `diff.reported`, `risk.reported`, `problem.reported`, `feedback.published` | event names inside empty states — they are what an agent has to send, so a translated one would be wrong advice |

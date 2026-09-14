@@ -1,6 +1,6 @@
 # ADR 0028: Tag-gated Docker-Hub image releases
 
-## Entscheidung
+## Decision
 
 Release images are published only from SemVer Git tags (`v1.2.3` or a
 prerelease such as `v1.2.3-rc.1`). The release workflow calls the existing CI
@@ -13,7 +13,7 @@ Stable tags receive `1.2.3`, `1.2`, `1` and `latest`; prereleases receive only
 their complete version tag. PostgreSQL remains the internal Compose service
 and is not part of the project image release.
 
-## Begründung und Trade-offs
+## Rationale and trade-offs
 
 Reusing the existing workflows keeps the release gate aligned with pull-request
 and main-branch validation without copying a growing test matrix. A single
