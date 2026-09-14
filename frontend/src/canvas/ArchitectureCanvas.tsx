@@ -943,7 +943,7 @@ function ArchitectureCanvasInner({
       { detailLevel, expandedEdgeIds, zoom: camera.zoom },
     )
     return positioned.map((edge) => edge.data ? {
-      ...edge, data: { ...edge.data, labelPositions: labelPositions.get(edge.id) ?? {} },
+      ...edge, data: { ...edge.data, labelPositions: labelPositions.get(edge.id) ?? {}, bundleExpanded: expandedEdgeIds.includes(edge.id) },
     } : edge)
   }, [graph.edges, graph.nodes, graph.routes, nodePositions, detailLevel, expandedEdgeIds, camera.zoom])
 

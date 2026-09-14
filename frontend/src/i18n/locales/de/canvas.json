@@ -37,7 +37,7 @@
     "none": "Keine gemeldeten Änderungen"
   },
   "detail": {
-    "fullDescription": "Zusätzlich Tags. Gebündelte Beziehungen sind einzeln aufgefächert.",
+    "fullDescription": "Zusätzlich Tags. Öffne ein Beziehungsbündel, um einzelne Pfeile zu sehen.",
     "fullLabel": "Vollständig",
     "indicator": "Darstellungsstufe: {{level}}",
     "minimalDescription": "Nur Form und Symbol. Texte werden ausgeblendet, bleiben aber über Auswahl und Inspector erreichbar.",

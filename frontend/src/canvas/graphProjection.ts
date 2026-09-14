@@ -174,6 +174,8 @@ export interface RelationshipEdgeData extends Record<string, unknown> {
   selectedComponentId?: ComponentId | null
   /** Collision-free HTML label centres, shared by canvas and native export. */
   labelPositions?: Record<string, { x: number; y: number }>
+  /** Explicit disclosure; changing zoom alone never opens every bundle. */
+  bundleExpanded?: boolean
 }
 
 export type ArchitectureEdge = Edge<RelationshipEdgeData, typeof RELATIONSHIP_EDGE_TYPE>

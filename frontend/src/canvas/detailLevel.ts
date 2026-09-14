@@ -13,7 +13,7 @@ import type { CanvasKey } from '@/i18n'
  * | `minimal`  | shape and icon only         | line and icon-only inspector action    |
  * | `overview` | primary name                | bundled, count badge only              |
  * | `standard` | + kind and technology       | bundled, kind badge + count            |
- * | `full`     | + tags                       | bundles fanned out, one label per edge |
+ * | `full`     | + tags                       | bundled until explicitly expanded     |
  *
  * Two rules keep this from becoming a source of surprise:
  *
@@ -39,7 +39,7 @@ export const DETAIL_LEVEL_THRESHOLDS = {
   overview: 0.93,
   /** At or above this zoom secondary 10 px metadata is readable. */
   standard: 1,
-  /** At or above this zoom tags appear and edge bundles fan out. */
+  /** At or above this zoom tags appear; bundle disclosure remains explicit. */
   full: 1.15,
 } as const
 
@@ -206,13 +206,5 @@ export function showsTechnology(level: DetailLevel): boolean {
 
 /** `true` once the level is detailed enough to show tags. */
 export function showsTags(level: DetailLevel): boolean {
-  return level === 'full'
-}
-
-/**
- * `true` once bundles are unfolded automatically. Below this level a bundle can
- * still be unfolded by clicking it — the zoom is a shortcut, not a gate.
- */
-export function unfoldsBundles(level: DetailLevel): boolean {
   return level === 'full'
 }

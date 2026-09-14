@@ -255,6 +255,43 @@ describe('architecture canvas — colour-independent relationship kinds', () => 
 
 describe('architecture canvas — edge bundling stays resolvable', () => {
   it(
+    'keeps one bundle arrow when zooming in and expands only on explicit keyboard disclosure',
+    async () => {
+      const user = userEvent.setup()
+      renderCanvas()
+      const canvas = await waitForCanvas()
+      await waitForCameraSettled()
+      const zoomIn = document.querySelector<HTMLButtonElement>('.react-flow__controls-zoomin')
+      expect(zoomIn).not.toBeNull()
+      for (let attempt = 0; attempt < 8 && canvas.getAttribute('data-detail-level') !== 'full'; attempt += 1) {
+        const before = Number(canvas.getAttribute('data-canvas-zoom'))
+        await user.click(zoomIn!)
+        await waitFor(() => expect(Number(canvas.getAttribute('data-canvas-zoom'))).toBeGreaterThan(before))
+        await waitForCameraSettled()
+      }
+      expect(canvas).toHaveAttribute('data-detail-level', 'full')
+      expect(document.querySelectorAll('path[data-relationship-kind]')).toHaveLength(6)
+      expect(screen.getByTestId(`edge-path-${BUNDLE_EDGE_ID}`)).toBeInTheDocument()
+      expect(screen.queryByTestId('edge-label-r-05')).not.toBeInTheDocument()
+
+      const bundle = screen.getByTestId(`edge-bundle-${BUNDLE_EDGE_ID}`)
+      act(() => bundle.focus())
+      await user.keyboard('{Enter}')
+      expect(document.querySelectorAll('path[data-relationship-kind]')).toHaveLength(8)
+      for (const id of ['r-05', 'r-06', 'r-07']) {
+        expect(screen.getByTestId(`edge-label-${id}`)).toBeInTheDocument()
+      }
+      expect(useUiStore.getState().selectedRelationshipId).toBeNull()
+
+      act(() => screen.getByTestId(`edge-collapse-${BUNDLE_EDGE_ID}`).focus())
+      await user.keyboard('{Enter}')
+      expect(document.querySelectorAll('path[data-relationship-kind]')).toHaveLength(6)
+      expect(screen.getByTestId(`edge-bundle-${BUNDLE_EDGE_ID}`)).toBeInTheDocument()
+    },
+    CANVAS_TIMEOUT,
+  )
+
+  it(
     'selects a single relationship from its line in the overview',
     async () => {
       const user = userEvent.setup()

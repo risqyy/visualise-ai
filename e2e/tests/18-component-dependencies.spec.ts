@@ -158,6 +158,95 @@ async function assertNoLabelCollisions(page: Page, label: string) {
   expect(geometry.overlaps, `${label}: actual browser rectangles`).toEqual([])
 }
 
+/** Sample the painted curve in screen coordinates. A self dependency must go
+ * around its component, including its rounded bends, in either orientation.
+ * Only the small endpoint/handle contact is exempt from this check.
+ */
+async function assertSelfLoopOutsideNode(page: Page, componentId: string) {
+  const loop = page.getByTestId(`edge-path-rel:${componentId}~>${componentId}`)
+  await expect(loop).toBeAttached()
+  const geometry = await loop.evaluate((element, id) => {
+    const path = element as SVGPathElement
+    const node = document.querySelector(`.react-flow__node[data-id="${id}"]`)
+    const matrix = path.getScreenCTM()
+    if (!node || !matrix) throw new Error('Missing self-loop geometry')
+    const box = node.getBoundingClientRect()
+    const length = path.getTotalLength()
+    const zoom = Math.hypot(matrix.a, matrix.b)
+    const violations: { x: number; y: number }[] = []
+    let samples = 0
+    for (let offset = 4 / zoom; offset < length - 4 / zoom; offset += 1 / zoom) {
+      const point = path.getPointAtLength(offset).matrixTransform(matrix)
+      samples += 1
+      if (point.x > box.left + 1 && point.x < box.right - 1 &&
+          point.y > box.top + 1 && point.y < box.bottom - 1) {
+        violations.push({ x: point.x, y: point.y })
+      }
+    }
+    return { samples, violations: violations.slice(0, 5) }
+  }, componentId)
+  expect(geometry.samples, 'must sample the actual visible self-loop curve').toBeGreaterThan(20)
+  expect(geometry.violations, 'self-loop must not cross its own component').toEqual([])
+}
+
+/** Label connectors are annotations, not additional dependency arrows. Their
+ * route endpoint must attach to their own relationship's nearest segment.
+ * Comparing rendered curves also catches a long leader back to an obsolete
+ * preferred label position after collision avoidance moved the badge.
+ */
+async function assertLabelAnnotations(page: Page, relationships: {
+  relationshipId: string; sourceComponentId: string; targetComponentId: string
+}[]) {
+  const annotations = await page.locator('[data-label-annotation="true"]').evaluateAll((elements, reported) => elements.map((element) => {
+    const owner = element.getAttribute('data-label-for') ?? ''
+    const line = element.querySelector('line')
+    if (!line) throw new Error(`Missing annotation line for ${owner}`)
+    const relationshipId = owner.replace(/^(edge-label-|overlay-mark-relationship-)/, '')
+    const relationship = reported.find((candidate) => candidate.relationshipId === relationshipId)
+    const pathId = owner.startsWith('edge-bundle-') || owner.startsWith('edge-collapse-')
+      ? owner.replace(/^edge-(bundle|collapse)-/, 'edge-path-')
+      : document.querySelector(`[data-testid="edge-path-${relationshipId}"]`)
+        ? `edge-path-${relationshipId}`
+        : relationship
+          ? `edge-path-rel:${relationship.sourceComponentId}~>${relationship.targetComponentId}`
+          : null
+    const path = pathId ? document.querySelector<SVGPathElement>(`[data-testid="${pathId}"]`) : null
+    const lineMatrix = line.getScreenCTM()
+    const pathMatrix = path?.getScreenCTM()
+    if (!path || !lineMatrix || !pathMatrix) throw new Error(`Cannot find owned route for ${owner}`)
+    const zoom = Math.hypot(pathMatrix.a, pathMatrix.b)
+    const point = (x: number, y: number) => new DOMPoint(x, y).matrixTransform(lineMatrix)
+    const anchor = point(line.x1.baseVal.value, line.y1.baseVal.value)
+    const label = point(line.x2.baseVal.value, line.y2.baseVal.value)
+    let anchorDistance = Infinity, closestLabelDistance = Infinity
+    const length = path.getTotalLength()
+    for (let offset = 0; offset <= length; offset += 0.5 / zoom) {
+      const onPath = path.getPointAtLength(offset).matrixTransform(pathMatrix)
+      anchorDistance = Math.min(anchorDistance, Math.hypot(onPath.x - anchor.x, onPath.y - anchor.y))
+      closestLabelDistance = Math.min(closestLabelDistance, Math.hypot(onPath.x - label.x, onPath.y - label.y))
+    }
+    const style = getComputedStyle(line)
+    return {
+      owner, zoom, anchorDistance,
+      excessLength: Math.hypot(anchor.x - label.x, anchor.y - label.y) - closestLabelDistance,
+      markerStart: style.markerStart, markerEnd: style.markerEnd,
+      dash: style.strokeDasharray, width: Number.parseFloat(style.strokeWidth),
+      opacity: Number.parseFloat(style.strokeOpacity),
+    }
+  }), relationships)
+  expect(annotations.length, 'dense fixture must exercise displaced-label annotations').toBeGreaterThan(0)
+  for (const annotation of annotations) {
+    expect(annotation.markerStart, annotation.owner).toBe('none')
+    expect(annotation.markerEnd, annotation.owner).toBe('none')
+    expect(annotation.dash, annotation.owner).toBe('none')
+    expect(annotation.width, annotation.owner).toBeLessThanOrEqual(1)
+    expect(annotation.opacity, annotation.owner).toBeLessThanOrEqual(0.3)
+    // Cosmetic rounded corners deviate slightly from the underlying polyline.
+    expect(annotation.anchorDistance / annotation.zoom, annotation.owner).toBeLessThanOrEqual(5)
+    expect(annotation.excessLength / annotation.zoom, annotation.owner).toBeLessThanOrEqual(5)
+  }
+}
+
 test('18 · component selection highlights incoming, outgoing, bundled and self relationships without changing the model or camera', async ({ page, request }) => {
   const model = await fixture()
   try {
@@ -270,6 +359,13 @@ for (const language of ['de', 'en'] as const) {
         await expect(page.getByTestId('overlay-mark-relationship-incoming-edge')).toHaveAttribute('data-work-state', 'active')
         expect(await page.locator('[data-testid^="overlay-mark-relationship-"]').count()).toBeGreaterThanOrEqual(4)
         await assertNoLabelCollisions(page, 'folded')
+        await assertSelfLoopOutsideNode(page, 'dependency-hub')
+
+        const selectedHub = page.locator('.react-flow__node[data-id="dependency-hub"]')
+        await selectedHub.focus()
+        await page.keyboard.press('Enter')
+        await page.screenshot({ path: testInfo.outputPath(`dependencies-folded-selected-${language}-${orientation}.png`), fullPage: true })
+        await page.keyboard.press('Escape')
 
         await page.getByTestId(`edge-bundle-${BUNDLE}`).focus()
         await page.keyboard.press('Enter')
@@ -294,15 +390,23 @@ for (const language of ['de', 'en'] as const) {
         await page.keyboard.press('Escape')
         await page.screenshot({ path: testInfo.outputPath(`dependencies-${language}-${orientation}.png`), fullPage: true })
 
-        // Clear explicit expansion first: increasing detail must itself fan
-        // out the bundle, with bounded text and work-state marks at zoom 2.5.
+        // Zoom changes readability, not the number of dependency arrows.
+        // Every member remains explicitly reachable with the keyboard.
         await page.getByTestId(`edge-collapse-${BUNDLE}`).focus()
         await page.keyboard.press('Enter')
         await expect(page.getByTestId(`edge-bundle-${BUNDLE}`)).toBeAttached()
         await fullDetailZoom(page)
-        await expect(page.getByTestId(`edge-bundle-${BUNDLE}`)).toHaveCount(0)
+        await expect(page.getByTestId(`edge-bundle-${BUNDLE}`)).toBeAttached()
+        await expect(page.getByTestId(`edge-path-${BUNDLE}`)).toBeAttached()
+        await expect(mainPaths(page)).toHaveCount(4)
+        await expect(page.getByTestId('edge-path-bundle-three')).toHaveCount(0)
+        await assertNoLabelCollisions(page, 'folded at high zoom')
+        await assertSelfLoopOutsideNode(page, 'dependency-hub')
+        await page.getByTestId(`edge-bundle-${BUNDLE}`).focus()
+        await page.keyboard.press('Enter')
+        await expect(mainPaths(page)).toHaveCount(6)
         await expect(page.getByTestId('edge-label-bundle-three')).toBeAttached()
-        await assertNoLabelCollisions(page, 'automatic full-detail expansion at high zoom')
+        await assertNoLabelCollisions(page, 'explicit full-detail expansion at high zoom')
         await assertBoundedBadgeText(page)
         await label.focus()
         await page.keyboard.press('Enter')
@@ -360,6 +464,8 @@ for (const orientation of ['top-down', 'left-to-right'] as const) {
     await expect(mainPaths(page)).toHaveCount(relationships.length)
     await expect(page.getByTestId('edge-label-native-bundle-5')).toBeAttached()
     await assertNoLabelCollisions(page, `native full-detail ${orientation}`)
+    await assertSelfLoopOutsideNode(page, 'native-hub')
+    await assertLabelAnnotations(page, relationships)
     await assertBoundedBadgeText(page)
     await page.screenshot({ path: testInfo.outputPath(`native-dependencies-${orientation}.png`) })
   })

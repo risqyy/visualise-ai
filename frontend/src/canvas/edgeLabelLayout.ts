@@ -1,5 +1,6 @@
-import { unfoldsBundles, type DetailLevel } from './detailLevel'
+import type { DetailLevel } from './detailLevel'
 import { fallbackRoute, fanOffset, fanRoute, pointAtRatio, selfLoopRoute } from './edgeGeometry'
+import { attachmentCrossesObstacle, nearestPointOnRoute } from './edgeLabelAttachment'
 import type { LayoutPoint } from './elkLayout'
 import {
   COMPOUND_HEADER_HEIGHT,
@@ -81,7 +82,10 @@ function routeFor(edge: ArchitectureEdge, boxes: ReadonlyMap<string, Box>): read
     ? { x: (targetBox.left + targetBox.right) / 2, y: targetBox.top }
     : { x: targetBox.left, y: (targetBox.top + targetBox.bottom) / 2 }
   return edge.source === edge.target
-    ? selfLoopRoute(source, target)
+    ? selfLoopRoute(source, target, orientation, {
+      width: sourceBox.right - sourceBox.left,
+      height: sourceBox.bottom - sourceBox.top,
+    })
     : fallbackRoute(source, target, orientation)
 }
 
@@ -90,8 +94,8 @@ function routeFor(edge: ArchitectureEdge, boxes: ReadonlyMap<string, Box>): read
  *
  * A bounded route search keeps labels near their relationships. If the local
  * space is exhausted, a shelf below all occupied rectangles guarantees a free
- * position in finite time. Callers draw leaders from displaced labels to their
- * preferred route anchors. Only label positions change, never nodes or routes.
+ * position in finite time. Callers attach displaced labels to the nearest route
+ * segment. Only label positions change, never nodes or routes.
  * The same pure planner is used by the interactive and native image renderers.
  */
 export function placeEdgeLabels(
@@ -104,12 +108,13 @@ export function placeEdgeLabels(
     : 0.93
   const expanded = new Set(options.expandedEdgeIds ?? [])
   const boxes = absoluteNodes(nodes)
-  const occupied: Box[] = nodes.filter((node) => !node.hidden).map((node) => {
+  const obstacles: Box[] = nodes.filter((node) => !node.hidden).map((node) => {
     const box = boxes.get(node.id) as Box
     return node.data.isCompound && !node.data.collapsed
       ? { ...box, bottom: box.top + COMPOUND_HEADER_HEIGHT }
       : box
   })
+  const occupied = [...obstacles]
   const requests: Request[] = []
   const ordered = [...edges].sort((a, b) => a.id < b.id ? -1 : a.id > b.id ? 1 : 0)
   for (const edge of ordered) {
@@ -119,8 +124,7 @@ export function placeEdgeLabels(
     const route = routeFor(edge, boxes)
     if (!route.length) continue
     const bundled = resolved.length > 1
-    const unfolded = bundled && options.detailLevel !== 'minimal' &&
-      (unfoldsBundles(options.detailLevel) || expanded.has(edge.id))
+    const unfolded = bundled && options.detailLevel !== 'minimal' && expanded.has(edge.id)
     const add = (key: string, labelRoute: readonly LayoutPoint[], ratio: number, compact = false) => {
       requests.push({ edgeId: edge.id, key, route: labelRoute, ratio, compact })
     }
@@ -156,21 +160,56 @@ export function placeEdgeLabels(
       top: point.y - height / 2,
       bottom: point.y + height / 2,
     })
-    const free = (point: LayoutPoint) => !occupied.some((box) => intersects(rect(point), box))
+    const free = (point: LayoutPoint) => {
+      if (occupied.some((box) => intersects(rect(point), box))) return false
+      const attachment = nearestPointOnRoute(point, request.route)
+      return !obstacles.some((box) => attachmentCrossesObstacle(point, attachment, box))
+    }
     const preferred = pointAtRatio(request.route, request.ratio)
     let point: LayoutPoint | undefined
-    // Try the route before leaving it. These anchors stay away from handles.
-    for (const ratio of [request.ratio, 0.35, 0.65, 0.2, 0.8]) {
-      const candidate = pointAtRatio(request.route, ratio)
+    const anchors = [request.ratio, 0.35, 0.65, 0.2, 0.8].map((ratio) => pointAtRatio(request.route, ratio))
+    // Sampling each segment also finds usable short branches that global path
+    // ratios miss. Keep the search finite, including routes with zero length.
+    const offsets: LayoutPoint[] = []
+    for (let index = 1; index < request.route.length; index += 1) {
+      const start = request.route[index - 1]!
+      const end = request.route[index]!
+      const dx = end.x - start.x
+      const dy = end.y - start.y
+      const length = Math.hypot(dx, dy)
+      if (!length) continue
+      for (const ratio of [0.15, 0.35, 0.5, 0.65, 0.85]) {
+        const anchor = { x: start.x + dx * ratio, y: start.y + dy * ratio }
+        anchors.push(anchor)
+        const step = Math.abs(dx) >= Math.abs(dy) ? height / 2 + gap : width / 2 + gap
+        for (let ring = 1; ring <= 8; ring += 1) {
+          for (const direction of [-1, 1]) {
+            offsets.push({
+              x: anchor.x - dy / length * step * ring * direction,
+              y: anchor.y + dx / length * step * ring * direction,
+            })
+          }
+        }
+      }
+    }
+    const distanceSquared = (first: LayoutPoint, second: LayoutPoint) =>
+      (first.x - second.x) ** 2 + (first.y - second.y) ** 2
+    anchors.sort((first, second) => distanceSquared(first, preferred) - distanceSquared(second, preferred))
+    for (const candidate of anchors) {
       if (free(candidate)) {
         point = candidate
         break
       }
     }
-    // A fixed number of candidates bounds work even in an extremely dense graph.
-    for (let ring = 1; !point && ring <= 8; ring += 1) {
-      for (const [dx, dy] of [[0, 1], [0, -1], [1, 0], [-1, 0], [1, 1], [-1, 1], [1, -1], [-1, -1]] as const) {
-        const candidate = { x: preferred.x + dx * width * ring, y: preferred.y + dy * height * ring }
+    if (!point) {
+      // Prefer short perpendicular leaders. Diagonal rings around a fixed
+      // anchor used to connect a shifted label across its own source node.
+      const ranked = offsets.map((candidate) => ({
+        candidate,
+        cost: distanceSquared(candidate, nearestPointOnRoute(candidate, request.route)) +
+          distanceSquared(candidate, preferred) * 0.05,
+      })).sort((first, second) => first.cost - second.cost)
+      for (const { candidate } of ranked) {
         if (free(candidate)) {
           point = candidate
           break

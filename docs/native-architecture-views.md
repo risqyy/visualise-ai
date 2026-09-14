@@ -19,8 +19,13 @@ selection. This leaves node positions, camera and reported work states intact.
 
 Relationship labels stay bounded even when focused or selected. Activate a label
 to read its full reported values in the inspector. Where labels would overlap
-each other or component text, they move into free space with dotted leaders back
-to their routes. The native PNG renderer uses the same placement rules.
+each other or component text, they move into free space. Short, faint solid
+annotation lines connect displaced labels to the nearest segment of their own
+relationship. The native PNG renderer uses the same placement rules.
+
+Zooming reveals more component metadata without opening relationship bundles.
+Activate a bundle to inspect its individual arrows and collapse it when finished.
+An explicitly requested full-detail native export still draws every member.
 
 An explicit view contains its selected components and their structural ancestors.
 It only draws selected relationships whose endpoints were explicitly selected.
