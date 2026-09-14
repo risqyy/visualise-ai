@@ -11,7 +11,6 @@ import (
 	"time"
 
 	"github.com/rs/zerolog"
-	"gorm.io/gorm"
 
 	"github.com/risqyy/visualise-ai/backend/internal/config"
 	"github.com/risqyy/visualise-ai/backend/internal/database"
@@ -135,6 +134,11 @@ func run() error {
 		ReadHeaderTimeout: 10 * time.Second,
 	}
 
+	// Also close the listener/connections on a startup failure or a failed
+	// graceful shutdown, before the deferred database cleanup runs.
+	defer server.Close()
+	defer checker.MarkNotBootstrapped()
+
 	serverErr := make(chan error, 1)
 	go func() {
 		if listenErr := server.ListenAndServe(); listenErr != nil && !errors.Is(listenErr, http.ErrServerClosed) {
@@ -144,8 +148,8 @@ func run() error {
 		serverErr <- nil
 	}()
 
-	// Startup work must succeed before the instance may report readiness.
-	if err := bootstrap(db, checker, logger); err != nil {
+	// The router admits only probes until all startup work succeeds.
+	if err := bootstrap(func() error { return store.Migrate(db.WithContext(ctx)) }, checker, logger); err != nil {
 		return err
 	}
 
@@ -187,10 +191,10 @@ func run() error {
 //
 // The schema is owned by the backend: GORM AutoMigrate is the only migration
 // mechanism in v0. A failing migration returns an error, so the instance never
-// marks itself bootstrapped, /readyz keeps answering 503 and the process exits
-// non-zero instead of serving against an unknown schema.
-func bootstrap(db *gorm.DB, checker *health.Checker, logger zerolog.Logger) error {
-	if err := store.Migrate(db); err != nil {
+// marks itself bootstrapped, application routes and /readyz keep answering 503,
+// and the process exits non-zero instead of serving against an unknown schema.
+func bootstrap(migrate func() error, checker *health.Checker, logger zerolog.Logger) error {
+	if err := migrate(); err != nil {
 		logger.Error().Err(err).Msg("schema migration failed")
 		return err
 	}

@@ -36,12 +36,18 @@ func (c *Checker) MarkNotBootstrapped() {
 	c.bootstrapped.Store(false)
 }
 
+// Bootstrapped reports the application admission state without probing the
+// database. A missing checker never admits traffic.
+func (c *Checker) Bootstrapped() bool {
+	return c != nil && c.bootstrapped.Load()
+}
+
 // Live reports process liveness.
 func (c *Checker) Live() bool { return true }
 
 // Ready returns nil when the backend may serve traffic.
 func (c *Checker) Ready(ctx context.Context) error {
-	if !c.bootstrapped.Load() {
+	if !c.Bootstrapped() {
 		return ErrNotBootstrapped
 	}
 	if c.dependency == nil {

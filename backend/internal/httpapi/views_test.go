@@ -11,6 +11,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/risqyy/visualise-ai/backend/internal/health"
 	"github.com/risqyy/visualise-ai/backend/internal/ingest"
 	"github.com/risqyy/visualise-ai/backend/internal/readapi"
 	"github.com/risqyy/visualise-ai/backend/internal/store"
@@ -49,7 +50,9 @@ func TestViewRESTCommandsReadsReplayAndSinglePublication(t *testing.T) {
 	if problem["currentModelRevision"] != float64(0) || problem["currentViewRevision"] != float64(1) {
 		t.Fatal(problem)
 	}
-	router := New(Options{Read: readapi.New(f.db), Logger: zerolog.Nop()})
+	checker := health.NewChecker(nil)
+	checker.MarkBootstrapped()
+	router := New(Options{Health: checker, Read: readapi.New(f.db), Logger: zerolog.Nop()})
 	for _, id := range []string{"team/api", "space view", "50%", "Übersicht", "with|separator", ".", "..", "a+b?c#d"} {
 		opaque := strings.Replace(body, `"viewId":"all-view"`, `"viewId":`+strconv.Quote(id), 1)
 		opaque = strings.Replace(opaque, env.ClientEventID, uuid.NewString(), 1)
