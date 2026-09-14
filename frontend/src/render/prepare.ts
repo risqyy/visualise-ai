@@ -46,9 +46,10 @@ export async function prepare(snapshot: Snapshot, settings: Settings) {
   )
   const labelPositions = placeEdgeLabels(positioned, layout.nodes, {
     detailLevel: DETAILS[settings.detailLevel], zoom: viewport.zoom,
+    expandedEdgeIds: settings.detailLevel === 'full' ? positioned.map((edge) => edge.id) : [],
   })
   const edges = positioned.map((edge) => ({
-    ...edge, data: { ...edge.data, labelPositions: labelPositions.get(edge.id) ?? {} },
+    ...edge, data: { ...edge.data, labelPositions: labelPositions.get(edge.id) ?? {}, bundleExpanded: settings.detailLevel === 'full' },
   }))
   return { nodes: layout.nodes, edges, viewport, resolved }
 }

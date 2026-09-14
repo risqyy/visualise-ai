@@ -37,7 +37,7 @@
     "none": "No reported changes"
   },
   "detail": {
-    "fullDescription": "Tags in addition. Bundled relationships are fanned out one by one.",
+    "fullDescription": "Tags in addition. Expand a relationship bundle to see individual arrows.",
     "fullLabel": "Full",
     "indicator": "Display level: {{level}}",
     "minimalDescription": "Shape and icon only. Text stays available through selection and the inspector.",

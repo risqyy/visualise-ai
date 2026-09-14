@@ -263,6 +263,21 @@ export function fanOffset(index: number, total: number): number {
   return (index - (total - 1) / 2) * BUNDLE_FAN_SPACING
 }
 
+/** Self-loop members nest outside the node instead of translating through it. */
+export function bundleMemberRoute(
+  points: readonly LayoutPoint[],
+  index: number,
+  total: number,
+  orientation: GraphOrientation = DEFAULT_GRAPH_ORIENTATION,
+  selfLoopSize?: { width: number; height: number },
+): LayoutPoint[] {
+  if (!selfLoopSize || points.length < 2) return fanRoute(points, fanOffset(index, total), orientation)
+  // All lanes fit the 12px header padding; wider symmetric fans cut into nodes.
+  // Retain at least 4px for stroke and rounded-corner clearance.
+  return selfLoopRoute(points[0]!, points[points.length - 1]!, orientation,
+    selfLoopSize, 4 + 6 * (index + 1) / Math.max(total, 1))
+}
+
 /** Point at a given ratio of the polyline's length. Used to place labels. */
 export function pointAtRatio(
   points: readonly LayoutPoint[],
@@ -324,19 +339,34 @@ export function fallbackRoute(
  * A visible loop for a relationship whose source and target are the same node.
  * ELK intentionally omits self references from its layout input; drawing the
  * fallback as a straight line would put its label inside the node. The loop
- * leaves both handles where React Flow expects them and reserves a clear label
- * point above the box.
+ * follows the handle direction and clears the actual node bounds, including
+ * compound nodes whose size exceeds the default leaf box.
  */
 export function selfLoopRoute(
   source: LayoutPoint,
   target: LayoutPoint,
+  orientation: GraphOrientation = 'left-right',
+  size: { width: number; height: number } = { width: 228, height: 96 },
+  clearance = 10,
 ): LayoutPoint[] {
-  // Keep the badge's roughly 10 px height clear of a 96 px leaf box: the
-  // handle is centred at y=48, so a centre 72 px above it leaves a visible
-  // gap instead of touching the node's top border.
-  const top = Math.min(source.y, target.y) - 72
-  const right = Math.max(source.x, target.x) + 48
-  const left = Math.min(source.x, target.x) - 48
+  // Fit inside both the sibling gap (36px) and compound header padding (12px).
+  if (orientation === 'top-down') {
+    const bottom = Math.max(source.y, target.y) + clearance
+    const top = Math.min(source.y, target.y) - clearance
+    const right = Math.max(source.x, target.x) + size.width / 2 + clearance
+    return [
+      source,
+      { x: source.x, y: bottom },
+      { x: right, y: bottom },
+      { x: right, y: top },
+      { x: target.x, y: top },
+      target,
+    ]
+  }
+
+  const top = Math.min(source.y, target.y) - size.height / 2 - clearance
+  const right = Math.max(source.x, target.x) + clearance
+  const left = Math.min(source.x, target.x) - clearance
   return [
     source,
     { x: right, y: source.y },

@@ -19,7 +19,6 @@ import {
   showsKind,
   showsTags,
   showsTechnology,
-  unfoldsBundles,
 } from './detailLevel'
 import { LEAF_NODE_SIZE } from './graphProjection'
 
@@ -30,7 +29,6 @@ describe('progressive detail levels', () => {
     expect(showsKind(level)).toBe(false)
     expect(showsTechnology(level)).toBe(false)
     expect(showsTags(level)).toBe(false)
-    expect(unfoldsBundles(level)).toBe(false)
   })
 
   it('adds technology at medium zoom and tags when zoomed in', () => {
@@ -43,7 +41,6 @@ describe('progressive detail levels', () => {
     expect(full).toBe('full')
     expect(showsTechnology(full)).toBe(true)
     expect(showsTags(full)).toBe(true)
-    expect(unfoldsBundles(full)).toBe(true)
   })
 
   it('is monotonic and total', () => {

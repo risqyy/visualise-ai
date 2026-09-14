@@ -40,6 +40,14 @@ interface ArchitectureResponse {
 const TOPIC_ORDER_CREATED = 'orders.order.created'
 const TOPIC_INVENTORY_RESERVED = 'inventory.item.reserved'
 
+async function expandRelationshipBundles(page: Page) {
+  for (const bundle of await page.locator('[data-testid^="edge-bundle-"]').all()) {
+    await bundle.focus()
+    await page.keyboard.press('Enter')
+    await expect(bundle).not.toBeAttached()
+  }
+}
+
 /** The four-level chain the snapshot is built around. */
 const HIERARCHY_CHAIN = [
   'shop-platform',
@@ -322,6 +330,7 @@ test('2 · every relationship kind is drawn, and every reported NATS topic stays
 
   // ---- the bundle is a rendering, never a merge ---------------------------
   await zoomToFullDetail(page)
+  await expandRelationshipBundles(page)
 
   // One label per reported relationship. If the canvas had merged the parallel
   // topic edges into one "messaging" line there would be fewer than eleven.
@@ -375,7 +384,7 @@ test('2 · every relationship kind is drawn, and every reported NATS topic stays
   })
   expect(
     edgeInventory.folded,
-    'a folded bundle at the full detail level would hide individual relationships',
+    'explicit disclosure must expose every individual relationship',
   ).toBe(0)
   // Applied and proposed edges each carry exactly one labelled relationship, so
   // no reported relationship can have been folded away.
@@ -393,6 +402,7 @@ test('2 · selecting one relationship is a reproducible URL and inspector contex
   await zoomToFullDetail(page)
 
   const label = page.getByTestId('edge-label-rel-orders-publishes-order-created')
+  await expandRelationshipBundles(page)
   await expect(label).toBeVisible()
   await panIntoCanvas(page, label)
   await label.click()

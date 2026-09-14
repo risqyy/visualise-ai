@@ -11,17 +11,16 @@ import { WORK_STATE_BY_ID } from '@/state/workStates'
 
 import { ChangeOverlayMark } from './ChangeOverlayMark'
 import { dominantOverlay, type ChangeOverlay } from './changeOverlays'
-import { unfoldsBundles } from './detailLevel'
+import { nearestPointOnRoute } from './edgeLabelAttachment'
 import {
   fallbackRoute,
-  fanOffset,
-  fanRoute,
+  bundleMemberRoute,
   pointAtRatio,
   roundedPolylinePath,
   selfLoopRoute,
 } from './edgeGeometry'
 import type { LayoutPoint } from './elkLayout'
-import { resolveRelationships, type ArchitectureEdge } from './graphProjection'
+import { LEAF_NODE_SIZE, resolveRelationships, type ArchitectureEdge } from './graphProjection'
 import {
   MARKER_IDS,
   RELATIONSHIP_KIND_STYLE_BY_ID,
@@ -43,7 +42,7 @@ import { useDetailLevel } from './useDetailLevel'
  *   kinds it contains,
  * * map level: one line plus an icon-only control that selects a member in the
  *   inspector without putting secondary text below its effective-size floor,
- * * unfolded (high zoom, or after a click on the badge): one line per
+ * * unfolded (explicit disclosure or a full-detail native export): one line per
  *   relationship, each labelled with a bounded identifier — the topic name for
  *   a NATS topic, the operation for a call. Full reported text stays on the
  *   accessible name, title and relationship inspector. Focusing or selecting a
@@ -152,18 +151,20 @@ function EdgeRoute({
 }
 
 /** HTML badge anchored to a point in flow coordinates. */
-function LabelLeader({ point, anchor, zIndex }: {
+function LabelLeader({ point, anchor, zIndex, dimmed = false, labelId }: {
   point: LayoutPoint
   anchor?: LayoutPoint
   zIndex: number
+  dimmed?: boolean
+  labelId?: string | undefined
 }) {
   if (!anchor || Math.hypot(point.x - anchor.x, point.y - anchor.y) < 8) return null
   return (
     <svg width={1} height={1} aria-hidden="true"
       className="pointer-events-none absolute overflow-visible text-muted-foreground"
-      style={{ left: 0, top: 0, zIndex }}>
+      style={{ left: 0, top: 0, zIndex, opacity: dimmed ? 0.25 : 1 }} data-label-annotation="true" data-label-for={labelId}>
       <line x1={anchor.x} y1={anchor.y} x2={point.x} y2={point.y}
-        stroke="currentColor" strokeWidth={1} strokeOpacity={0.4} strokeDasharray="2 3" />
+        stroke="currentColor" strokeWidth={1} strokeOpacity={0.3} />
     </svg>
   )
 }
@@ -214,7 +215,7 @@ function EdgeBadge({
     iconOnly && 'size-7 justify-center p-1',
     emphasised || componentRelated
       ? 'border-ring/70 bg-popover text-foreground'
-      : 'border-border bg-popover/95 text-muted-foreground',
+      : 'border-border bg-popover text-muted-foreground',
     onClick && 'hover:border-muted-foreground cursor-pointer',
     dimmed && 'opacity-25',
   )
@@ -236,7 +237,7 @@ function EdgeBadge({
   if (onClick) {
     return (
       <>
-      <LabelLeader point={point} {...(anchor ? { anchor } : {})} zIndex={zIndex} />
+      <LabelLeader point={point} {...(anchor ? { anchor } : {})} zIndex={zIndex} dimmed={dimmed} labelId={testId} />
       <button
         type="button"
         style={interactiveStyle}
@@ -307,7 +308,7 @@ function EdgeOverlayMark({
 }) {
   return (
     <>
-    <LabelLeader point={point} {...(anchor ? { anchor } : {})} zIndex={zIndex} />
+    <LabelLeader point={point} {...(anchor ? { anchor } : {})} zIndex={zIndex} dimmed={dimmed} labelId={`overlay-mark-${overlay.targetKind}-${overlay.targetId}`} />
     <span
       style={{
         position: 'absolute',
@@ -366,6 +367,8 @@ export const RelationshipEdge = memo(function RelationshipEdge({
     return edgeZ + Math.max(sourceZ, targetZ) + 1
   })
   const level = useDetailLevel()
+  const sourceWidth = useStore((state) => state.nodeLookup.get(source)?.width ?? state.nodeLookup.get(source)?.measured.width ?? LEAF_NODE_SIZE.width)
+  const sourceHeight = useStore((state) => state.nodeLookup.get(source)?.height ?? state.nodeLookup.get(source)?.measured.height ?? LEAF_NODE_SIZE.height)
   const { expandedEdgeIds, toggleEdgeExpanded, selectedRelationshipId: storedSelectedRelationshipId, setSelectedRelationshipId } = useCanvasEdgeActions()
 
   if (!data) return null
@@ -385,7 +388,7 @@ export const RelationshipEdge = memo(function RelationshipEdge({
   const route: LayoutPoint[] =
     data.route ??
     (data.sourceComponentId === data.targetComponentId
-      ? selfLoopRoute({ x: sourceX, y: sourceY }, { x: targetX, y: targetY })
+      ? selfLoopRoute({ x: sourceX, y: sourceY }, { x: targetX, y: targetY }, data.fallbackOrientation ?? 'top-down', { width: sourceWidth, height: sourceHeight })
       : fallbackRoute(
           { x: sourceX, y: sourceY },
           { x: targetX, y: targetY },
@@ -397,7 +400,7 @@ export const RelationshipEdge = memo(function RelationshipEdge({
   const unfolded =
     bundled &&
     level !== 'minimal' &&
-    (unfoldsBundles(level) || expandedEdgeIds.includes(id))
+    (data.bundleExpanded ?? expandedEdgeIds.includes(id))
   const selectedEntry = resolved.find(
     (entry) => entry.relationship.relationshipId === selectedRelationshipId,
   )
@@ -409,6 +412,12 @@ export const RelationshipEdge = memo(function RelationshipEdge({
   const selectRelationship = data.onSelectRelationship ?? setSelectedRelationshipId
   const labelRatio = data.labelRatio ?? 0.5
   const labelPoint = (key: string, preferred: LayoutPoint) => data.labelPositions?.[key] ?? preferred
+  const labelAnchor = (key: string, ownRoute: LayoutPoint[], preferred: LayoutPoint) =>
+    nearestPointOnRoute(labelPoint(key, preferred), ownRoute)
+  const memberRoute = (index: number, total: number) => bundleMemberRoute(
+    route, index, total, data.fallbackOrientation,
+    source === target ? { width: sourceWidth, height: sourceHeight } : undefined,
+  )
 
   if (!bundled || !unfolded) {
     const edgeOverlay = dominantOverlay(Object.values(overlays))
@@ -451,7 +460,7 @@ export const RelationshipEdge = memo(function RelationshipEdge({
           {edgeOverlay && (
             <EdgeOverlayMark
               point={labelPoint('overlay', pointAtRatio(route, 0.74))}
-              anchor={pointAtRatio(route, 0.74)}
+              anchor={labelAnchor('overlay', route, pointAtRatio(route, 0.74))}
               overlay={edgeOverlay}
               zIndex={edgeLabelZIndex}
               dimmed={dimmed}
@@ -461,7 +470,7 @@ export const RelationshipEdge = memo(function RelationshipEdge({
           {bundled ? (
             <EdgeBadge
               point={labelPoint('badge', badgePoint)}
-              anchor={badgePoint}
+              anchor={labelAnchor('badge', route, badgePoint)}
               zIndex={edgeLabelZIndex}
               onClick={() => {
                 if (level === 'minimal') {
@@ -508,7 +517,7 @@ export const RelationshipEdge = memo(function RelationshipEdge({
             single && (
               <EdgeBadge
                 point={labelPoint('badge', badgePoint)}
-                anchor={badgePoint}
+                anchor={labelAnchor('badge', route, badgePoint)}
                 zIndex={edgeLabelZIndex}
                 onClick={() =>
                   selectRelationship(
@@ -540,11 +549,7 @@ export const RelationshipEdge = memo(function RelationshipEdge({
     <>
       {resolved.map((entry) => {
         const style = RELATIONSHIP_KIND_STYLE_BY_ID[entry.relationship.kind]
-        const fanned = fanRoute(
-          route,
-          fanOffset(entry.index, entry.total),
-          data.fallbackOrientation,
-        )
+        const fanned = memberRoute(entry.index, entry.total)
         const emphasised = entry.relationship.relationshipId === selectedRelationshipId
         const entryDimmed = hasSelection && !emphasised && !componentRelated
         return (
@@ -567,16 +572,12 @@ export const RelationshipEdge = memo(function RelationshipEdge({
         {resolved.map((entry) => {
           const overlay = overlays[entry.relationship.relationshipId]
           if (!overlay) return null
-          const fanned = fanRoute(
-            route,
-            fanOffset(entry.index, entry.total),
-            data.fallbackOrientation,
-          )
+          const fanned = memberRoute(entry.index, entry.total)
           return (
             <EdgeOverlayMark
               key={`state-${entry.relationship.relationshipId}`}
               point={labelPoint(`overlay:${entry.relationship.relationshipId}`, pointAtRatio(fanned, 0.74))}
-              anchor={pointAtRatio(fanned, 0.74)}
+              anchor={labelAnchor(`overlay:${entry.relationship.relationshipId}`, fanned, pointAtRatio(fanned, 0.74))}
               overlay={overlay}
               zIndex={edgeLabelZIndex}
               dimmed={hasSelection && entry.relationship.relationshipId !== selectedRelationshipId && !componentRelated}
@@ -585,11 +586,7 @@ export const RelationshipEdge = memo(function RelationshipEdge({
         })}
         {resolved.map((entry) => {
           const style = RELATIONSHIP_KIND_STYLE_BY_ID[entry.relationship.kind]
-          const fanned = fanRoute(
-            route,
-            fanOffset(entry.index, entry.total),
-            data.fallbackOrientation,
-          )
+          const fanned = memberRoute(entry.index, entry.total)
           const emphasised = entry.relationship.relationshipId === selectedRelationshipId
           const entryDimmed = hasSelection && !emphasised && !componentRelated
           const discriminator = entry.discriminator
@@ -598,7 +595,7 @@ export const RelationshipEdge = memo(function RelationshipEdge({
             <EdgeBadge
               key={entry.relationship.relationshipId}
               point={labelPoint(`relationship:${entry.relationship.relationshipId}`, pointAtRatio(fanned, labelRatio))}
-              anchor={pointAtRatio(fanned, labelRatio)}
+              anchor={labelAnchor(`relationship:${entry.relationship.relationshipId}`, fanned, pointAtRatio(fanned, labelRatio))}
               zIndex={edgeLabelZIndex}
               onClick={() =>
                 selectRelationship(
@@ -622,7 +619,6 @@ export const RelationshipEdge = memo(function RelationshipEdge({
         })}
         <EdgeBadge
           point={labelPoint('collapse', pointAtRatio(route, 0.12))}
-          anchor={pointAtRatio(route, 0.12)}
           zIndex={edgeLabelZIndex}
           onClick={() => toggleEdgeExpanded(id)}
           title={t('edge.bundleCollapse')}

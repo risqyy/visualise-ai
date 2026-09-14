@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 
 import {
   BUNDLE_FAN_SPACING,
+  bundleMemberRoute,
   EDGE_LABEL_STAGGER_END,
   EDGE_LABEL_STAGGER_START,
   fallbackRoute,
@@ -202,6 +203,72 @@ describe('edge geometry', () => {
     const route = selfLoopRoute({ x: 228, y: 48 }, { x: 0, y: 48 })
     expect(route[0]).toEqual({ x: 228, y: 48 })
     expect(route[route.length - 1]).toEqual({ x: 0, y: 48 })
-    expect(pointAtRatio(route)).toEqual({ x: 114, y: -24 })
+    expect(pointAtRatio(route)).toEqual({ x: 114, y: -10 })
+  })
+
+  it.each([
+    { orientation: 'top-down' as const, width: 228, height: 96 },
+    { orientation: 'left-right' as const, width: 228, height: 96 },
+    { orientation: 'top-down' as const, width: 720, height: 480 },
+    { orientation: 'left-right' as const, width: 720, height: 480 },
+  ])('keeps every $orientation self-loop segment outside a $width × $height node', ({ orientation, width, height }) => {
+    const left = 173
+    const top = 291
+    const right = left + width
+    const bottom = top + height
+    const topDown = orientation === 'top-down'
+    const source = topDown
+      ? { x: left + width / 2, y: bottom }
+      : { x: right, y: top + height / 2 }
+    const target = topDown
+      ? { x: left + width / 2, y: top }
+      : { x: left, y: top + height / 2 }
+    const baseRoute = selfLoopRoute(source, target, orientation, { width, height })
+    const routes = [baseRoute, ...[2, 6].flatMap((total) => Array.from({ length: total }, (_, index) =>
+      bundleMemberRoute(baseRoute, index, total, orientation, { width, height })))]
+    expect(new Set(routes.slice(-6).map((route) => JSON.stringify(route))).size).toBe(6)
+    for (const route of routes) {
+
+    // A sibling may start just 36px beyond any side of this node.
+    for (const point of route) {
+      expect(point.x).toBeGreaterThan(left - 36)
+      expect(point.x).toBeLessThan(right + 36)
+      expect(point.y).toBeGreaterThan(top - 36)
+      expect(point.y).toBeGreaterThan(top - 12)
+      expect(point.y).toBeLessThan(bottom + 36)
+    }
+
+    expect(route[0]).toEqual(source)
+    expect(route[route.length - 1]).toEqual(target)
+    // Both endpoint tangents follow the visible handle directions. In
+    // particular a top-down loop must not leave its bottom handle sideways.
+    const departure = route[1]!
+    const arrival = route[route.length - 2]!
+    if (topDown) {
+      expect(departure.x).toBe(source.x)
+      expect(departure.y).toBeGreaterThan(bottom)
+      expect(arrival.x).toBe(target.x)
+      expect(arrival.y).toBeLessThan(top)
+    } else {
+      expect(departure.y).toBe(source.y)
+      expect(departure.x).toBeGreaterThan(right)
+      expect(arrival.y).toBe(target.y)
+      expect(arrival.x).toBeLessThan(left)
+    }
+
+    for (let index = 1; index < route.length; index += 1) {
+      const from = route[index - 1]!
+      const to = route[index]!
+      expect(from.x === to.x || from.y === to.y).toBe(true)
+      // Check complete segment interiors, not merely the bend points: a
+      // segment with both endpoints outside a box can still cut through it.
+      const crossesInterior = from.x === to.x
+        ? from.x > left && from.x < right &&
+          Math.max(from.y, to.y) > top && Math.min(from.y, to.y) < bottom
+        : from.y > top && from.y < bottom &&
+          Math.max(from.x, to.x) > left && Math.min(from.x, to.x) < right
+      expect(crossesInterior).toBe(false)
+    }
+    }
   })
 })
