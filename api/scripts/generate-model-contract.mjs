@@ -13,7 +13,7 @@ const source = parse(await readFile(new URL('model-view-mcp.schema.yaml', root),
 const marker = '    # GENERATED MODEL COMMAND SCHEMAS — npm run generate:model-contract\n'
 let base = original.split(marker)[0].trimEnd() + '\n\n'
 const legacy = parse(original)
-const implemented = { 'model.mutation_applied': 'ModelMutationApplied', 'context.opened': 'ContextOpened', 'work.reported': 'WorkReported', 'work.scope_reported': 'WorkScopeReported' }
+const implemented = { 'model.mutation_applied': 'ModelMutationApplied', 'context.opened': 'ContextOpened', 'work.reported': 'WorkReported', 'work.scope_reported': 'WorkScopeReported', 'view.saved': 'ViewSaved', 'view.removed': 'ViewRemoved' }
 for (const [type, name] of Object.entries(implemented).slice(1)) {
  if (!base.includes(`          ${type}:`)) {
   base = base.replace("        - model.mutation_applied", `        - model.mutation_applied\n        - ${type}`)

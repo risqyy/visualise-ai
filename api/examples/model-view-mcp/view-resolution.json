@@ -1,0 +1,462 @@
+[
+  {
+    "name": "ancestors never expand explicit edge boundary",
+    "model": {
+      "components": [
+        {
+          "componentId": "root-aa",
+          "name": "root-aa",
+          "kind": "service",
+          "parentComponentId": null
+        },
+        {
+          "componentId": "child-aa",
+          "name": "child-aa",
+          "kind": "service",
+          "parentComponentId": "root-aa"
+        },
+        {
+          "componentId": "child-bb",
+          "name": "child-bb",
+          "kind": "service",
+          "parentComponentId": "root-aa"
+        },
+        {
+          "componentId": "outside-aa",
+          "name": "outside-aa",
+          "kind": "service",
+          "parentComponentId": null
+        }
+      ],
+      "relationships": [
+        {
+          "relationshipId": "edge-aa",
+          "sourceComponentId": "child-aa",
+          "targetComponentId": "child-bb",
+          "kind": "dependency"
+        },
+        {
+          "relationshipId": "edge-bb",
+          "sourceComponentId": "root-aa",
+          "targetComponentId": "child-aa",
+          "kind": "dependency"
+        },
+        {
+          "relationshipId": "edge-cc",
+          "sourceComponentId": "child-aa",
+          "targetComponentId": "outside-aa",
+          "kind": "dependency"
+        }
+      ]
+    },
+    "view": {
+      "viewId": "detail-view",
+      "name": "Detail",
+      "kind": "architecture",
+      "selection": {
+        "mode": "explicit",
+        "scope": {
+          "componentIds": [
+            "child-aa",
+            "child-bb"
+          ],
+          "relationshipIds": [
+            "edge-aa",
+            "edge-bb"
+          ]
+        }
+      },
+      "orientation": "top-down",
+      "collapsedComponentIds": [
+        "root-aa"
+      ]
+    },
+    "expected": {
+      "componentIds": [
+        "child-aa",
+        "child-bb",
+        "root-aa"
+      ],
+      "relationshipIds": [
+        "edge-aa"
+      ],
+      "structuralContextIds": [
+        "root-aa"
+      ],
+      "collapsedComponentIds": [
+        "root-aa"
+      ],
+      "missingReferences": {
+        "componentIds": [],
+        "relationshipIds": []
+      },
+      "boundaryRelationshipIds": [
+        "edge-bb"
+      ]
+    }
+  },
+  {
+    "name": "missing and retargeted references omit without resurrection",
+    "model": {
+      "components": [
+        {
+          "componentId": "root-aa",
+          "name": "root-aa",
+          "kind": "service",
+          "parentComponentId": null
+        },
+        {
+          "componentId": "child-aa",
+          "name": "child-aa",
+          "kind": "service",
+          "parentComponentId": "root-aa"
+        },
+        {
+          "componentId": "child-bb",
+          "name": "child-bb",
+          "kind": "service",
+          "parentComponentId": "root-aa"
+        },
+        {
+          "componentId": "outside-aa",
+          "name": "outside-aa",
+          "kind": "service",
+          "parentComponentId": null
+        }
+      ],
+      "relationships": [
+        {
+          "relationshipId": "edge-aa",
+          "sourceComponentId": "child-aa",
+          "targetComponentId": "child-bb",
+          "kind": "dependency"
+        },
+        {
+          "relationshipId": "edge-bb",
+          "sourceComponentId": "root-aa",
+          "targetComponentId": "child-aa",
+          "kind": "dependency"
+        },
+        {
+          "relationshipId": "edge-cc",
+          "sourceComponentId": "child-aa",
+          "targetComponentId": "outside-aa",
+          "kind": "dependency"
+        }
+      ]
+    },
+    "view": {
+      "viewId": "detail-view",
+      "name": "Detail",
+      "kind": "architecture",
+      "selection": {
+        "mode": "explicit",
+        "scope": {
+          "componentIds": [
+            "child-aa",
+            "removed-aa"
+          ],
+          "relationshipIds": [
+            "edge-cc",
+            "removed-edge"
+          ]
+        }
+      },
+      "orientation": "top-down",
+      "collapsedComponentIds": [
+        "removed-bb",
+        "root-aa"
+      ]
+    },
+    "expected": {
+      "componentIds": [
+        "child-aa",
+        "root-aa"
+      ],
+      "relationshipIds": [],
+      "structuralContextIds": [
+        "root-aa"
+      ],
+      "collapsedComponentIds": [
+        "root-aa"
+      ],
+      "missingReferences": {
+        "componentIds": [
+          "removed-aa",
+          "removed-bb"
+        ],
+        "relationshipIds": [
+          "removed-edge"
+        ]
+      },
+      "boundaryRelationshipIds": [
+        "edge-cc"
+      ]
+    }
+  },
+  {
+    "name": "empty explicit view",
+    "model": {
+      "components": [
+        {
+          "componentId": "root-aa",
+          "name": "root-aa",
+          "kind": "service",
+          "parentComponentId": null
+        },
+        {
+          "componentId": "child-aa",
+          "name": "child-aa",
+          "kind": "service",
+          "parentComponentId": "root-aa"
+        },
+        {
+          "componentId": "child-bb",
+          "name": "child-bb",
+          "kind": "service",
+          "parentComponentId": "root-aa"
+        },
+        {
+          "componentId": "outside-aa",
+          "name": "outside-aa",
+          "kind": "service",
+          "parentComponentId": null
+        }
+      ],
+      "relationships": [
+        {
+          "relationshipId": "edge-aa",
+          "sourceComponentId": "child-aa",
+          "targetComponentId": "child-bb",
+          "kind": "dependency"
+        },
+        {
+          "relationshipId": "edge-bb",
+          "sourceComponentId": "root-aa",
+          "targetComponentId": "child-aa",
+          "kind": "dependency"
+        },
+        {
+          "relationshipId": "edge-cc",
+          "sourceComponentId": "child-aa",
+          "targetComponentId": "outside-aa",
+          "kind": "dependency"
+        }
+      ]
+    },
+    "view": {
+      "viewId": "detail-view",
+      "name": "Detail",
+      "kind": "architecture",
+      "selection": {
+        "mode": "explicit",
+        "scope": {
+          "componentIds": [],
+          "relationshipIds": []
+        }
+      },
+      "orientation": "top-down",
+      "collapsedComponentIds": []
+    },
+    "expected": {
+      "componentIds": [],
+      "relationshipIds": [],
+      "structuralContextIds": [],
+      "collapsedComponentIds": [],
+      "missingReferences": {
+        "componentIds": [],
+        "relationshipIds": []
+      },
+      "boundaryRelationshipIds": []
+    }
+  },
+  {
+    "name": "cycle stops without sibling expansion",
+    "model": {
+      "components": [
+        {
+          "componentId": "cycle-aa",
+          "name": "cycle-aa",
+          "kind": "service",
+          "parentComponentId": "cycle-bb"
+        },
+        {
+          "componentId": "cycle-bb",
+          "name": "cycle-bb",
+          "kind": "service",
+          "parentComponentId": "cycle-aa"
+        },
+        {
+          "componentId": "sibling-aa",
+          "name": "sibling-aa",
+          "kind": "service",
+          "parentComponentId": "cycle-bb"
+        }
+      ],
+      "relationships": []
+    },
+    "view": {
+      "viewId": "detail-view",
+      "name": "Detail",
+      "kind": "architecture",
+      "selection": {
+        "mode": "explicit",
+        "scope": {
+          "componentIds": [
+            "cycle-aa"
+          ],
+          "relationshipIds": []
+        }
+      },
+      "orientation": "top-down",
+      "collapsedComponentIds": [
+        "cycle-bb"
+      ]
+    },
+    "expected": {
+      "componentIds": [
+        "cycle-aa",
+        "cycle-bb"
+      ],
+      "relationshipIds": [],
+      "structuralContextIds": [
+        "cycle-bb"
+      ],
+      "collapsedComponentIds": [
+        "cycle-bb"
+      ],
+      "missingReferences": {
+        "componentIds": [],
+        "relationshipIds": []
+      },
+      "boundaryRelationshipIds": []
+    }
+  },
+  {
+    "name": "all selects the shared graph",
+    "model": {
+      "components": [
+        {
+          "componentId": "root-aa",
+          "name": "root-aa",
+          "kind": "service",
+          "parentComponentId": null
+        },
+        {
+          "componentId": "child-aa",
+          "name": "child-aa",
+          "kind": "service",
+          "parentComponentId": "root-aa"
+        },
+        {
+          "componentId": "child-bb",
+          "name": "child-bb",
+          "kind": "service",
+          "parentComponentId": "root-aa"
+        },
+        {
+          "componentId": "outside-aa",
+          "name": "outside-aa",
+          "kind": "service",
+          "parentComponentId": null
+        }
+      ],
+      "relationships": [
+        {
+          "relationshipId": "edge-aa",
+          "sourceComponentId": "child-aa",
+          "targetComponentId": "child-bb",
+          "kind": "dependency"
+        },
+        {
+          "relationshipId": "edge-bb",
+          "sourceComponentId": "root-aa",
+          "targetComponentId": "child-aa",
+          "kind": "dependency"
+        },
+        {
+          "relationshipId": "edge-cc",
+          "sourceComponentId": "child-aa",
+          "targetComponentId": "outside-aa",
+          "kind": "dependency"
+        }
+      ]
+    },
+    "view": {
+      "viewId": "detail-view",
+      "name": "Detail",
+      "kind": "architecture",
+      "selection": {
+        "mode": "all"
+      },
+      "orientation": "top-down",
+      "collapsedComponentIds": []
+    },
+    "expected": {
+      "componentIds": [
+        "child-aa",
+        "child-bb",
+        "outside-aa",
+        "root-aa"
+      ],
+      "relationshipIds": [
+        "edge-aa",
+        "edge-bb",
+        "edge-cc"
+      ],
+      "structuralContextIds": [],
+      "collapsedComponentIds": [],
+      "missingReferences": {
+        "componentIds": [],
+        "relationshipIds": []
+      },
+      "boundaryRelationshipIds": []
+    }
+  },
+  {
+    "name": "legacy missing parent and dangling edge",
+    "model": {
+      "components": [
+        {
+          "componentId": "child-aa",
+          "name": "child-aa",
+          "kind": "service",
+          "parentComponentId": "missing-aa"
+        }
+      ],
+      "relationships": [
+        {
+          "relationshipId": "edge-aa",
+          "sourceComponentId": "child-aa",
+          "targetComponentId": "missing-aa",
+          "kind": "dependency"
+        }
+      ]
+    },
+    "view": {
+      "viewId": "detail-view",
+      "name": "Detail",
+      "kind": "architecture",
+      "selection": {
+        "mode": "all"
+      },
+      "orientation": "top-down",
+      "collapsedComponentIds": []
+    },
+    "expected": {
+      "componentIds": [
+        "child-aa"
+      ],
+      "relationshipIds": [],
+      "structuralContextIds": [],
+      "collapsedComponentIds": [],
+      "missingReferences": {
+        "componentIds": [],
+        "relationshipIds": []
+      },
+      "boundaryRelationshipIds": [
+        "edge-aa"
+      ]
+    }
+  }
+]

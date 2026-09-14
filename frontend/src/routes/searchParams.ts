@@ -33,6 +33,8 @@ const relationshipIdSchema = z.preprocess(
 )
 
 export const workspaceSearchSchema = z.object({
+  /** Opaque saved view ID; omitted means the compatible complete overview. */
+  view: relationshipIdSchema.optional().catch(undefined),
   /** Selected component; drives the inspector. */
   component: componentIdSchema.optional().catch(undefined),
   /** Reading direction of the architecture graph. */

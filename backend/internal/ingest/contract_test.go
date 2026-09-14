@@ -47,8 +47,8 @@ func TestContractExposesTheClosedCatalogue(t *testing.T) {
 	contract := testContract(t)
 
 	types := contract.EventTypes()
-	if len(types) != 24 {
-		t.Fatalf("want 20 legacy event types and four domain commands, got %d: %v", len(types), types)
+	if len(types) != 26 {
+		t.Fatalf("want 20 legacy event types and six domain commands, got %d: %v", len(types), types)
 	}
 	for _, eventType := range types {
 		if !contract.KnowsEventType(eventType) {

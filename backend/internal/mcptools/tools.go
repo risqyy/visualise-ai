@@ -36,6 +36,10 @@ type definition struct {
 }
 
 var definitions = []definition{
+	{"visualise_views_list", "List saved native architecture views of one shared project model. Pages bind projectPosition; restart after stale_cursor.", true},
+	{"visualise_view_get", "Read one saved view definition and its revision, with missing references and relationships now outside its explicit boundary. No model elements are copied.", true},
+	{"visualise_view_put", "Create (expectedViewRevision zero) or replace a complete native architecture view at exact model and view revisions. Selected edges require explicitly selected endpoints; ancestors add structure only. Retry uncertain writes with the identical input and clientEventId.", false},
+	{"visualise_view_remove", "Remove a saved view at expectedViewRevision, retaining its ID forever. Shared model, work and history remain unchanged. Retry uncertain writes with the identical input and clientEventId.", false},
 	{"visualise_discover", "Discover the available native architecture workflow and limits. Open a context explicitly, read IDs and modelRevision, then mutate with a fresh clientEventId. Connections do not start or finish work; views and rendering are advertised only when implemented.", true},
 	{"visualise_projects_list", "List known project IDs in lexical order. Use limit (default 50, maximum 200) and nextCursor; restart on stale_cursor when catalogue membership changes.", true},
 	{"visualise_model_read", "Read a consistent page of stable native component and relationship IDs with modelRevision and projectPosition. Read all nextCursor pages at one model revision; restart on stale_cursor. Use the revision for atomic mutation CAS.", true},
@@ -104,7 +108,7 @@ func Names() []string {
 func (s *Service) Register(server *mcp.Server) error {
 	for _, def := range definitions {
 		spec := s.specs[def.Name]
-		closed, destructive := false, def.Name == "visualise_model_mutate"
+		closed, destructive := false, def.Name == "visualise_model_mutate" || def.Name == "visualise_view_remove"
 		output := map[string]any{"type": "object", "anyOf": []any{spec.Output, s.errorOutput}}
 		server.AddTool(&mcp.Tool{Name: def.Name, Description: def.Description, InputSchema: spec.Input, OutputSchema: output, Annotations: &mcp.ToolAnnotations{ReadOnlyHint: def.ReadOnly, IdempotentHint: true, DestructiveHint: &destructive, OpenWorldHint: &closed}}, func(ctx context.Context, req *mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 			return s.call(ctx, def.Name, req.Params.Arguments), nil
@@ -195,6 +199,7 @@ type field struct {
 	Message string `json:"message"`
 }
 type failure struct {
+	CurrentViewRevision     *int64  `json:"currentViewRevision,omitempty"`
 	Code                    string  `json:"code"`
 	Message                 string  `json:"message"`
 	Fields                  []field `json:"fields"`
@@ -217,6 +222,7 @@ func errorResult(err error) *mcp.CallToolResult {
 		data.Code = d.Code
 		data.Message = d.Detail
 		data.CurrentModelRevision = d.CurrentModelRevision
+		data.CurrentViewRevision = d.CurrentViewRevision
 		data.Fields = append(data.Fields, field{mcpPointer(d.Field), d.Detail})
 	case errors.As(err, &life):
 		data.Code = life.Code

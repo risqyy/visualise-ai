@@ -61,6 +61,20 @@ func (s *Service) decodeCursor(raw string, expected cursor) (cursor, error) {
 }
 func (s *Service) read(ctx context.Context, name string, args map[string]any) (any, error) {
 	switch name {
+	case "visualise_view_get":
+		return store.New(s.db).ReadView(ctx, args["projectId"].(string), args["viewId"].(string))
+	case "visualise_views_list":
+		project := args["projectId"].(string)
+		snapshot, err := store.New(s.db).ListViews(ctx, project)
+		if err != nil {
+			return nil, err
+		}
+		items := make([]keyed, 0, len(snapshot.Items))
+		for _, item := range snapshot.Items {
+			items = append(items, keyed{item.ViewID, item})
+		}
+		return s.page(args, cursor{Operation: name, Project: project, Snapshot: decimal(snapshot.ProjectPosition)}, counters(project, snapshot.ModelRevision, snapshot.ProjectPosition), items)
+
 	case "visualise_discover":
 		return map[string]any{"contractVersion": "2.0.0", "tools": Names(), "viewKinds": []string{"architecture"}, "limits": map[string]int{"maxOperations": 100, "maxPageSize": 200, "maxRequestBytes": 1048576, "maxStructuredResponseBytes": 1048576, "maxImageBytes": 4194304}}, nil
 	case "visualise_projects_list":

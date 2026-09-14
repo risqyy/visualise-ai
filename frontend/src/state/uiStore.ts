@@ -2,6 +2,7 @@ import { create } from 'zustand'
 import { createJSONStorage, persist } from 'zustand/middleware'
 
 import type { ComponentId, Identifier } from '@/api/types'
+import type { GraphOrientation } from '@/canvas/graphOrientation'
 
 /**
  * Local UI state — strictly separated from server state.
@@ -142,7 +143,33 @@ export interface PaneArrangement {
   rightCollapsed: boolean
 }
 
+export interface CanvasViewState {
+  orientationOverride: GraphOrientation | null
+  camera: CameraState
+  cameraInitialized: boolean
+  nodePositions: Record<ComponentId, { x: number; y: number }>
+  selectedComponentId: ComponentId | null
+  selectedRelationshipId: Identifier | null
+  expandedEdgeIds: string[]
+  collapsedComponentIds: string[] | null
+}
+
+/** JSON tuples keep opaque IDs (including separators) collision-free. */
+export function canvasViewKey(projectId: string, viewId: string | null): string {
+  return JSON.stringify([projectId, viewId])
+}
+function canvasViewState(state: UiState): CanvasViewState {
+  return { orientationOverride: state.orientationOverride, camera: state.camera, cameraInitialized: state.cameraInitialized, nodePositions: state.nodePositions, selectedComponentId: state.selectedComponentId, selectedRelationshipId: state.selectedRelationshipId, expandedEdgeIds: state.expandedEdgeIds, collapsedComponentIds: state.collapsedComponentIds }
+}
+
 export interface UiState {
+  orientationOverride: GraphOrientation | null
+  setCanvasOrientationOverride: (orientation: GraphOrientation | null) => void
+  activeCanvasViewKey: string | null
+  canvasViews: Record<string, CanvasViewState>
+  cameraInitialized: boolean
+  activateCanvasView: (projectId: string, viewId: string | null, collapsedDefaults?: string[]) => void
+
   // ---- persisted ---------------------------------------------------------
   layout: PaneLayout
   leftCollapsed: boolean
@@ -231,6 +258,10 @@ export interface UiState {
 }
 
 const transientDefaults = {
+  orientationOverride: null,
+  activeCanvasViewKey: null,
+  canvasViews: {},
+  cameraInitialized: false,
   camera: DEFAULT_CAMERA,
   nodePositions: {},
   selectedComponentId: null,
@@ -264,7 +295,19 @@ export const useUiStore = create<UiState>()(
       toggleLeftCollapsed: () => set((s) => ({ leftCollapsed: !s.leftCollapsed })),
       toggleRightCollapsed: () => set((s) => ({ rightCollapsed: !s.rightCollapsed })),
 
-      setCamera: (camera) => set({ camera }),
+      setCanvasOrientationOverride: (orientationOverride) => set({ orientationOverride }),
+      activateCanvasView: (projectId, viewId, collapsedDefaults) => set((state) => {
+        const key = canvasViewKey(projectId, viewId)
+        if (state.activeCanvasViewKey === key) return state.collapsedComponentIds === null && collapsedDefaults !== undefined ? { collapsedComponentIds: collapsedDefaults } : {}
+        const canvasViews = { ...state.canvasViews }
+        if (state.activeCanvasViewKey !== null) canvasViews[state.activeCanvasViewKey] = canvasViewState(state)
+        const remembered = canvasViews[key]
+        const next = remembered ?? (state.activeCanvasViewKey === null && viewId === null ? canvasViewState(state) : {
+          orientationOverride: null, camera: DEFAULT_CAMERA, cameraInitialized: false, nodePositions: {}, selectedComponentId: null, selectedRelationshipId: null, expandedEdgeIds: [], collapsedComponentIds: collapsedDefaults ?? null,
+        })
+        return { ...next, activeCanvasViewKey: key, canvasViews, hoveredComponentId: null }
+      }),
+      setCamera: (camera) => set({ camera, cameraInitialized: true }),
       resetCamera: () => set({ camera: DEFAULT_CAMERA }),
       setNodePosition: (componentId, position) =>
         set((s) => ({ nodePositions: { ...s.nodePositions, [componentId]: position } })),

@@ -6,7 +6,7 @@ import { useTranslation } from 'react-i18next'
 
 import type { Relationship } from '@/api/types'
 import { cn } from '@/lib/utils'
-import { useUiStore } from '@/state/uiStore'
+import { useCanvasEdgeActions } from './CanvasEdgeActionsContext'
 import { WORK_STATE_BY_ID } from '@/state/workStates'
 
 import { ChangeOverlayMark } from './ChangeOverlayMark'
@@ -333,10 +333,7 @@ export const RelationshipEdge = memo(function RelationshipEdge({
     return edgeZ + Math.max(sourceZ, targetZ) + 1
   })
   const level = useDetailLevel()
-  const expandedEdgeIds = useUiStore((state) => state.expandedEdgeIds)
-  const toggleEdgeExpanded = useUiStore((state) => state.toggleEdgeExpanded)
-  const storedSelectedRelationshipId = useUiStore((state) => state.selectedRelationshipId)
-  const setSelectedRelationshipId = useUiStore((state) => state.setSelectedRelationshipId)
+  const { expandedEdgeIds, toggleEdgeExpanded, selectedRelationshipId: storedSelectedRelationshipId, setSelectedRelationshipId } = useCanvasEdgeActions()
 
   if (!data) return null
 

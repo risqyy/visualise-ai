@@ -779,6 +779,57 @@ paths:
                     detail: The event store is not reachable.
                     code: not_ready
 
+  /api/v1/projects/{projectId}/views:
+    get:
+      operationId: listViews
+      summary: List saved native architecture views
+      description: Pages contain shared-model view summaries and bind projectPosition; restart on stale_cursor.
+      tags: [Read models]
+      parameters:
+        - $ref: '#/components/parameters/ProjectIdPath'
+        - name: limit
+          in: query
+          schema: { type: integer, minimum: 1, maximum: 200, default: 50 }
+        - name: cursor
+          in: query
+          schema: { type: string, maxLength: 2048 }
+      responses:
+        '200':
+          description: One consistent page of saved views.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/MV_ViewsListResult' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '404': { $ref: '#/components/responses/ProjectNotFound' }
+        '409':
+          description: The cursor snapshot changed; restart pagination.
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/Problem' }
+  /api/v1/projects/{projectId}/view:
+    get:
+      operationId: getView
+      summary: Read a saved native architecture view
+      description: References are resolved against one model snapshot; missing and boundary references remain explicit diagnostics.
+      tags: [Read models]
+      parameters:
+        - $ref: '#/components/parameters/ProjectIdPath'
+        - name: viewId
+          in: query
+          required: true
+          schema: { $ref: '#/components/schemas/Identifier' }
+      responses:
+        '200':
+          description: The saved definition and current reference diagnostics.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/MV_ViewGetResult' }
+        '404':
+          description: The project or view does not exist, or the view was removed.
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/Problem' }
+
 components:
 
   parameters:
@@ -1210,6 +1261,8 @@ components:
         - retraction.issued
         - run.finished
         - model.mutation_applied
+        - view.removed
+        - view.saved
         - work.scope_reported
         - work.reported
         - context.opened
@@ -2219,6 +2272,8 @@ components:
         - $ref: '#/components/schemas/RetractionIssuedEvent'
         - $ref: '#/components/schemas/RunFinishedEvent'
         - $ref: '#/components/schemas/ModelMutationAppliedEvent'
+        - $ref: '#/components/schemas/ViewRemovedEvent'
+        - $ref: '#/components/schemas/ViewSavedEvent'
         - $ref: '#/components/schemas/WorkScopeReportedEvent'
         - $ref: '#/components/schemas/WorkReportedEvent'
         - $ref: '#/components/schemas/ContextOpenedEvent'
@@ -2246,6 +2301,8 @@ components:
           retraction.issued: '#/components/schemas/RetractionIssuedEvent'
           run.finished: '#/components/schemas/RunFinishedEvent'
           model.mutation_applied: '#/components/schemas/ModelMutationAppliedEvent'
+          view.removed: '#/components/schemas/ViewRemovedEvent'
+          view.saved: '#/components/schemas/ViewSavedEvent'
           work.scope_reported: '#/components/schemas/WorkScopeReportedEvent'
           work.reported: '#/components/schemas/WorkReportedEvent'
           context.opened: '#/components/schemas/ContextOpenedEvent'
@@ -2585,6 +2642,8 @@ components:
         - $ref: '#/components/schemas/StreamedRetractionIssuedEvent'
         - $ref: '#/components/schemas/StreamedRunFinishedEvent'
         - $ref: '#/components/schemas/StreamedModelMutationAppliedEvent'
+        - $ref: '#/components/schemas/StreamedViewRemovedEvent'
+        - $ref: '#/components/schemas/StreamedViewSavedEvent'
         - $ref: '#/components/schemas/StreamedWorkScopeReportedEvent'
         - $ref: '#/components/schemas/StreamedWorkReportedEvent'
         - $ref: '#/components/schemas/StreamedContextOpenedEvent'
@@ -2612,6 +2671,8 @@ components:
           retraction.issued: '#/components/schemas/StreamedRetractionIssuedEvent'
           run.finished: '#/components/schemas/StreamedRunFinishedEvent'
           model.mutation_applied: '#/components/schemas/StreamedModelMutationAppliedEvent'
+          view.removed: '#/components/schemas/StreamedViewRemovedEvent'
+          view.saved: '#/components/schemas/StreamedViewSavedEvent'
           work.scope_reported: '#/components/schemas/StreamedWorkScopeReportedEvent'
           work.reported: '#/components/schemas/StreamedWorkReportedEvent'
           context.opened: '#/components/schemas/StreamedContextOpenedEvent'
@@ -2672,6 +2733,10 @@ components:
           minItems: 1
           items:
             $ref: '#/components/schemas/ValidationError'
+        currentViewRevision:
+          type: integer
+          minimum: 0
+          maximum: 9007199254740991
         currentModelRevision:
           type: integer
           minimum: 0
@@ -2748,6 +2813,10 @@ components:
         RFC 9457 problem extended with structured field errors. Returned for `400` responses
         with codes `invalid_field`, `unsupported_event_type` or `unsupported_schema_version`.
       properties:
+        currentViewRevision:
+          type: integer
+          minimum: 0
+          maximum: 9007199254740991
         currentModelRevision:
           type: integer
           minimum: 0
@@ -5621,6 +5690,208 @@ components:
           properties:
             scope:
               $ref: "#/components/schemas/MV_Scope"
+        position:
+          type: integer
+          minimum: 1
+        serverEventId:
+          $ref: "#/components/schemas/Uuid"
+        receivedAt:
+          $ref: "#/components/schemas/Timestamp"
+    ViewSavedEvent:
+      description: view.saved command, generated from contract 2.0.0.
+      type: object
+      required:
+        - schemaVersion
+        - clientEventId
+        - projectId
+        - runId
+        - agentId
+        - parentAgentId
+        - occurredAt
+        - type
+        - payload
+      additionalProperties: false
+      properties:
+        schemaVersion:
+          const: "2.0"
+        clientEventId:
+          $ref: "#/components/schemas/MV_Uuid"
+        projectId:
+          $ref: "#/components/schemas/MV_ProjectId"
+        runId:
+          $ref: "#/components/schemas/MV_RunId"
+        agentId:
+          $ref: "#/components/schemas/MV_AgentId"
+        parentAgentId:
+          oneOf:
+            - $ref: "#/components/schemas/MV_AgentId"
+            - type: "null"
+        occurredAt:
+          $ref: "#/components/schemas/MV_Timestamp"
+        type:
+          const: view.saved
+        payload:
+          type: object
+          required:
+            - expectedModelRevision
+            - expectedViewRevision
+            - view
+          additionalProperties: false
+          properties:
+            expectedModelRevision:
+              $ref: "#/components/schemas/MV_Revision"
+            expectedViewRevision:
+              $ref: "#/components/schemas/MV_Revision"
+            view:
+              $ref: "#/components/schemas/MV_View"
+    StreamedViewSavedEvent:
+      description: view.saved command, generated from contract 2.0.0.
+      type: object
+      required:
+        - schemaVersion
+        - clientEventId
+        - projectId
+        - runId
+        - agentId
+        - parentAgentId
+        - occurredAt
+        - type
+        - payload
+        - position
+        - serverEventId
+        - receivedAt
+      additionalProperties: false
+      properties:
+        schemaVersion:
+          const: "2.0"
+        clientEventId:
+          $ref: "#/components/schemas/MV_Uuid"
+        projectId:
+          $ref: "#/components/schemas/MV_ProjectId"
+        runId:
+          $ref: "#/components/schemas/MV_RunId"
+        agentId:
+          $ref: "#/components/schemas/MV_AgentId"
+        parentAgentId:
+          oneOf:
+            - $ref: "#/components/schemas/MV_AgentId"
+            - type: "null"
+        occurredAt:
+          $ref: "#/components/schemas/MV_Timestamp"
+        type:
+          const: view.saved
+        payload:
+          type: object
+          required:
+            - expectedModelRevision
+            - expectedViewRevision
+            - view
+          additionalProperties: false
+          properties:
+            expectedModelRevision:
+              $ref: "#/components/schemas/MV_Revision"
+            expectedViewRevision:
+              $ref: "#/components/schemas/MV_Revision"
+            view:
+              $ref: "#/components/schemas/MV_View"
+        position:
+          type: integer
+          minimum: 1
+        serverEventId:
+          $ref: "#/components/schemas/Uuid"
+        receivedAt:
+          $ref: "#/components/schemas/Timestamp"
+    ViewRemovedEvent:
+      description: view.removed command, generated from contract 2.0.0.
+      type: object
+      required:
+        - schemaVersion
+        - clientEventId
+        - projectId
+        - runId
+        - agentId
+        - parentAgentId
+        - occurredAt
+        - type
+        - payload
+      additionalProperties: false
+      properties:
+        schemaVersion:
+          const: "2.0"
+        clientEventId:
+          $ref: "#/components/schemas/MV_Uuid"
+        projectId:
+          $ref: "#/components/schemas/MV_ProjectId"
+        runId:
+          $ref: "#/components/schemas/MV_RunId"
+        agentId:
+          $ref: "#/components/schemas/MV_AgentId"
+        parentAgentId:
+          oneOf:
+            - $ref: "#/components/schemas/MV_AgentId"
+            - type: "null"
+        occurredAt:
+          $ref: "#/components/schemas/MV_Timestamp"
+        type:
+          const: view.removed
+        payload:
+          type: object
+          required:
+            - expectedViewRevision
+            - viewId
+          additionalProperties: false
+          properties:
+            expectedViewRevision:
+              $ref: "#/components/schemas/MV_Revision"
+            viewId:
+              $ref: "#/components/schemas/MV_Identifier"
+    StreamedViewRemovedEvent:
+      description: view.removed command, generated from contract 2.0.0.
+      type: object
+      required:
+        - schemaVersion
+        - clientEventId
+        - projectId
+        - runId
+        - agentId
+        - parentAgentId
+        - occurredAt
+        - type
+        - payload
+        - position
+        - serverEventId
+        - receivedAt
+      additionalProperties: false
+      properties:
+        schemaVersion:
+          const: "2.0"
+        clientEventId:
+          $ref: "#/components/schemas/MV_Uuid"
+        projectId:
+          $ref: "#/components/schemas/MV_ProjectId"
+        runId:
+          $ref: "#/components/schemas/MV_RunId"
+        agentId:
+          $ref: "#/components/schemas/MV_AgentId"
+        parentAgentId:
+          oneOf:
+            - $ref: "#/components/schemas/MV_AgentId"
+            - type: "null"
+        occurredAt:
+          $ref: "#/components/schemas/MV_Timestamp"
+        type:
+          const: view.removed
+        payload:
+          type: object
+          required:
+            - expectedViewRevision
+            - viewId
+          additionalProperties: false
+          properties:
+            expectedViewRevision:
+              $ref: "#/components/schemas/MV_Revision"
+            viewId:
+              $ref: "#/components/schemas/MV_Identifier"
         position:
           type: integer
           minimum: 1

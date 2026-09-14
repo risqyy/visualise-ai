@@ -1,5 +1,5 @@
 import { getRouteApi } from '@tanstack/react-router'
-import { useCallback, useEffect } from 'react'
+import { useCallback, useEffect, useLayoutEffect } from 'react'
 
 import { useProject } from '@/api/queries'
 import { useLiveStream } from '@/api/useLiveStream'
@@ -8,10 +8,9 @@ import { InspectorPane } from '@/components/workspace/InspectorPane'
 import { RunAgentPane } from '@/components/workspace/RunAgentPane'
 import { WorkspaceHeader } from '@/components/workspace/WorkspaceHeader'
 import { WorkspaceLayout } from '@/components/workspace/WorkspaceLayout'
-import { useUiStore } from '@/state/uiStore'
+import { canvasViewKey, useUiStore } from '@/state/uiStore'
 import type { DeepFocusTarget } from '@/routes/searchParams'
 import {
-  DEFAULT_GRAPH_ORIENTATION,
   type GraphOrientation,
 } from '@/canvas/graphOrientation'
 
@@ -41,18 +40,28 @@ export function WorkspacePage() {
   const enterDeepFocus = useUiStore((state) => state.enterDeepFocus)
   const exitDeepFocus = useUiStore((state) => state.exitDeepFocus)
 
+  // Save the departing view before passive URL mirroring overwrites selection
+  // or orientation, including when the next definition is still loading.
+  useLayoutEffect(() => {
+    useUiStore.getState().activateCanvasView(projectId, search.view ?? null)
+  }, [projectId, search.view])
+
   // URL -> UI store. The canvas (#9) and the inspector (#12) read the selection
   // from the store; the URL stays authoritative.
   useEffect(() => {
     setSelectedComponentId(search.component ?? null)
-  }, [search.component, setSelectedComponentId])
+  }, [projectId, search.view, search.component, setSelectedComponentId])
 
   // Relationship selection follows the same URL -> local mirror as component
   // selection. The URL remains authoritative, so a reload and a click expose
   // the same inspector and canvas state.
   useEffect(() => {
     setSelectedRelationshipId(search.relationship ?? null)
-  }, [search.relationship, setSelectedRelationshipId])
+  }, [projectId, search.view, search.relationship, setSelectedRelationshipId])
+
+  useEffect(() => {
+    useUiStore.getState().setCanvasOrientationOverride(search.layout ?? null)
+  }, [projectId, search.view, search.layout])
 
   // URL -> deep-focus layout.
   useEffect(() => {
@@ -111,8 +120,14 @@ export function WorkspacePage() {
     [navigate],
   )
 
+  const setView = useCallback((viewId: string | undefined) => {
+    const remembered = useUiStore.getState().canvasViews[canvasViewKey(projectId, viewId ?? null)]
+    void navigate({ search: (previous) => ({ ...previous, view: viewId, layout: remembered?.orientationOverride ?? undefined, component: remembered?.selectedComponentId ?? undefined, relationship: remembered?.selectedRelationshipId ?? undefined }), replace: false })
+  }, [navigate, projectId])
+
   const setGraphOrientation = useCallback(
     (layout: GraphOrientation) => {
+      useUiStore.getState().setCanvasOrientationOverride(layout)
       void navigate({
         search: (previous) => ({ ...previous, layout }),
         replace: true,
@@ -140,10 +155,12 @@ export function WorkspacePage() {
           <ArchitecturePane
             projectId={projectId}
             runId={runId}
+            viewId={search.view}
+            onSelectView={setView}
             selectedComponentId={search.component}
             selectedRelationshipId={search.relationship}
             onSelectComponent={setSelectedComponent}
-            orientation={search.layout ?? DEFAULT_GRAPH_ORIENTATION}
+            orientation={search.layout}
             onOrientationChange={setGraphOrientation}
             onSelectRelationship={setSelectedRelationship}
           />

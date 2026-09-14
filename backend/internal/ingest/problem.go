@@ -13,6 +13,7 @@ import (
 // for a plain Problem and populated for a ValidationProblem, which the contract
 // defines as a Problem plus that array.
 type Problem struct {
+	CurrentViewRevision  *int64       `json:"currentViewRevision,omitempty"`
 	CurrentModelRevision *int64       `json:"currentModelRevision,omitempty"`
 	Type                 string       `json:"type"`
 	Title                string       `json:"title"`

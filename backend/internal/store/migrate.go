@@ -16,6 +16,7 @@ func Models() []any {
 		&Project{},
 		&ModelIdentity{},
 		&CommandReceipt{},
+		&ArchitectureView{},
 		&Run{},
 		&Agent{},
 		&AgentWorkScope{},

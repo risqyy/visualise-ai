@@ -81,6 +81,8 @@ func EventTypes() []string {
 		TypeContextOpened,
 		TypeWorkReported,
 		TypeWorkScopeReported,
+		TypeViewSaved,
+		TypeViewRemoved,
 	}
 }
 

@@ -156,3 +156,17 @@ isolation. `E2E_KEEP_STACK=1` retains the stack for inspection. Successful runs
 also retain screenshots of overlapping scopes and selected removal under their
 Playwright test output directory. `E2E_SKIP_COMPOSE=1` is only for a deliberately
 prepared stack, never evidence that a fresh full acceptance deployment passed.
+
+## Native architecture view acceptance (#82)
+
+`tests/16-native-views.spec.ts` creates an isolated project through the official
+MCP SDK and operates two saved views in Chromium against freshly built
+Compose/Nginx. It checks shared native identities, original history event IDs,
+work evidence, independent cameras/orientations and remembered selection,
+shared live renames, a live empty-scope roundtrip, boundary diagnostics, removal,
+and opaque view IDs through browser selection, deep links, query reads and reload.
+
+Run `npx playwright test 16-native-views.spec.ts` with the same isolated Compose
+settings described above. Successful runs retain `native-detail-view.png` and
+`native-complete-view.png` in the test output directory. Local camera state is
+session-only; reload assertions cover the URL view/selection and saved defaults.

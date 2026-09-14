@@ -157,11 +157,11 @@ func report(f *fixture, agent, action string, fields map[string]any) map[string]
 func TestFreshSDKWorkflowLifecycleReplayAndScopes(t *testing.T) {
 	f := setup(t)
 	discovery := f.call("visualise_discover", map[string]any{}, "")
-	if len(discovery["tools"].([]any)) != 9 {
+	if len(discovery["tools"].([]any)) != len(Names()) {
 		t.Fatal(discovery)
 	}
 	listing, err := f.session.ListTools(context.Background(), nil)
-	if err != nil || len(listing.Tools) != 9 {
+	if err != nil || len(listing.Tools) != len(Names()) {
 		t.Fatalf("tools %v %v", listing, err)
 	}
 	for _, tool := range listing.Tools {

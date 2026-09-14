@@ -46,6 +46,9 @@ export const queryKeys = {
   architecture: (projectId: ProjectId) =>
     [...queryKeys.project(projectId), 'architecture'] as const,
 
+  views: (projectId: ProjectId) => [...queryKeys.project(projectId), 'views'] as const,
+  view: (projectId: ProjectId, viewId: string) => [...queryKeys.views(projectId), 'definition', viewId] as const,
+
   /** Paged run list of a project. */
   runs: (projectId: ProjectId) =>
     [...queryKeys.project(projectId), 'runs'] as const,
