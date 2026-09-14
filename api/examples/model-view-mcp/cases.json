@@ -1,0 +1,1020 @@
+{
+  "note": "Independent structural examples, not a sequential event stream or executable state-machine test.",
+  "tools": [
+    {
+      "tool": "visualise_discover",
+      "input": {},
+      "result": {
+        "contractVersion": "2.0.0",
+        "tools": [
+          "visualise_discover",
+          "visualise_projects_list",
+          "visualise_model_read",
+          "visualise_element_get",
+          "visualise_context_read",
+          "visualise_context_open",
+          "visualise_work_report",
+          "visualise_work_scope_set",
+          "visualise_model_mutate",
+          "visualise_views_list",
+          "visualise_view_get",
+          "visualise_view_put",
+          "visualise_view_remove",
+          "visualise_view_render"
+        ],
+        "viewKinds": [
+          "architecture"
+        ],
+        "limits": {
+          "maxOperations": 100,
+          "maxPageSize": 200,
+          "maxRequestBytes": 1048576,
+          "maxStructuredResponseBytes": 1048576,
+          "maxImageBytes": 4194304
+        }
+      }
+    },
+    {
+      "tool": "visualise_projects_list",
+      "input": {
+        "contractVersion": "2.0.0",
+        "limit": 50
+      },
+      "result": {
+        "items": [
+          "shop-platform"
+        ],
+        "nextCursor": null
+      }
+    },
+    {
+      "tool": "visualise_model_read",
+      "input": {
+        "contractVersion": "2.0.0",
+        "projectId": "shop-platform",
+        "expectedModelRevision": 3,
+        "limit": 50
+      },
+      "result": {
+        "projectId": "shop-platform",
+        "modelRevision": 3,
+        "projectPosition": 12,
+        "items": [
+          {
+            "type": "component",
+            "value": {
+              "componentId": "orders-api",
+              "name": "Orders API",
+              "kind": "service",
+              "parentComponentId": null
+            }
+          },
+          {
+            "type": "relationship",
+            "value": {
+              "relationshipId": "stores-orders",
+              "sourceComponentId": "orders-api",
+              "targetComponentId": "orders-db",
+              "kind": "data"
+            }
+          }
+        ],
+        "nextCursor": "opaque-server-cursor",
+        "diagnostics": [],
+        "diagnosticOverflow": false
+      }
+    },
+    {
+      "tool": "visualise_element_get",
+      "input": {
+        "contractVersion": "2.0.0",
+        "projectId": "shop-platform",
+        "target": {
+          "type": "component",
+          "id": "orders-api"
+        }
+      },
+      "result": {
+        "projectId": "shop-platform",
+        "modelRevision": 3,
+        "projectPosition": 12,
+        "element": {
+          "type": "component",
+          "value": {
+            "componentId": "orders-api",
+            "name": "Orders API",
+            "kind": "service",
+            "parentComponentId": null
+          }
+        }
+      }
+    },
+    {
+      "tool": "visualise_context_read",
+      "input": {
+        "contractVersion": "2.0.0",
+        "projectId": "shop-platform",
+        "runId": "run-001",
+        "limit": 50
+      },
+      "result": {
+        "projectId": "shop-platform",
+        "modelRevision": 3,
+        "projectPosition": 12,
+        "runId": "run-001",
+        "isOpen": true,
+        "items": [
+          {
+            "agent": {
+              "agentId": "agent-root",
+              "runId": "run-001",
+              "parentAgentId": null,
+              "role": "orchestrator",
+              "displayName": "Architect",
+              "assignedTask": "Refine the model",
+              "status": "working",
+              "statusNote": "Updating architecture",
+              "progress": {
+                "percent": 50,
+                "scope": "own_task",
+                "basis": "reported_estimate"
+              },
+              "finishedOutcome": null,
+              "startedAt": "2026-09-14T10:00:00Z",
+              "lastEventAt": "2026-09-14T10:00:01Z",
+              "position": 12
+            },
+            "scope": {
+              "componentIds": [
+                "orders-api"
+              ],
+              "relationshipIds": []
+            },
+            "scopePosition": 11,
+            "missingReferences": {
+              "componentIds": [],
+              "relationshipIds": []
+            }
+          }
+        ],
+        "nextCursor": null
+      }
+    },
+    {
+      "tool": "visualise_context_open",
+      "input": {
+        "contractVersion": "2.0.0",
+        "projectId": "shop-platform",
+        "runId": "run-001",
+        "agentId": "agent-root",
+        "parentAgentId": null,
+        "clientEventId": "00000000-0000-4000-8000-000000000001",
+        "occurredAt": "2026-09-14T10:00:00Z",
+        "role": "orchestrator",
+        "displayName": "Architect",
+        "assignedTask": "Refine the native architecture model"
+      },
+      "result": {
+        "projectId": "shop-platform",
+        "modelRevision": 0,
+        "projectPosition": 1,
+        "clientEventId": "00000000-0000-4000-8000-000000000001",
+        "serverEventId": "00000000-0000-4000-8000-000000000099",
+        "receivedAt": "2026-09-14T10:00:01Z",
+        "duplicate": false,
+        "viewRevision": null,
+        "runId": "run-001",
+        "agentId": "agent-root",
+        "affected": {
+          "componentIds": [],
+          "relationshipIds": []
+        }
+      }
+    },
+    {
+      "tool": "visualise_work_report",
+      "input": {
+        "contractVersion": "2.0.0",
+        "projectId": "shop-platform",
+        "runId": "run-001",
+        "agentId": "agent-root",
+        "parentAgentId": null,
+        "clientEventId": "00000000-0000-4000-8000-000000000001",
+        "occurredAt": "2026-09-14T10:00:00Z",
+        "report": {
+          "action": "step_start",
+          "workStepId": "step-1",
+          "title": "Refine architecture",
+          "componentIds": []
+        }
+      },
+      "result": {
+        "projectId": "shop-platform",
+        "modelRevision": 3,
+        "projectPosition": 12,
+        "clientEventId": "00000000-0000-4000-8000-000000000001",
+        "serverEventId": "00000000-0000-4000-8000-000000000099",
+        "receivedAt": "2026-09-14T10:00:01Z",
+        "duplicate": false,
+        "viewRevision": null,
+        "runId": "run-001",
+        "agentId": "agent-root",
+        "affected": {
+          "componentIds": [],
+          "relationshipIds": []
+        }
+      }
+    },
+    {
+      "tool": "visualise_work_scope_set",
+      "input": {
+        "contractVersion": "2.0.0",
+        "projectId": "shop-platform",
+        "runId": "run-001",
+        "agentId": "agent-root",
+        "parentAgentId": null,
+        "clientEventId": "00000000-0000-4000-8000-000000000001",
+        "occurredAt": "2026-09-14T10:00:00Z",
+        "scope": {
+          "componentIds": [
+            "orders-api",
+            "orders-db"
+          ],
+          "relationshipIds": [
+            "stores-orders"
+          ]
+        }
+      },
+      "result": {
+        "projectId": "shop-platform",
+        "modelRevision": 3,
+        "projectPosition": 12,
+        "clientEventId": "00000000-0000-4000-8000-000000000001",
+        "serverEventId": "00000000-0000-4000-8000-000000000099",
+        "receivedAt": "2026-09-14T10:00:01Z",
+        "duplicate": false,
+        "viewRevision": null,
+        "runId": "run-001",
+        "agentId": "agent-root",
+        "affected": {
+          "componentIds": [
+            "orders-api",
+            "orders-db"
+          ],
+          "relationshipIds": [
+            "stores-orders"
+          ]
+        }
+      }
+    },
+    {
+      "tool": "visualise_model_mutate",
+      "input": {
+        "contractVersion": "2.0.0",
+        "projectId": "shop-platform",
+        "runId": "run-001",
+        "agentId": "agent-root",
+        "parentAgentId": null,
+        "clientEventId": "00000000-0000-4000-8000-000000000001",
+        "occurredAt": "2026-09-14T10:00:00Z",
+        "expectedModelRevision": 2,
+        "operations": [
+          {
+            "op": "component.update",
+            "componentId": "orders-api",
+            "set": {
+              "name": "Order service",
+              "description": null
+            }
+          }
+        ]
+      },
+      "result": {
+        "projectId": "shop-platform",
+        "modelRevision": 3,
+        "projectPosition": 12,
+        "clientEventId": "00000000-0000-4000-8000-000000000001",
+        "serverEventId": "00000000-0000-4000-8000-000000000099",
+        "receivedAt": "2026-09-14T10:00:01Z",
+        "duplicate": false,
+        "viewRevision": null,
+        "runId": "run-001",
+        "agentId": "agent-root",
+        "affected": {
+          "componentIds": [
+            "orders-api"
+          ],
+          "relationshipIds": []
+        }
+      }
+    },
+    {
+      "tool": "visualise_views_list",
+      "input": {
+        "contractVersion": "2.0.0",
+        "projectId": "shop-platform",
+        "limit": 50
+      },
+      "result": {
+        "projectId": "shop-platform",
+        "modelRevision": 3,
+        "projectPosition": 12,
+        "items": [
+          {
+            "viewId": "orders-view",
+            "name": "Orders",
+            "kind": "architecture",
+            "viewRevision": 1
+          }
+        ],
+        "nextCursor": null
+      }
+    },
+    {
+      "tool": "visualise_view_get",
+      "input": {
+        "contractVersion": "2.0.0",
+        "projectId": "shop-platform",
+        "viewId": "orders-view"
+      },
+      "result": {
+        "projectId": "shop-platform",
+        "modelRevision": 3,
+        "projectPosition": 12,
+        "view": {
+          "viewId": "orders-view",
+          "name": "Orders",
+          "kind": "architecture",
+          "selection": {
+            "mode": "explicit",
+            "scope": {
+              "componentIds": [
+                "orders-api",
+                "orders-db"
+              ],
+              "relationshipIds": [
+                "stores-orders"
+              ]
+            }
+          },
+          "orientation": "top-down",
+          "collapsedComponentIds": []
+        },
+        "viewRevision": 1,
+        "missingReferences": {
+          "componentIds": [],
+          "relationshipIds": []
+        },
+        "boundaryRelationshipIds": []
+      }
+    },
+    {
+      "tool": "visualise_view_put",
+      "input": {
+        "contractVersion": "2.0.0",
+        "projectId": "shop-platform",
+        "runId": "run-001",
+        "agentId": "agent-root",
+        "parentAgentId": null,
+        "clientEventId": "00000000-0000-4000-8000-000000000001",
+        "occurredAt": "2026-09-14T10:00:00Z",
+        "expectedModelRevision": 3,
+        "expectedViewRevision": 0,
+        "view": {
+          "viewId": "orders-view",
+          "name": "Orders",
+          "kind": "architecture",
+          "selection": {
+            "mode": "explicit",
+            "scope": {
+              "componentIds": [
+                "orders-api",
+                "orders-db"
+              ],
+              "relationshipIds": [
+                "stores-orders"
+              ]
+            }
+          },
+          "orientation": "top-down",
+          "collapsedComponentIds": []
+        }
+      },
+      "result": {
+        "projectId": "shop-platform",
+        "modelRevision": 3,
+        "projectPosition": 12,
+        "clientEventId": "00000000-0000-4000-8000-000000000001",
+        "serverEventId": "00000000-0000-4000-8000-000000000099",
+        "receivedAt": "2026-09-14T10:00:01Z",
+        "duplicate": false,
+        "viewRevision": 1,
+        "runId": "run-001",
+        "agentId": "agent-root",
+        "affected": {
+          "componentIds": [],
+          "relationshipIds": []
+        }
+      }
+    },
+    {
+      "tool": "visualise_view_remove",
+      "input": {
+        "contractVersion": "2.0.0",
+        "projectId": "shop-platform",
+        "runId": "run-001",
+        "agentId": "agent-root",
+        "parentAgentId": null,
+        "clientEventId": "00000000-0000-4000-8000-000000000001",
+        "occurredAt": "2026-09-14T10:00:00Z",
+        "expectedViewRevision": 1,
+        "viewId": "orders-view"
+      },
+      "result": {
+        "projectId": "shop-platform",
+        "modelRevision": 3,
+        "projectPosition": 12,
+        "clientEventId": "00000000-0000-4000-8000-000000000001",
+        "serverEventId": "00000000-0000-4000-8000-000000000099",
+        "receivedAt": "2026-09-14T10:00:01Z",
+        "duplicate": false,
+        "viewRevision": 2,
+        "runId": "run-001",
+        "agentId": "agent-root",
+        "affected": {
+          "componentIds": [],
+          "relationshipIds": []
+        }
+      }
+    },
+    {
+      "tool": "visualise_view_render",
+      "input": {
+        "contractVersion": "2.0.0",
+        "projectId": "shop-platform",
+        "viewId": "orders-view",
+        "expectedModelRevision": 3,
+        "expectedViewRevision": 1,
+        "viewport": {
+          "width": 1280,
+          "height": 720,
+          "pixelRatio": 1
+        },
+        "detailLevel": "standard"
+      },
+      "result": {
+        "projectId": "shop-platform",
+        "modelRevision": 3,
+        "projectPosition": 12,
+        "viewId": "orders-view",
+        "viewRevision": 1,
+        "renderedAt": "2026-09-14T10:00:02Z",
+        "viewport": {
+          "width": 1280,
+          "height": 720,
+          "pixelRatio": 1
+        },
+        "detailLevel": "standard",
+        "mimeType": "image/png",
+        "byteLength": 24576,
+        "missingReferences": {
+          "componentIds": [],
+          "relationshipIds": []
+        },
+        "boundaryRelationshipIds": [],
+        "visibleIds": {
+          "componentIds": [
+            "orders-api",
+            "orders-db"
+          ],
+          "relationshipIds": [
+            "stores-orders"
+          ]
+        },
+        "clipped": false
+      }
+    }
+  ],
+  "operations": [
+    {
+      "op": "component.add",
+      "component": {
+        "componentId": "orders-api",
+        "name": "Orders API",
+        "kind": "service",
+        "parentComponentId": null
+      }
+    },
+    {
+      "op": "component.update",
+      "componentId": "orders-api",
+      "set": {
+        "name": "Order service",
+        "description": null
+      }
+    },
+    {
+      "op": "component.remove",
+      "componentId": "orders-api"
+    },
+    {
+      "op": "relationship.add",
+      "relationship": {
+        "relationshipId": "stores-orders",
+        "sourceComponentId": "orders-api",
+        "targetComponentId": "orders-db",
+        "kind": "data"
+      }
+    },
+    {
+      "op": "relationship.update",
+      "relationshipId": "stores-orders",
+      "set": {
+        "label": "Persists orders",
+        "channel": null
+      }
+    },
+    {
+      "op": "relationship.remove",
+      "relationshipId": "stores-orders"
+    }
+  ],
+  "reports": [
+    {
+      "action": "step_start",
+      "workStepId": "step-1",
+      "title": "Refine architecture",
+      "componentIds": []
+    },
+    {
+      "action": "step_complete",
+      "workStepId": "step-1",
+      "summary": "Model updated"
+    },
+    {
+      "action": "status",
+      "status": "working",
+      "note": "Updating the model"
+    },
+    {
+      "action": "progress",
+      "percent": 50,
+      "scope": "own_task",
+      "basis": "reported_estimate"
+    },
+    {
+      "action": "agent_finish",
+      "outcome": "completed",
+      "summary": "Model task done"
+    },
+    {
+      "action": "run_finish",
+      "outcome": "completed",
+      "summary": "Run done"
+    }
+  ],
+  "invalid": [
+    {
+      "reason": "CAS is required",
+      "schema": "#/$defs/ModelMutateInput",
+      "value": {
+        "contractVersion": "2.0.0",
+        "projectId": "shop-platform",
+        "runId": "run-001",
+        "agentId": "agent-root",
+        "parentAgentId": null,
+        "clientEventId": "00000000-0000-4000-8000-000000000001",
+        "occurredAt": "2026-09-14T10:00:00Z",
+        "operations": [
+          {
+            "op": "component.update",
+            "componentId": "orders-api",
+            "set": {
+              "name": "Order service",
+              "description": null
+            }
+          }
+        ]
+      }
+    },
+    {
+      "reason": "stream cursor is not model revision",
+      "schema": "#/$defs/ModelMutateInput",
+      "value": {
+        "contractVersion": "2.0.0",
+        "projectId": "shop-platform",
+        "runId": "run-001",
+        "agentId": "agent-root",
+        "parentAgentId": null,
+        "clientEventId": "00000000-0000-4000-8000-000000000001",
+        "occurredAt": "2026-09-14T10:00:00Z",
+        "projectPosition": 2,
+        "operations": [
+          {
+            "op": "component.update",
+            "componentId": "orders-api",
+            "set": {
+              "name": "Order service",
+              "description": null
+            }
+          }
+        ]
+      }
+    },
+    {
+      "reason": "empty mutation batch",
+      "schema": "#/$defs/ModelMutateInput",
+      "value": {
+        "contractVersion": "2.0.0",
+        "projectId": "shop-platform",
+        "runId": "run-001",
+        "agentId": "agent-root",
+        "parentAgentId": null,
+        "clientEventId": "00000000-0000-4000-8000-000000000001",
+        "occurredAt": "2026-09-14T10:00:00Z",
+        "expectedModelRevision": 2,
+        "operations": []
+      }
+    },
+    {
+      "reason": "identity cannot be patched",
+      "schema": "#/$defs/Operation",
+      "value": {
+        "op": "component.update",
+        "componentId": "orders-api",
+        "set": {
+          "componentId": "renamed-api"
+        }
+      }
+    },
+    {
+      "reason": "empty patch",
+      "schema": "#/$defs/Operation",
+      "value": {
+        "op": "component.update",
+        "componentId": "orders-api",
+        "set": {}
+      }
+    },
+    {
+      "reason": "remove cannot contain a hidden cascade",
+      "schema": "#/$defs/Operation",
+      "value": {
+        "op": "component.remove",
+        "componentId": "orders-api",
+        "cascade": true
+      }
+    },
+    {
+      "reason": "unknown operation",
+      "schema": "#/$defs/Operation",
+      "value": {
+        "op": "component.upsert",
+        "component": {
+          "componentId": "orders-api",
+          "name": "Orders API",
+          "kind": "service",
+          "parentComponentId": null
+        }
+      }
+    },
+    {
+      "reason": "required name cannot be cleared",
+      "schema": "#/$defs/Operation",
+      "value": {
+        "op": "component.update",
+        "componentId": "orders-api",
+        "set": {
+          "name": null
+        }
+      }
+    },
+    {
+      "reason": "page limit is bounded",
+      "schema": "#/$defs/ModelReadInput",
+      "value": {
+        "contractVersion": "2.0.0",
+        "projectId": "shop-platform",
+        "limit": 201
+      }
+    },
+    {
+      "reason": "work scope IDs cannot duplicate",
+      "schema": "#/$defs/Scope",
+      "value": {
+        "componentIds": [
+          "orders-api",
+          "orders-api"
+        ],
+        "relationshipIds": []
+      }
+    },
+    {
+      "reason": "view is not an independent model",
+      "schema": "#/$defs/View",
+      "value": {
+        "viewId": "orders-view",
+        "name": "Orders",
+        "kind": "architecture",
+        "selection": {
+          "mode": "explicit",
+          "scope": {
+            "componentIds": [
+              "orders-api",
+              "orders-db"
+            ],
+            "relationshipIds": [
+              "stores-orders"
+            ]
+          }
+        },
+        "orientation": "top-down",
+        "collapsedComponentIds": [],
+        "components": [
+          {
+            "componentId": "orders-api",
+            "name": "Orders API",
+            "kind": "service",
+            "parentComponentId": null
+          }
+        ]
+      }
+    },
+    {
+      "reason": "unsupported view family",
+      "schema": "#/$defs/View",
+      "value": {
+        "viewId": "orders-view",
+        "name": "Orders",
+        "kind": "sequence",
+        "selection": {
+          "mode": "explicit",
+          "scope": {
+            "componentIds": [
+              "orders-api",
+              "orders-db"
+            ],
+            "relationshipIds": [
+              "stores-orders"
+            ]
+          }
+        },
+        "orientation": "top-down",
+        "collapsedComponentIds": []
+      }
+    },
+    {
+      "reason": "render requires exact view revision",
+      "schema": "#/$defs/ViewRenderInput",
+      "value": {
+        "contractVersion": "2.0.0",
+        "projectId": "shop-platform",
+        "viewId": "orders-view",
+        "expectedModelRevision": 3,
+        "viewport": {
+          "width": 1280,
+          "height": 720,
+          "pixelRatio": 1
+        },
+        "detailLevel": "standard"
+      }
+    },
+    {
+      "reason": "unbounded render viewport",
+      "schema": "#/$defs/Viewport",
+      "value": {
+        "width": 10000,
+        "height": 720,
+        "pixelRatio": 1
+      }
+    },
+    {
+      "reason": "render requires a detail level",
+      "schema": "#/$defs/ViewRenderInput",
+      "value": {
+        "contractVersion": "2.0.0",
+        "projectId": "shop-platform",
+        "viewId": "orders-view",
+        "expectedModelRevision": 3,
+        "expectedViewRevision": 1,
+        "viewport": {
+          "width": 1280,
+          "height": 720,
+          "pixelRatio": 1
+        }
+      }
+    },
+    {
+      "reason": "new writes require UTC timestamp",
+      "schema": "#/$defs/ModelMutateInput",
+      "value": {
+        "contractVersion": "2.0.0",
+        "projectId": "shop-platform",
+        "runId": "run-001",
+        "agentId": "agent-root",
+        "parentAgentId": null,
+        "clientEventId": "00000000-0000-4000-8000-000000000001",
+        "occurredAt": "2026-09-14T12:00:00+02:00",
+        "expectedModelRevision": 2,
+        "operations": [
+          {
+            "op": "component.update",
+            "componentId": "orders-api",
+            "set": {
+              "name": "Order service",
+              "description": null
+            }
+          }
+        ]
+      }
+    },
+    {
+      "reason": "work report is typed, not an event envelope",
+      "schema": "#/$defs/WorkReportInput",
+      "value": {
+        "contractVersion": "2.0.0",
+        "projectId": "shop-platform",
+        "runId": "run-001",
+        "agentId": "agent-root",
+        "parentAgentId": null,
+        "clientEventId": "00000000-0000-4000-8000-000000000001",
+        "occurredAt": "2026-09-14T10:00:00Z",
+        "event": {
+          "type": "agent.started"
+        }
+      }
+    },
+    {
+      "reason": "invalid work progress",
+      "schema": "#/$defs/WorkReport",
+      "value": {
+        "action": "progress",
+        "percent": 101,
+        "scope": "own_task",
+        "basis": "reported_estimate"
+      }
+    },
+    {
+      "reason": "unknown contract version",
+      "schema": "#/$defs/ProjectsListInput",
+      "value": {
+        "contractVersion": "3.0.0"
+      }
+    },
+    {
+      "reason": "added component metadata is bounded",
+      "schema": "#/$defs/Operation",
+      "value": {
+        "op": "component.add",
+        "component": {
+          "componentId": "orders-api",
+          "name": "Orders",
+          "kind": "service",
+          "parentComponentId": null,
+          "tags": [
+            "tag",
+            "tag",
+            "tag",
+            "tag",
+            "tag",
+            "tag",
+            "tag",
+            "tag",
+            "tag",
+            "tag",
+            "tag",
+            "tag",
+            "tag",
+            "tag",
+            "tag",
+            "tag",
+            "tag",
+            "tag",
+            "tag",
+            "tag",
+            "tag",
+            "tag",
+            "tag",
+            "tag",
+            "tag",
+            "tag",
+            "tag",
+            "tag",
+            "tag",
+            "tag",
+            "tag",
+            "tag",
+            "tag",
+            "tag",
+            "tag",
+            "tag",
+            "tag",
+            "tag",
+            "tag",
+            "tag",
+            "tag",
+            "tag",
+            "tag",
+            "tag",
+            "tag",
+            "tag",
+            "tag",
+            "tag",
+            "tag",
+            "tag",
+            "tag",
+            "tag",
+            "tag",
+            "tag",
+            "tag",
+            "tag",
+            "tag",
+            "tag",
+            "tag",
+            "tag",
+            "tag",
+            "tag",
+            "tag",
+            "tag",
+            "tag",
+            "tag",
+            "tag",
+            "tag",
+            "tag",
+            "tag",
+            "tag",
+            "tag",
+            "tag",
+            "tag",
+            "tag",
+            "tag",
+            "tag",
+            "tag",
+            "tag",
+            "tag",
+            "tag",
+            "tag",
+            "tag",
+            "tag",
+            "tag",
+            "tag",
+            "tag",
+            "tag",
+            "tag",
+            "tag",
+            "tag",
+            "tag",
+            "tag",
+            "tag",
+            "tag",
+            "tag",
+            "tag",
+            "tag",
+            "tag",
+            "tag",
+            "tag"
+          ]
+        }
+      }
+    }
+  ],
+  "errors": [
+    {
+      "code": "revision_conflict",
+      "message": "Expected model revision 2; current revision is 3.",
+      "fields": [
+        {
+          "pointer": "/expectedModelRevision",
+          "message": "Read revision 3 and reconcile before issuing a new command."
+        }
+      ],
+      "currentModelRevision": 3
+    },
+    {
+      "code": "client_event_id_conflict",
+      "message": "This key was accepted with a different reporter.",
+      "fields": [
+        {
+          "pointer": "/agentId",
+          "message": "The original command used agent-root."
+        }
+      ],
+      "existingProjectPosition": 12
+    },
+    {
+      "code": "reference_invalid",
+      "message": "Remove incident edges explicitly in the same batch.",
+      "fields": [
+        {
+          "pointer": "/operations/0/componentId",
+          "message": "orders-api is referenced by stores-orders."
+        }
+      ]
+    },
+    {
+      "code": "stale_cursor",
+      "message": "The context changed after the first page.",
+      "fields": []
+    }
+  ]
+}

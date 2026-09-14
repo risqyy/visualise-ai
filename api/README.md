@@ -1,5 +1,14 @@
 # Event contract
 
+The [prospective model/view/MCP contract](../docs/model-view-mcp-contract.md)
+for #76 is defined separately in `model-view-mcp.schema.yaml` and
+`model-view-mcp.tools.yaml`. It specifies the implementation target for #77–#83;
+those operations are not exposed by the existing server. `npm run
+validate:model-view` checks its tool request/result examples, future REST event
+mapping, closed schemas and rejection boundaries against the shared legacy
+OpenAPI descriptors. `npm test` includes this check. Runtime lifecycle,
+concurrency, reference and rendering guarantees require the later issues' tests.
+
 `openapi.yaml` is the single, versioned contract between the reporting agents, the Visualise
 AI cockpit and its UI. Everything the cockpit shows arrives through it; nothing is inferred.
 
