@@ -3,6 +3,7 @@ import { expect } from 'vitest'
 import type { i18n as I18n } from 'i18next'
 
 import type { Language } from '@/i18n'
+import { resetUiStore } from '@/state/uiStore'
 
 import { PROJECT_ID, RUN_ID, component, createFakeFetch } from './fixtures'
 import {
@@ -74,6 +75,9 @@ export interface WorkspaceSceneOptions {
  * languages, on whichever of the two happened to be measured first.
  */
 export async function renderWorkspaceScene(options: WorkspaceSceneOptions = {}) {
+  // Each locale is a fresh comparison scene. A previous locale render now
+  // correctly retains its per-view camera on remount, so reset that local state.
+  resetUiStore()
   const renderOptions: RenderAppOptions = {
     fetchImpl: workspaceSceneServer(),
     ...(options.i18n ? { i18n: options.i18n } : {}),

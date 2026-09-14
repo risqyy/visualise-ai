@@ -481,6 +481,8 @@ func TestEveryCatalogueTypeIsProjected(t *testing.T) {
 		{TypeContextOpened, `{"role":"subagent","displayName":"MCP worker","assignedTask":"Explicit work"}`},
 		{TypeWorkReported, `{"report":{"action":"status","status":"working"}}`},
 		{TypeWorkScopeReported, `{"scope":{"componentIds":[],"relationshipIds":[]}}`},
+		{TypeViewSaved, `{"expectedModelRevision":4,"expectedViewRevision":0,"view":{"viewId":"all-view","name":"All","kind":"architecture","selection":{"mode":"all"},"orientation":"top-down","collapsedComponentIds":[]}}`},
+		{TypeViewRemoved, `{"expectedViewRevision":1,"viewId":"all-view"}`},
 	} {
 		env := s.event("mcp-worker", subagent, command.kind, command.payload)
 		env.SchemaVersion = "2.0"
@@ -501,8 +503,8 @@ func TestEveryCatalogueTypeIsProjected(t *testing.T) {
 	}
 
 	catalogue := EventTypes()
-	if len(catalogue) != 24 {
-		t.Fatalf("the catalogue has %d types, want 24", len(catalogue))
+	if len(catalogue) != 26 {
+		t.Fatalf("the catalogue has %d types, want 26", len(catalogue))
 	}
 	for _, evType := range catalogue {
 		if !stored[evType] {

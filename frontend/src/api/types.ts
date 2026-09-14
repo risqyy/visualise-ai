@@ -109,6 +109,8 @@ export const EVENT_TYPES = [
   'context.opened',
   'work.reported',
   'work.scope_reported',
+  'view.saved',
+  'view.removed',
   'component.change_planned',
   'component.change_applied',
   'relationship.change_planned',
@@ -277,3 +279,9 @@ export function changeSnapshot(change: ActiveChange): Component | Relationship |
   if (typeof snapshot !== 'object' || snapshot === null) return null
   return snapshot as Component | Relationship
 }
+
+/** Native saved architecture view, generated from the frozen model/view contract. */
+export type SavedView = Schemas['MV_View']
+
+export type ViewListResponse = Schemas['MV_ViewsListResult']
+export type ViewResponse = Schemas['MV_ViewGetResult']

@@ -40,6 +40,8 @@ func (p *Projector) Apply(tx *gorm.DB, ev *Event) error {
 
 func (p *Projector) applyPayload(tx *gorm.DB, ev *Event, evType string, payload []byte, depth int) error {
 	switch evType {
+	case TypeViewSaved, TypeViewRemoved:
+		return applyViewCommand(tx, ev)
 	case TypeContextOpened, TypeWorkReported:
 		effective, err := EffectiveWork(Envelope{Type: evType, Payload: payload})
 		if err != nil {

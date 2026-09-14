@@ -136,6 +136,8 @@ export const EVENT_TYPE_LABEL_KEY: Record<EventType, InspectorKey> = {
   'context.opened': 'eventType.contextOpened',
   'work.reported': 'eventType.workReported',
   'work.scope_reported': 'eventType.workScopeReported',
+  'view.saved': 'eventType.viewSaved',
+  'view.removed': 'eventType.viewRemoved',
   'architecture.snapshot_published': 'eventType.architectureSnapshotPublished',
   'component.change_planned': 'eventType.componentChangePlanned',
   'component.change_applied': 'eventType.componentChangeApplied',

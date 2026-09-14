@@ -212,6 +212,11 @@ func (s *Store) AppendGuarded(ctx context.Context, env Envelope, guard Guard) (R
 			}
 		}
 
+		viewRevision, err := prepareViewWrite(tx, env, project)
+		if err != nil {
+			return err
+		}
+
 		before, modelWrite, err := prepareModelWrite(tx, env, project)
 		if err != nil {
 			return err
@@ -263,6 +268,7 @@ func (s *Store) AppendGuarded(ctx context.Context, env Envelope, guard Guard) (R
 		result.RunID = env.RunID
 		result.AgentID = env.AgentID
 		result.ModelRevision = project.ModelRevision
+		result.ViewRevision = viewRevision
 		result.Affected, err = workAffected(tx, env)
 		if err != nil {
 			return err

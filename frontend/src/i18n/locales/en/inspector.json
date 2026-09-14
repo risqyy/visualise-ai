@@ -76,7 +76,9 @@
     "workStepStarted": "Work step started",
     "contextOpened": "Work context opened",
     "workReported": "Work reported",
-    "workScopeReported": "Work scope reported"
+    "workScopeReported": "Work scope reported",
+    "viewSaved": "View saved",
+    "viewRemoved": "View removed"
   },
   "feedback": {
     "emptyDescription": "For this component no feedback.published was reported in this run.",

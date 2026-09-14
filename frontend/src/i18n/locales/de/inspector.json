@@ -76,7 +76,9 @@
     "workStepStarted": "Arbeitsschritt begonnen",
     "contextOpened": "Arbeitskontext eröffnet",
     "workReported": "Arbeit gemeldet",
-    "workScopeReported": "Arbeitsbereich gemeldet"
+    "workScopeReported": "Arbeitsbereich gemeldet",
+    "viewSaved": "Ansicht gespeichert",
+    "viewRemoved": "Ansicht entfernt"
   },
   "feedback": {
     "emptyDescription": "Für diese Komponente wurde in diesem Run kein feedback.published gemeldet.",

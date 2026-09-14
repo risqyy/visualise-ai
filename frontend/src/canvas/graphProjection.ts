@@ -260,8 +260,8 @@ export function diagnosticsCount(diagnostics: ProjectionDiagnostics): number {
 // ---------------------------------------------------------------------------
 
 export interface ArchitectureModel {
-  components: readonly AppliedComponent[]
-  relationships: readonly AppliedRelationship[]
+  components: readonly (AppliedComponent | Component)[]
+  relationships: readonly (AppliedRelationship | Relationship)[]
   /**
    * The live change overlay, if one was built. It never enters `components` or
    * `relationships`: proposals and ghosts become their **own** nodes and edges,

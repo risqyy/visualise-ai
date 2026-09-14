@@ -286,7 +286,7 @@ func (h *Handler) checkSchemaVersion(c *gin.Context, document map[string]any) bo
 	version, ok := document["schemaVersion"].(string)
 	eventType, _ := document["type"].(string)
 	accepted := h.contract.AcceptsSchemaVersion(version)
-	modern := eventType == store.TypeModelMutationApplied || eventType == store.TypeContextOpened || eventType == store.TypeWorkReported || eventType == store.TypeWorkScopeReported
+	modern := eventType == store.TypeModelMutationApplied || eventType == store.TypeContextOpened || eventType == store.TypeWorkReported || eventType == store.TypeWorkScopeReported || eventType == store.TypeViewSaved || eventType == store.TypeViewRemoved
 	if !modern && version != "1.0" {
 		accepted = false
 	}
@@ -445,6 +445,7 @@ func (h *Handler) writeAppendError(c *gin.Context, event acceptedEvent, err erro
 		}
 		problem := newProblem(status, domain.Code, domain.Detail)
 		problem.CurrentModelRevision = domain.CurrentModelRevision
+		problem.CurrentViewRevision = domain.CurrentViewRevision
 		problem.Errors = []FieldError{{Field: domain.Field, Code: domain.Code, Message: domain.Detail}}
 		respond(c, status, problem)
 		return

@@ -350,46 +350,54 @@ type ModelSnapshot struct {
 }
 
 func (s *Store) ReadModel(ctx context.Context, projectID string) (ModelSnapshot, error) {
-	result := ModelSnapshot{ProjectID: projectID, Components: []componentDescriptor{}, Relationships: []relationshipDescriptor{}}
+	var result ModelSnapshot
 	err := s.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
-		var p Project
-		if err := tx.Where("project_id = ?", projectID).Take(&p).Error; err != nil {
-			if err == gorm.ErrRecordNotFound {
-				return domainError("project_not_found", "/projectId", "project %q does not exist", projectID)
-			}
-			return err
-		}
-		g, err := loadGraph(tx, projectID)
-		if err != nil {
-			return err
-		}
-		result.ModelRevision = p.ModelRevision
-		result.ProjectPosition = p.LastPosition
-		for _, c := range g.components {
-			result.Components = append(result.Components, c)
-		}
-		for _, r := range g.relationships {
-			result.Relationships = append(result.Relationships, r)
-		}
-		sort.Slice(result.Components, func(i, j int) bool { return result.Components[i].ComponentID < result.Components[j].ComponentID })
-		sort.Slice(result.Relationships, func(i, j int) bool {
-			return result.Relationships[i].RelationshipID < result.Relationships[j].RelationshipID
-		})
-		result.Diagnostics = graphDiagnostics(g)
-		var reused []ModelIdentity
-		if err := tx.Where("project_id = ? AND historical_reuse", projectID).Order("kind, id").Find(&reused).Error; err != nil {
-			return err
-		}
-		for _, id := range reused {
-			result.Diagnostics = append(result.Diagnostics, ModelDiagnostic{"historical_id_reuse", ModelTarget{id.Kind, id.ID}, "historical materialization reused a retired identity"})
-		}
-		if len(result.Diagnostics) > 200 {
-			result.DiagnosticOverflow = true
-			result.Diagnostics = result.Diagnostics[:200]
-		}
-		return nil
+		var err error
+		result, err = readModelSnapshot(tx, projectID)
+		return err
 	}, &sql.TxOptions{Isolation: sql.LevelRepeatableRead, ReadOnly: true})
 	return result, err
+}
+
+// readModelSnapshot never opens a transaction: callers supply their snapshot.
+func readModelSnapshot(tx *gorm.DB, projectID string) (ModelSnapshot, error) {
+	result := ModelSnapshot{ProjectID: projectID, Components: []componentDescriptor{}, Relationships: []relationshipDescriptor{}}
+	var p Project
+	if err := tx.Where("project_id = ?", projectID).Take(&p).Error; err != nil {
+		if err == gorm.ErrRecordNotFound {
+			return result, domainError("project_not_found", "/projectId", "project %q does not exist", projectID)
+		}
+		return result, err
+	}
+	g, err := loadGraph(tx, projectID)
+	if err != nil {
+		return result, err
+	}
+	result.ModelRevision = p.ModelRevision
+	result.ProjectPosition = p.LastPosition
+	for _, c := range g.components {
+		result.Components = append(result.Components, c)
+	}
+	for _, r := range g.relationships {
+		result.Relationships = append(result.Relationships, r)
+	}
+	sort.Slice(result.Components, func(i, j int) bool { return result.Components[i].ComponentID < result.Components[j].ComponentID })
+	sort.Slice(result.Relationships, func(i, j int) bool {
+		return result.Relationships[i].RelationshipID < result.Relationships[j].RelationshipID
+	})
+	result.Diagnostics = graphDiagnostics(g)
+	var reused []ModelIdentity
+	if err := tx.Where("project_id = ? AND historical_reuse", projectID).Order("kind, id").Find(&reused).Error; err != nil {
+		return result, err
+	}
+	for _, id := range reused {
+		result.Diagnostics = append(result.Diagnostics, ModelDiagnostic{"historical_id_reuse", ModelTarget{id.Kind, id.ID}, "historical materialization reused a retired identity"})
+	}
+	if len(result.Diagnostics) > 200 {
+		result.DiagnosticOverflow = true
+		result.Diagnostics = result.Diagnostics[:200]
+	}
+	return result, nil
 }
 
 // UnmarshalJSON accepts every exact JSON Schema integer spelling while leaving

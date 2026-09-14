@@ -14,6 +14,7 @@ type DomainError struct {
 	Detail               string `json:"message"`
 	Field                string `json:"-"`
 	CurrentModelRevision *int64 `json:"currentModelRevision,omitempty"`
+	CurrentViewRevision  *int64 `json:"currentViewRevision,omitempty"`
 }
 
 func (e *DomainError) Error() string { return e.Code + ": " + e.Detail }

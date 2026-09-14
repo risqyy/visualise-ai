@@ -56,6 +56,7 @@ describe('affectedQueryKeys', () => {
       queryKeys.architecture(PROJECT_ID),
       queryKeys.components(PROJECT_ID),
       queryKeys.runScope(PROJECT_ID),
+      queryKeys.views(PROJECT_ID),
     ])
   })
 
@@ -68,7 +69,19 @@ describe('affectedQueryKeys', () => {
     expect(affectedQueryKeys(event)).toEqual([
       queryKeys.architecture(PROJECT_ID),
       queryKeys.component(PROJECT_ID, COMPONENT_A),
+      queryKeys.views(PROJECT_ID),
     ])
+  })
+
+  it('refreshes saved-view diagnostics for legacy relationship writes and effective corrections', () => {
+    const payload = { operation: 'modify' as const, relationship: { relationshipId: 'edge-1', sourceComponentId: COMPONENT_A, targetComponentId: COMPONENT_B, kind: 'dependency' as const } }
+    const direct = streamedEvent('relationship.change_applied', payload)
+    const corrected = streamedEvent('correction.issued', {
+      correctsClientEventId: '3f2504e0-4f89-41d3-9a0c-0305e82c3301', reason: 'correct endpoint',
+      correctedType: 'relationship.change_applied', correctedPayload: payload,
+    })
+    expect(affectedQueryKeys(direct)).toContainEqual(queryKeys.views(PROJECT_ID))
+    expect(affectedQueryKeys(corrected)).toEqual(affectedQueryKeys(direct))
   })
 
   it('maps agent progress to the agent tree of that run only', () => {

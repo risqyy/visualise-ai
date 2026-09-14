@@ -5,7 +5,7 @@
  * (openapi-typescript). Edit the contract, then regenerate.
  *
  * authority: api/openapi.yaml
- * sha256:    6d7e3f27e953ccc31dd2cf4d5ff4d99e576c6b5cb2186c9345ef64f48fb61b84
+ * sha256:    41dbd8561aea9b4b7bb9dcddbb4952351780aff9964eb3fae66fe9a34f44fcd7
  *
  * `npm run check:contract` — also run by the Vitest suite — fails when this
  * file no longer matches the authority above.
@@ -405,6 +405,46 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/projects/{projectId}/views": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List saved native architecture views
+         * @description Pages contain shared-model view summaries and bind projectPosition; restart on stale_cursor.
+         */
+        get: operations["listViews"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/projects/{projectId}/view": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Read a saved native architecture view
+         * @description References are resolved against one model snapshot; missing and boundary references remain explicit diagnostics.
+         */
+        get: operations["getView"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -472,7 +512,7 @@ export interface components {
          *     Low-level tool, terminal and file-read events are intentionally absent.
          * @enum {string}
          */
-        EventType: "agent.started" | "agent.status_reported" | "agent.progress_reported" | "agent.finished" | "plan.published" | "plan.step_updated" | "work.step_started" | "work.step_completed" | "feedback.published" | "architecture.snapshot_published" | "component.change_planned" | "component.change_applied" | "relationship.change_planned" | "relationship.change_applied" | "diff.reported" | "risk.reported" | "problem.reported" | "correction.issued" | "retraction.issued" | "run.finished" | "model.mutation_applied" | "work.scope_reported" | "work.reported" | "context.opened";
+        EventType: "agent.started" | "agent.status_reported" | "agent.progress_reported" | "agent.finished" | "plan.published" | "plan.step_updated" | "work.step_started" | "work.step_completed" | "feedback.published" | "architecture.snapshot_published" | "component.change_planned" | "component.change_applied" | "relationship.change_planned" | "relationship.change_applied" | "diff.reported" | "risk.reported" | "problem.reported" | "correction.issued" | "retraction.issued" | "run.finished" | "model.mutation_applied" | "view.removed" | "view.saved" | "work.scope_reported" | "work.reported" | "context.opened";
         /**
          * @description Kind of change applied to a component or relationship of the architecture model.
          * @enum {string}
@@ -1111,7 +1151,7 @@ export interface components {
          *     one envelope schema, which in turn fixes the payload schema. A body whose `type` is not
          *     in the mapping cannot match any branch and is rejected.
          */
-        IngestEventRequest: components["schemas"]["AgentStartedEvent"] | components["schemas"]["AgentStatusReportedEvent"] | components["schemas"]["AgentProgressReportedEvent"] | components["schemas"]["AgentFinishedEvent"] | components["schemas"]["PlanPublishedEvent"] | components["schemas"]["PlanStepUpdatedEvent"] | components["schemas"]["WorkStepStartedEvent"] | components["schemas"]["WorkStepCompletedEvent"] | components["schemas"]["FeedbackPublishedEvent"] | components["schemas"]["ArchitectureSnapshotPublishedEvent"] | components["schemas"]["ComponentChangePlannedEvent"] | components["schemas"]["ComponentChangeAppliedEvent"] | components["schemas"]["RelationshipChangePlannedEvent"] | components["schemas"]["RelationshipChangeAppliedEvent"] | components["schemas"]["DiffReportedEvent"] | components["schemas"]["RiskReportedEvent"] | components["schemas"]["ProblemReportedEvent"] | components["schemas"]["CorrectionIssuedEvent"] | components["schemas"]["RetractionIssuedEvent"] | components["schemas"]["RunFinishedEvent"] | components["schemas"]["ModelMutationAppliedEvent"] | components["schemas"]["WorkScopeReportedEvent"] | components["schemas"]["WorkReportedEvent"] | components["schemas"]["ContextOpenedEvent"];
+        IngestEventRequest: components["schemas"]["AgentStartedEvent"] | components["schemas"]["AgentStatusReportedEvent"] | components["schemas"]["AgentProgressReportedEvent"] | components["schemas"]["AgentFinishedEvent"] | components["schemas"]["PlanPublishedEvent"] | components["schemas"]["PlanStepUpdatedEvent"] | components["schemas"]["WorkStepStartedEvent"] | components["schemas"]["WorkStepCompletedEvent"] | components["schemas"]["FeedbackPublishedEvent"] | components["schemas"]["ArchitectureSnapshotPublishedEvent"] | components["schemas"]["ComponentChangePlannedEvent"] | components["schemas"]["ComponentChangeAppliedEvent"] | components["schemas"]["RelationshipChangePlannedEvent"] | components["schemas"]["RelationshipChangeAppliedEvent"] | components["schemas"]["DiffReportedEvent"] | components["schemas"]["RiskReportedEvent"] | components["schemas"]["ProblemReportedEvent"] | components["schemas"]["CorrectionIssuedEvent"] | components["schemas"]["RetractionIssuedEvent"] | components["schemas"]["RunFinishedEvent"] | components["schemas"]["ModelMutationAppliedEvent"] | components["schemas"]["ViewRemovedEvent"] | components["schemas"]["ViewSavedEvent"] | components["schemas"]["WorkScopeReportedEvent"] | components["schemas"]["WorkReportedEvent"] | components["schemas"]["ContextOpenedEvent"];
         /**
          * @description Envelope of a streamed event: the ingested envelope plus the server-assigned metadata
          *     `position`, `serverEventId` and `receivedAt`. Base schema only; the concrete streamed
@@ -1387,7 +1427,7 @@ export interface components {
          *     the server-assigned `position`, `serverEventId` and `receivedAt`. The SSE `event:`
          *     field always equals the `type` of the object.
          */
-        StreamedEvent: components["schemas"]["StreamedAgentStartedEvent"] | components["schemas"]["StreamedAgentStatusReportedEvent"] | components["schemas"]["StreamedAgentProgressReportedEvent"] | components["schemas"]["StreamedAgentFinishedEvent"] | components["schemas"]["StreamedPlanPublishedEvent"] | components["schemas"]["StreamedPlanStepUpdatedEvent"] | components["schemas"]["StreamedWorkStepStartedEvent"] | components["schemas"]["StreamedWorkStepCompletedEvent"] | components["schemas"]["StreamedFeedbackPublishedEvent"] | components["schemas"]["StreamedArchitectureSnapshotPublishedEvent"] | components["schemas"]["StreamedComponentChangePlannedEvent"] | components["schemas"]["StreamedComponentChangeAppliedEvent"] | components["schemas"]["StreamedRelationshipChangePlannedEvent"] | components["schemas"]["StreamedRelationshipChangeAppliedEvent"] | components["schemas"]["StreamedDiffReportedEvent"] | components["schemas"]["StreamedRiskReportedEvent"] | components["schemas"]["StreamedProblemReportedEvent"] | components["schemas"]["StreamedCorrectionIssuedEvent"] | components["schemas"]["StreamedRetractionIssuedEvent"] | components["schemas"]["StreamedRunFinishedEvent"] | components["schemas"]["StreamedModelMutationAppliedEvent"] | components["schemas"]["StreamedWorkScopeReportedEvent"] | components["schemas"]["StreamedWorkReportedEvent"] | components["schemas"]["StreamedContextOpenedEvent"];
+        StreamedEvent: components["schemas"]["StreamedAgentStartedEvent"] | components["schemas"]["StreamedAgentStatusReportedEvent"] | components["schemas"]["StreamedAgentProgressReportedEvent"] | components["schemas"]["StreamedAgentFinishedEvent"] | components["schemas"]["StreamedPlanPublishedEvent"] | components["schemas"]["StreamedPlanStepUpdatedEvent"] | components["schemas"]["StreamedWorkStepStartedEvent"] | components["schemas"]["StreamedWorkStepCompletedEvent"] | components["schemas"]["StreamedFeedbackPublishedEvent"] | components["schemas"]["StreamedArchitectureSnapshotPublishedEvent"] | components["schemas"]["StreamedComponentChangePlannedEvent"] | components["schemas"]["StreamedComponentChangeAppliedEvent"] | components["schemas"]["StreamedRelationshipChangePlannedEvent"] | components["schemas"]["StreamedRelationshipChangeAppliedEvent"] | components["schemas"]["StreamedDiffReportedEvent"] | components["schemas"]["StreamedRiskReportedEvent"] | components["schemas"]["StreamedProblemReportedEvent"] | components["schemas"]["StreamedCorrectionIssuedEvent"] | components["schemas"]["StreamedRetractionIssuedEvent"] | components["schemas"]["StreamedRunFinishedEvent"] | components["schemas"]["StreamedModelMutationAppliedEvent"] | components["schemas"]["StreamedViewRemovedEvent"] | components["schemas"]["StreamedViewSavedEvent"] | components["schemas"]["StreamedWorkScopeReportedEvent"] | components["schemas"]["StreamedWorkReportedEvent"] | components["schemas"]["StreamedContextOpenedEvent"];
         /**
          * @description Acknowledgement of an ingested event. Returned with `201` for a first delivery and with
          *     `200` for an idempotent retry, in which case the originally assigned `position` and
@@ -1416,6 +1456,7 @@ export interface components {
          */
         Problem: {
             errors?: components["schemas"]["ValidationError"][];
+            currentViewRevision?: number;
             currentModelRevision?: number;
             /**
              * Format: uri
@@ -1466,6 +1507,7 @@ export interface components {
          *     with codes `invalid_field`, `unsupported_event_type` or `unsupported_schema_version`.
          */
         ValidationProblem: {
+            currentViewRevision?: number;
             currentModelRevision?: number;
             /**
              * Format: uri
@@ -2630,6 +2672,94 @@ export interface components {
             serverEventId: components["schemas"]["Uuid"];
             receivedAt: components["schemas"]["Timestamp"];
         };
+        /** @description view.saved command, generated from contract 2.0.0. */
+        ViewSavedEvent: {
+            /** @constant */
+            schemaVersion: "2.0";
+            clientEventId: components["schemas"]["MV_Uuid"];
+            projectId: components["schemas"]["MV_ProjectId"];
+            runId: components["schemas"]["MV_RunId"];
+            agentId: components["schemas"]["MV_AgentId"];
+            parentAgentId: components["schemas"]["MV_AgentId"] | null;
+            occurredAt: components["schemas"]["MV_Timestamp"];
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            type: "view.saved";
+            payload: {
+                expectedModelRevision: components["schemas"]["MV_Revision"];
+                expectedViewRevision: components["schemas"]["MV_Revision"];
+                view: components["schemas"]["MV_View"];
+            };
+        };
+        /** @description view.saved command, generated from contract 2.0.0. */
+        StreamedViewSavedEvent: {
+            /** @constant */
+            schemaVersion: "2.0";
+            clientEventId: components["schemas"]["MV_Uuid"];
+            projectId: components["schemas"]["MV_ProjectId"];
+            runId: components["schemas"]["MV_RunId"];
+            agentId: components["schemas"]["MV_AgentId"];
+            parentAgentId: components["schemas"]["MV_AgentId"] | null;
+            occurredAt: components["schemas"]["MV_Timestamp"];
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            type: "view.saved";
+            payload: {
+                expectedModelRevision: components["schemas"]["MV_Revision"];
+                expectedViewRevision: components["schemas"]["MV_Revision"];
+                view: components["schemas"]["MV_View"];
+            };
+            position: number;
+            serverEventId: components["schemas"]["Uuid"];
+            receivedAt: components["schemas"]["Timestamp"];
+        };
+        /** @description view.removed command, generated from contract 2.0.0. */
+        ViewRemovedEvent: {
+            /** @constant */
+            schemaVersion: "2.0";
+            clientEventId: components["schemas"]["MV_Uuid"];
+            projectId: components["schemas"]["MV_ProjectId"];
+            runId: components["schemas"]["MV_RunId"];
+            agentId: components["schemas"]["MV_AgentId"];
+            parentAgentId: components["schemas"]["MV_AgentId"] | null;
+            occurredAt: components["schemas"]["MV_Timestamp"];
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            type: "view.removed";
+            payload: {
+                expectedViewRevision: components["schemas"]["MV_Revision"];
+                viewId: components["schemas"]["MV_Identifier"];
+            };
+        };
+        /** @description view.removed command, generated from contract 2.0.0. */
+        StreamedViewRemovedEvent: {
+            /** @constant */
+            schemaVersion: "2.0";
+            clientEventId: components["schemas"]["MV_Uuid"];
+            projectId: components["schemas"]["MV_ProjectId"];
+            runId: components["schemas"]["MV_RunId"];
+            agentId: components["schemas"]["MV_AgentId"];
+            parentAgentId: components["schemas"]["MV_AgentId"] | null;
+            occurredAt: components["schemas"]["MV_Timestamp"];
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            type: "view.removed";
+            payload: {
+                expectedViewRevision: components["schemas"]["MV_Revision"];
+                viewId: components["schemas"]["MV_Identifier"];
+            };
+            position: number;
+            serverEventId: components["schemas"]["Uuid"];
+            receivedAt: components["schemas"]["Timestamp"];
+        };
     };
     responses: {
         /**
@@ -3242,6 +3372,77 @@ export interface operations {
             };
             /** @description The backend is not ready, for example because PostgreSQL is unreachable. */
             503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    listViews: {
+        parameters: {
+            query?: {
+                limit?: number;
+                cursor?: string;
+            };
+            header?: never;
+            path: {
+                /** @description Project the request is scoped to. */
+                projectId: components["parameters"]["ProjectIdPath"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description One consistent page of saved views. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MV_ViewsListResult"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            404: components["responses"]["ProjectNotFound"];
+            /** @description The cursor snapshot changed; restart pagination. */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    getView: {
+        parameters: {
+            query: {
+                viewId: components["schemas"]["Identifier"];
+            };
+            header?: never;
+            path: {
+                /** @description Project the request is scoped to. */
+                projectId: components["parameters"]["ProjectIdPath"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The saved definition and current reference diagnostics. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MV_ViewGetResult"];
+                };
+            };
+            /** @description The project or view does not exist, or the view was removed. */
+            404: {
                 headers: {
                     [name: string]: unknown;
                 };

@@ -237,6 +237,9 @@ export function affectedQueryKeys(event: StreamedEvent, depth = 0): QueryKey[] {
   const run = event.runId
 
   switch (event.type) {
+    case 'view.saved':
+    case 'view.removed':
+      return [queryKeys.views(project)]
     case 'context.opened':
       return [queryKeys.agents(project, run), queryKeys.runs(project), queryKeys.projectDetail(project)]
     case 'work.scope_reported':
@@ -272,17 +275,19 @@ export function affectedQueryKeys(event: StreamedEvent, depth = 0): QueryKey[] {
 
     case 'model.mutation_applied':
     case 'architecture.snapshot_published':
-      return [queryKeys.architecture(project), queryKeys.components(project), queryKeys.runScope(project)]
+      return [queryKeys.architecture(project), queryKeys.components(project), queryKeys.runScope(project), queryKeys.views(project)]
 
-    case 'component.change_planned':
     case 'component.change_applied':
+      return [queryKeys.architecture(project), queryKeys.component(project, event.payload.component.componentId), queryKeys.views(project)]
+    case 'component.change_planned':
       return [
         queryKeys.architecture(project),
         queryKeys.component(project, event.payload.component.componentId),
       ]
 
-    case 'relationship.change_planned':
     case 'relationship.change_applied':
+      return dedupe([queryKeys.architecture(project), queryKeys.component(project, event.payload.relationship.sourceComponentId), queryKeys.component(project, event.payload.relationship.targetComponentId), queryKeys.views(project)])
+    case 'relationship.change_planned':
       return dedupe([
         queryKeys.architecture(project),
         queryKeys.component(project, event.payload.relationship.sourceComponentId),
