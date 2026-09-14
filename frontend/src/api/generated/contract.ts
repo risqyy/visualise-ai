@@ -5,7 +5,7 @@
  * (openapi-typescript). Edit the contract, then regenerate.
  *
  * authority: api/openapi.yaml
- * sha256:    979fd8955591d474a030bf2046c77019fc4b4346b3a2a8a823e3648b32bacdef
+ * sha256:    6d7e3f27e953ccc31dd2cf4d5ff4d99e576c6b5cb2186c9345ef64f48fb61b84
  *
  * `npm run check:contract` — also run by the Vitest suite — fails when this
  * file no longer matches the authority above.
@@ -472,7 +472,7 @@ export interface components {
          *     Low-level tool, terminal and file-read events are intentionally absent.
          * @enum {string}
          */
-        EventType: "agent.started" | "agent.status_reported" | "agent.progress_reported" | "agent.finished" | "plan.published" | "plan.step_updated" | "work.step_started" | "work.step_completed" | "feedback.published" | "architecture.snapshot_published" | "component.change_planned" | "component.change_applied" | "relationship.change_planned" | "relationship.change_applied" | "diff.reported" | "risk.reported" | "problem.reported" | "correction.issued" | "retraction.issued" | "run.finished" | "model.mutation_applied";
+        EventType: "agent.started" | "agent.status_reported" | "agent.progress_reported" | "agent.finished" | "plan.published" | "plan.step_updated" | "work.step_started" | "work.step_completed" | "feedback.published" | "architecture.snapshot_published" | "component.change_planned" | "component.change_applied" | "relationship.change_planned" | "relationship.change_applied" | "diff.reported" | "risk.reported" | "problem.reported" | "correction.issued" | "retraction.issued" | "run.finished" | "model.mutation_applied" | "work.scope_reported" | "work.reported" | "context.opened";
         /**
          * @description Kind of change applied to a component or relationship of the architecture model.
          * @enum {string}
@@ -1111,7 +1111,7 @@ export interface components {
          *     one envelope schema, which in turn fixes the payload schema. A body whose `type` is not
          *     in the mapping cannot match any branch and is rejected.
          */
-        IngestEventRequest: components["schemas"]["AgentStartedEvent"] | components["schemas"]["AgentStatusReportedEvent"] | components["schemas"]["AgentProgressReportedEvent"] | components["schemas"]["AgentFinishedEvent"] | components["schemas"]["PlanPublishedEvent"] | components["schemas"]["PlanStepUpdatedEvent"] | components["schemas"]["WorkStepStartedEvent"] | components["schemas"]["WorkStepCompletedEvent"] | components["schemas"]["FeedbackPublishedEvent"] | components["schemas"]["ArchitectureSnapshotPublishedEvent"] | components["schemas"]["ComponentChangePlannedEvent"] | components["schemas"]["ComponentChangeAppliedEvent"] | components["schemas"]["RelationshipChangePlannedEvent"] | components["schemas"]["RelationshipChangeAppliedEvent"] | components["schemas"]["DiffReportedEvent"] | components["schemas"]["RiskReportedEvent"] | components["schemas"]["ProblemReportedEvent"] | components["schemas"]["CorrectionIssuedEvent"] | components["schemas"]["RetractionIssuedEvent"] | components["schemas"]["RunFinishedEvent"] | components["schemas"]["ModelMutationAppliedEvent"];
+        IngestEventRequest: components["schemas"]["AgentStartedEvent"] | components["schemas"]["AgentStatusReportedEvent"] | components["schemas"]["AgentProgressReportedEvent"] | components["schemas"]["AgentFinishedEvent"] | components["schemas"]["PlanPublishedEvent"] | components["schemas"]["PlanStepUpdatedEvent"] | components["schemas"]["WorkStepStartedEvent"] | components["schemas"]["WorkStepCompletedEvent"] | components["schemas"]["FeedbackPublishedEvent"] | components["schemas"]["ArchitectureSnapshotPublishedEvent"] | components["schemas"]["ComponentChangePlannedEvent"] | components["schemas"]["ComponentChangeAppliedEvent"] | components["schemas"]["RelationshipChangePlannedEvent"] | components["schemas"]["RelationshipChangeAppliedEvent"] | components["schemas"]["DiffReportedEvent"] | components["schemas"]["RiskReportedEvent"] | components["schemas"]["ProblemReportedEvent"] | components["schemas"]["CorrectionIssuedEvent"] | components["schemas"]["RetractionIssuedEvent"] | components["schemas"]["RunFinishedEvent"] | components["schemas"]["ModelMutationAppliedEvent"] | components["schemas"]["WorkScopeReportedEvent"] | components["schemas"]["WorkReportedEvent"] | components["schemas"]["ContextOpenedEvent"];
         /**
          * @description Envelope of a streamed event: the ingested envelope plus the server-assigned metadata
          *     `position`, `serverEventId` and `receivedAt`. Base schema only; the concrete streamed
@@ -1387,7 +1387,7 @@ export interface components {
          *     the server-assigned `position`, `serverEventId` and `receivedAt`. The SSE `event:`
          *     field always equals the `type` of the object.
          */
-        StreamedEvent: components["schemas"]["StreamedAgentStartedEvent"] | components["schemas"]["StreamedAgentStatusReportedEvent"] | components["schemas"]["StreamedAgentProgressReportedEvent"] | components["schemas"]["StreamedAgentFinishedEvent"] | components["schemas"]["StreamedPlanPublishedEvent"] | components["schemas"]["StreamedPlanStepUpdatedEvent"] | components["schemas"]["StreamedWorkStepStartedEvent"] | components["schemas"]["StreamedWorkStepCompletedEvent"] | components["schemas"]["StreamedFeedbackPublishedEvent"] | components["schemas"]["StreamedArchitectureSnapshotPublishedEvent"] | components["schemas"]["StreamedComponentChangePlannedEvent"] | components["schemas"]["StreamedComponentChangeAppliedEvent"] | components["schemas"]["StreamedRelationshipChangePlannedEvent"] | components["schemas"]["StreamedRelationshipChangeAppliedEvent"] | components["schemas"]["StreamedDiffReportedEvent"] | components["schemas"]["StreamedRiskReportedEvent"] | components["schemas"]["StreamedProblemReportedEvent"] | components["schemas"]["StreamedCorrectionIssuedEvent"] | components["schemas"]["StreamedRetractionIssuedEvent"] | components["schemas"]["StreamedRunFinishedEvent"] | components["schemas"]["StreamedModelMutationAppliedEvent"];
+        StreamedEvent: components["schemas"]["StreamedAgentStartedEvent"] | components["schemas"]["StreamedAgentStatusReportedEvent"] | components["schemas"]["StreamedAgentProgressReportedEvent"] | components["schemas"]["StreamedAgentFinishedEvent"] | components["schemas"]["StreamedPlanPublishedEvent"] | components["schemas"]["StreamedPlanStepUpdatedEvent"] | components["schemas"]["StreamedWorkStepStartedEvent"] | components["schemas"]["StreamedWorkStepCompletedEvent"] | components["schemas"]["StreamedFeedbackPublishedEvent"] | components["schemas"]["StreamedArchitectureSnapshotPublishedEvent"] | components["schemas"]["StreamedComponentChangePlannedEvent"] | components["schemas"]["StreamedComponentChangeAppliedEvent"] | components["schemas"]["StreamedRelationshipChangePlannedEvent"] | components["schemas"]["StreamedRelationshipChangeAppliedEvent"] | components["schemas"]["StreamedDiffReportedEvent"] | components["schemas"]["StreamedRiskReportedEvent"] | components["schemas"]["StreamedProblemReportedEvent"] | components["schemas"]["StreamedCorrectionIssuedEvent"] | components["schemas"]["StreamedRetractionIssuedEvent"] | components["schemas"]["StreamedRunFinishedEvent"] | components["schemas"]["StreamedModelMutationAppliedEvent"] | components["schemas"]["StreamedWorkScopeReportedEvent"] | components["schemas"]["StreamedWorkReportedEvent"] | components["schemas"]["StreamedContextOpenedEvent"];
         /**
          * @description Acknowledgement of an ingested event. Returned with `201` for a first delivery and with
          *     `200` for an idempotent retry, in which case the originally assigned `position` and
@@ -1765,6 +1765,9 @@ export interface components {
          *     `null` until `agent.finished`. Silence changes nothing.
          */
         RunAgent: {
+            workScope?: components["schemas"]["MV_Scope"] | null;
+            workScopePosition?: components["schemas"]["MV_Revision"] | null;
+            missingScopeReferences?: components["schemas"]["MV_Scope"];
             agentId: components["schemas"]["AgentId"];
             runId: components["schemas"]["RunId"];
             /** @description The delegating agent, `null` for the root orchestrator. */
@@ -1800,6 +1803,7 @@ export interface components {
          *     parent precedes the subagents it spawned.
          */
         AgentListResponse: {
+            modelRevision?: components["schemas"]["MV_Revision"];
             projectPosition: components["schemas"]["ProjectPosition"];
             /** @description Every agent of the run. */
             agents: components["schemas"]["RunAgent"][];
@@ -2460,7 +2464,7 @@ export interface components {
         });
         /** @enum {string} */
         LegacyEventType: "agent.started" | "agent.status_reported" | "agent.progress_reported" | "agent.finished" | "plan.published" | "plan.step_updated" | "work.step_started" | "work.step_completed" | "feedback.published" | "architecture.snapshot_published" | "component.change_planned" | "component.change_applied" | "relationship.change_planned" | "relationship.change_applied" | "diff.reported" | "risk.reported" | "problem.reported" | "correction.issued" | "retraction.issued" | "run.finished";
-        /** @description Atomic model mutation command, generated from contract 2.0.0. */
+        /** @description model.mutation_applied command, generated from contract 2.0.0. */
         ModelMutationAppliedEvent: {
             /** @constant */
             schemaVersion: "2.0";
@@ -2477,7 +2481,7 @@ export interface components {
             type: "model.mutation_applied";
             payload: components["schemas"]["MV_ModelMutationPayload"];
         };
-        /** @description Atomic model mutation command, generated from contract 2.0.0. */
+        /** @description model.mutation_applied command, generated from contract 2.0.0. */
         StreamedModelMutationAppliedEvent: {
             /** @constant */
             schemaVersion: "2.0";
@@ -2493,6 +2497,135 @@ export interface components {
              */
             type: "model.mutation_applied";
             payload: components["schemas"]["MV_ModelMutationPayload"];
+            position: number;
+            serverEventId: components["schemas"]["Uuid"];
+            receivedAt: components["schemas"]["Timestamp"];
+        };
+        /** @description context.opened command, generated from contract 2.0.0. */
+        ContextOpenedEvent: {
+            /** @constant */
+            schemaVersion: "2.0";
+            clientEventId: components["schemas"]["MV_Uuid"];
+            projectId: components["schemas"]["MV_ProjectId"];
+            runId: components["schemas"]["MV_RunId"];
+            agentId: components["schemas"]["MV_AgentId"];
+            parentAgentId: components["schemas"]["MV_AgentId"] | null;
+            occurredAt: components["schemas"]["MV_Timestamp"];
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            type: "context.opened";
+            payload: {
+                /** @enum {unknown} */
+                role: "orchestrator" | "subagent";
+                displayName: string;
+                assignedTask: string;
+            };
+        };
+        /** @description context.opened command, generated from contract 2.0.0. */
+        StreamedContextOpenedEvent: {
+            /** @constant */
+            schemaVersion: "2.0";
+            clientEventId: components["schemas"]["MV_Uuid"];
+            projectId: components["schemas"]["MV_ProjectId"];
+            runId: components["schemas"]["MV_RunId"];
+            agentId: components["schemas"]["MV_AgentId"];
+            parentAgentId: components["schemas"]["MV_AgentId"] | null;
+            occurredAt: components["schemas"]["MV_Timestamp"];
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            type: "context.opened";
+            payload: {
+                /** @enum {unknown} */
+                role: "orchestrator" | "subagent";
+                displayName: string;
+                assignedTask: string;
+            };
+            position: number;
+            serverEventId: components["schemas"]["Uuid"];
+            receivedAt: components["schemas"]["Timestamp"];
+        };
+        /** @description work.reported command, generated from contract 2.0.0. */
+        WorkReportedEvent: {
+            /** @constant */
+            schemaVersion: "2.0";
+            clientEventId: components["schemas"]["MV_Uuid"];
+            projectId: components["schemas"]["MV_ProjectId"];
+            runId: components["schemas"]["MV_RunId"];
+            agentId: components["schemas"]["MV_AgentId"];
+            parentAgentId: components["schemas"]["MV_AgentId"] | null;
+            occurredAt: components["schemas"]["MV_Timestamp"];
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            type: "work.reported";
+            payload: {
+                report: components["schemas"]["MV_WorkReport"];
+            };
+        };
+        /** @description work.reported command, generated from contract 2.0.0. */
+        StreamedWorkReportedEvent: {
+            /** @constant */
+            schemaVersion: "2.0";
+            clientEventId: components["schemas"]["MV_Uuid"];
+            projectId: components["schemas"]["MV_ProjectId"];
+            runId: components["schemas"]["MV_RunId"];
+            agentId: components["schemas"]["MV_AgentId"];
+            parentAgentId: components["schemas"]["MV_AgentId"] | null;
+            occurredAt: components["schemas"]["MV_Timestamp"];
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            type: "work.reported";
+            payload: {
+                report: components["schemas"]["MV_WorkReport"];
+            };
+            position: number;
+            serverEventId: components["schemas"]["Uuid"];
+            receivedAt: components["schemas"]["Timestamp"];
+        };
+        /** @description work.scope_reported command, generated from contract 2.0.0. */
+        WorkScopeReportedEvent: {
+            /** @constant */
+            schemaVersion: "2.0";
+            clientEventId: components["schemas"]["MV_Uuid"];
+            projectId: components["schemas"]["MV_ProjectId"];
+            runId: components["schemas"]["MV_RunId"];
+            agentId: components["schemas"]["MV_AgentId"];
+            parentAgentId: components["schemas"]["MV_AgentId"] | null;
+            occurredAt: components["schemas"]["MV_Timestamp"];
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            type: "work.scope_reported";
+            payload: {
+                scope: components["schemas"]["MV_Scope"];
+            };
+        };
+        /** @description work.scope_reported command, generated from contract 2.0.0. */
+        StreamedWorkScopeReportedEvent: {
+            /** @constant */
+            schemaVersion: "2.0";
+            clientEventId: components["schemas"]["MV_Uuid"];
+            projectId: components["schemas"]["MV_ProjectId"];
+            runId: components["schemas"]["MV_RunId"];
+            agentId: components["schemas"]["MV_AgentId"];
+            parentAgentId: components["schemas"]["MV_AgentId"] | null;
+            occurredAt: components["schemas"]["MV_Timestamp"];
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            type: "work.scope_reported";
+            payload: {
+                scope: components["schemas"]["MV_Scope"];
+            };
             position: number;
             serverEventId: components["schemas"]["Uuid"];
             receivedAt: components["schemas"]["Timestamp"];

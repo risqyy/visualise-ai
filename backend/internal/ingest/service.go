@@ -60,12 +60,21 @@ func (s *Service) Submit(ctx context.Context, body []byte) (store.Result, error)
 	return h.submit(ctx, env)
 }
 func (h *Handler) submit(ctx context.Context, env store.Envelope) (store.Result, error) {
-	role, target, err := payloadFacts(env.Type, env.Payload)
+	effective, err := store.EffectiveWork(env)
 	if err != nil {
 		return store.Result{}, err
 	}
-	ev := acceptedEvent{envelope: env, role: role, correctionTarget: target}
-	result, err := h.store.AppendGuarded(ctx, env, func(tx *gorm.DB, _ store.Envelope) error { return checkLifecycle(tx, ev) })
+	role, target, err := payloadFacts(effective.Type, effective.Payload)
+	if err != nil {
+		return store.Result{}, err
+	}
+	ev := acceptedEvent{envelope: effective, role: role, correctionTarget: target}
+	result, err := h.store.AppendGuarded(ctx, env, func(tx *gorm.DB, _ store.Envelope) error {
+		if err := checkLifecycle(tx, ev); err != nil {
+			return err
+		}
+		return store.ValidateWork(tx, env)
+	})
 	if err == nil && !result.Duplicate {
 		h.publisher.Publish(ctx, committedEvent(env, result))
 	}

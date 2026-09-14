@@ -78,6 +78,9 @@ func EventTypes() []string {
 		TypeRetractionIssued,
 		TypeRunFinished,
 		TypeModelMutationApplied,
+		TypeContextOpened,
+		TypeWorkReported,
+		TypeWorkScopeReported,
 	}
 }
 

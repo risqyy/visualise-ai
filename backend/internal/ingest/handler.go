@@ -286,10 +286,11 @@ func (h *Handler) checkSchemaVersion(c *gin.Context, document map[string]any) bo
 	version, ok := document["schemaVersion"].(string)
 	eventType, _ := document["type"].(string)
 	accepted := h.contract.AcceptsSchemaVersion(version)
-	if eventType != store.TypeModelMutationApplied && version != "1.0" {
+	modern := eventType == store.TypeModelMutationApplied || eventType == store.TypeContextOpened || eventType == store.TypeWorkReported || eventType == store.TypeWorkScopeReported
+	if !modern && version != "1.0" {
 		accepted = false
 	}
-	if eventType == store.TypeModelMutationApplied && version != "2.0" {
+	if modern && version != "2.0" {
 		accepted = false
 	}
 	if !ok || accepted {

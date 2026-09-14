@@ -1,0 +1,4323 @@
+{
+  "visualise_discover": {
+    "input": {
+      "type": "object",
+      "additionalProperties": false
+    },
+    "output": {
+      "type": "object",
+      "required": [
+        "contractVersion",
+        "tools",
+        "viewKinds",
+        "limits"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "contractVersion": {
+          "type": "string",
+          "const": "2.0.0"
+        },
+        "tools": {
+          "type": "array",
+          "maxItems": 14,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "pattern": "^visualise_[a-z_]+$",
+            "maxLength": 64
+          }
+        },
+        "viewKinds": {
+          "type": "array",
+          "maxItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "const": "architecture"
+          }
+        },
+        "limits": {
+          "type": "object",
+          "required": [
+            "maxOperations",
+            "maxPageSize",
+            "maxRequestBytes",
+            "maxStructuredResponseBytes",
+            "maxImageBytes"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "maxOperations": {
+              "const": 100
+            },
+            "maxPageSize": {
+              "const": 200
+            },
+            "maxRequestBytes": {
+              "const": 1048576
+            },
+            "maxStructuredResponseBytes": {
+              "const": 1048576
+            },
+            "maxImageBytes": {
+              "const": 4194304
+            }
+          }
+        }
+      }
+    },
+    "eventType": null
+  },
+  "visualise_projects_list": {
+    "input": {
+      "allOf": [
+        {
+          "type": "object",
+          "properties": {
+            "limit": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 200,
+              "default": 50
+            },
+            "cursor": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 2048
+            }
+          }
+        }
+      ],
+      "type": "object",
+      "required": [
+        "contractVersion"
+      ],
+      "unevaluatedProperties": false,
+      "properties": {
+        "contractVersion": {
+          "type": "string",
+          "const": "2.0.0"
+        }
+      }
+    },
+    "output": {
+      "type": "object",
+      "required": [
+        "items",
+        "nextCursor"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "items": {
+          "type": "array",
+          "maxItems": 200,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "description": "Stable, human-readable project slug. Lowercase alphanumerics and hyphens,\n3 to 64 characters, must start and end with an alphanumeric character.\n",
+            "pattern": "^[a-z0-9][a-z0-9-]{1,62}[a-z0-9]$",
+            "examples": [
+              "visualise-ai"
+            ]
+          }
+        },
+        "nextCursor": {
+          "oneOf": [
+            {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 2048
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      }
+    },
+    "eventType": null
+  },
+  "visualise_model_read": {
+    "input": {
+      "allOf": [
+        {
+          "type": "object",
+          "required": [
+            "contractVersion",
+            "projectId"
+          ],
+          "properties": {
+            "contractVersion": {
+              "type": "string",
+              "const": "2.0.0"
+            },
+            "projectId": {
+              "type": "string",
+              "description": "Stable, human-readable project slug. Lowercase alphanumerics and hyphens,\n3 to 64 characters, must start and end with an alphanumeric character.\n",
+              "pattern": "^[a-z0-9][a-z0-9-]{1,62}[a-z0-9]$",
+              "examples": [
+                "visualise-ai"
+              ]
+            }
+          }
+        },
+        {
+          "type": "object",
+          "properties": {
+            "limit": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 200,
+              "default": 50
+            },
+            "cursor": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 2048
+            }
+          }
+        }
+      ],
+      "type": "object",
+      "unevaluatedProperties": false,
+      "properties": {
+        "expectedModelRevision": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        }
+      }
+    },
+    "output": {
+      "allOf": [
+        {
+          "type": "object",
+          "required": [
+            "projectId",
+            "modelRevision",
+            "projectPosition"
+          ],
+          "properties": {
+            "projectId": {
+              "type": "string",
+              "description": "Stable, human-readable project slug. Lowercase alphanumerics and hyphens,\n3 to 64 characters, must start and end with an alphanumeric character.\n",
+              "pattern": "^[a-z0-9][a-z0-9-]{1,62}[a-z0-9]$",
+              "examples": [
+                "visualise-ai"
+              ]
+            },
+            "modelRevision": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 9007199254740991
+            },
+            "projectPosition": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 9007199254740991
+            }
+          }
+        }
+      ],
+      "type": "object",
+      "required": [
+        "items",
+        "nextCursor",
+        "diagnostics",
+        "diagnosticOverflow"
+      ],
+      "unevaluatedProperties": false,
+      "properties": {
+        "items": {
+          "type": "array",
+          "maxItems": 200,
+          "items": {
+            "oneOf": [
+              {
+                "type": "object",
+                "required": [
+                  "type",
+                  "value"
+                ],
+                "additionalProperties": false,
+                "properties": {
+                  "type": {
+                    "const": "component"
+                  },
+                  "value": {
+                    "type": "object",
+                    "description": "One node of the application architecture. Components form a tree through\n`parentComponentId`; the root of a tree has `parentComponentId: null`. Arbitrary\nnesting depth is allowed, for example system -> service -> module -> module.\n",
+                    "properties": {
+                      "componentId": {
+                        "type": "string",
+                        "description": "Identifier of an architecture component, stable across snapshots. Lowercase\nalphanumerics plus `.`, `_` and `-`; must start and end with an alphanumeric\ncharacter. Dotted paths are a convention, not a hierarchy: the hierarchy is expressed\nexclusively through `parentComponentId`.\n",
+                        "pattern": "^[a-z0-9][a-z0-9._-]{0,126}[a-z0-9]$",
+                        "examples": [
+                          "shop-platform.orders.domain"
+                        ]
+                      },
+                      "name": {
+                        "type": "string",
+                        "description": "Human-readable display name shown on the architecture canvas.",
+                        "minLength": 1,
+                        "maxLength": 200
+                      },
+                      "kind": {
+                        "type": "string",
+                        "description": "Structural role of the component. `topic` models a single message topic as its own\nnode so that topic-level relationships stay visible.\n",
+                        "enum": [
+                          "system",
+                          "service",
+                          "module",
+                          "datastore",
+                          "queue",
+                          "topic",
+                          "ui",
+                          "external",
+                          "library"
+                        ]
+                      },
+                      "parentComponentId": {
+                        "description": "Parent node in the component hierarchy, or `null` for a root component. The value\nmust reference a `componentId` contained in the same architecture model.\n",
+                        "oneOf": [
+                          {
+                            "type": "string",
+                            "description": "Identifier of an architecture component, stable across snapshots. Lowercase\nalphanumerics plus `.`, `_` and `-`; must start and end with an alphanumeric\ncharacter. Dotted paths are a convention, not a hierarchy: the hierarchy is expressed\nexclusively through `parentComponentId`.\n",
+                            "pattern": "^[a-z0-9][a-z0-9._-]{0,126}[a-z0-9]$",
+                            "examples": [
+                              "shop-platform.orders.domain"
+                            ]
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      },
+                      "description": {
+                        "type": "string",
+                        "description": "Short explanation of the component's responsibility."
+                      },
+                      "technology": {
+                        "type": "object",
+                        "description": "Technology metadata of a component. Every field is optional; agents report what they\nknow and omit the rest.\n",
+                        "properties": {
+                          "language": {
+                            "type": "string",
+                            "description": "Primary implementation language, for example `Go` or `TypeScript`."
+                          },
+                          "framework": {
+                            "type": "string",
+                            "description": "Dominant framework or library, for example `React` or `chi`."
+                          },
+                          "runtime": {
+                            "type": "string",
+                            "description": "Execution runtime, for example `Node.js`, `JVM` or `PostgreSQL`."
+                          },
+                          "version": {
+                            "type": "string",
+                            "description": "Version of the language, framework or runtime, as reported."
+                          }
+                        },
+                        "additionalProperties": false
+                      },
+                      "tags": {
+                        "type": "array",
+                        "description": "Free-form labels for filtering and grouping on the canvas.",
+                        "items": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 64
+                        }
+                      }
+                    },
+                    "required": [
+                      "componentId",
+                      "name",
+                      "kind",
+                      "parentComponentId"
+                    ],
+                    "additionalProperties": false
+                  }
+                }
+              },
+              {
+                "type": "object",
+                "required": [
+                  "type",
+                  "value"
+                ],
+                "additionalProperties": false,
+                "properties": {
+                  "type": {
+                    "const": "relationship"
+                  },
+                  "value": {
+                    "type": "object",
+                    "description": "A typed, directed edge between two components.\n\nMessage topics are never aggregated server-side: **every NATS topic is its own\nrelationship** with its own `relationshipId`, `kind: nats_topic` and the topic name in\n`channel`. Two producers publishing to two topics therefore yield two relationships,\nnot one merged \"messaging\" edge.\n",
+                    "properties": {
+                      "relationshipId": {
+                        "type": "string",
+                        "description": "Opaque, agent-assigned identifier for a domain object such as a plan, work step,\nfeedback item, diff, risk or relationship. Stable for the lifetime of the run.\n",
+                        "minLength": 1,
+                        "maxLength": 128,
+                        "examples": [
+                          "plan-2026-08-04-0001"
+                        ]
+                      },
+                      "sourceComponentId": {
+                        "type": "string",
+                        "description": "Identifier of an architecture component, stable across snapshots. Lowercase\nalphanumerics plus `.`, `_` and `-`; must start and end with an alphanumeric\ncharacter. Dotted paths are a convention, not a hierarchy: the hierarchy is expressed\nexclusively through `parentComponentId`.\n",
+                        "pattern": "^[a-z0-9][a-z0-9._-]{0,126}[a-z0-9]$",
+                        "examples": [
+                          "shop-platform.orders.domain"
+                        ]
+                      },
+                      "targetComponentId": {
+                        "type": "string",
+                        "description": "Identifier of an architecture component, stable across snapshots. Lowercase\nalphanumerics plus `.`, `_` and `-`; must start and end with an alphanumeric\ncharacter. Dotted paths are a convention, not a hierarchy: the hierarchy is expressed\nexclusively through `parentComponentId`.\n",
+                        "pattern": "^[a-z0-9][a-z0-9._-]{0,126}[a-z0-9]$",
+                        "examples": [
+                          "shop-platform.orders.domain"
+                        ]
+                      },
+                      "kind": {
+                        "type": "string",
+                        "description": "Interaction type of the edge. `nats_topic` denotes exactly one topic, named in\n`channel`.\n",
+                        "enum": [
+                          "http",
+                          "grpc",
+                          "data",
+                          "async",
+                          "nats_topic",
+                          "dependency"
+                        ]
+                      },
+                      "label": {
+                        "type": "string",
+                        "description": "Short human-readable edge label for the canvas."
+                      },
+                      "protocol": {
+                        "type": "string",
+                        "description": "Concrete protocol, for example `HTTPS`, `gRPC/HTTP2` or `postgresql`."
+                      },
+                      "operation": {
+                        "type": "string",
+                        "description": "Concrete operation carried by the edge, for example `GET /orders` or\n`orders.v1.OrderService/PlaceOrder`.\n"
+                      },
+                      "channel": {
+                        "type": "string",
+                        "description": "Channel name for message-based edges. For `kind: nats_topic` this is the NATS\ntopic name and identifies the relationship semantically.\n"
+                      }
+                    },
+                    "required": [
+                      "relationshipId",
+                      "sourceComponentId",
+                      "targetComponentId",
+                      "kind"
+                    ],
+                    "additionalProperties": false
+                  }
+                }
+              }
+            ]
+          }
+        },
+        "nextCursor": {
+          "oneOf": [
+            {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 2048
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "diagnostics": {
+          "description": "Bounded diagnostics; diagnosticOverflow signals more issues exist.",
+          "type": "array",
+          "maxItems": 200,
+          "items": {
+            "type": "object",
+            "required": [
+              "code",
+              "target",
+              "message"
+            ],
+            "additionalProperties": false,
+            "properties": {
+              "code": {
+                "enum": [
+                  "missing_reference",
+                  "hierarchy_cycle",
+                  "historical_id_reuse"
+                ]
+              },
+              "target": {
+                "oneOf": [
+                  {
+                    "type": "object",
+                    "required": [
+                      "type",
+                      "id"
+                    ],
+                    "additionalProperties": false,
+                    "properties": {
+                      "type": {
+                        "const": "component"
+                      },
+                      "id": {
+                        "type": "string",
+                        "description": "Identifier of an architecture component, stable across snapshots. Lowercase\nalphanumerics plus `.`, `_` and `-`; must start and end with an alphanumeric\ncharacter. Dotted paths are a convention, not a hierarchy: the hierarchy is expressed\nexclusively through `parentComponentId`.\n",
+                        "pattern": "^[a-z0-9][a-z0-9._-]{0,126}[a-z0-9]$",
+                        "examples": [
+                          "shop-platform.orders.domain"
+                        ]
+                      }
+                    }
+                  },
+                  {
+                    "type": "object",
+                    "required": [
+                      "type",
+                      "id"
+                    ],
+                    "additionalProperties": false,
+                    "properties": {
+                      "type": {
+                        "const": "relationship"
+                      },
+                      "id": {
+                        "type": "string",
+                        "description": "Opaque, agent-assigned identifier for a domain object such as a plan, work step,\nfeedback item, diff, risk or relationship. Stable for the lifetime of the run.\n",
+                        "minLength": 1,
+                        "maxLength": 128,
+                        "examples": [
+                          "plan-2026-08-04-0001"
+                        ]
+                      }
+                    }
+                  }
+                ]
+              },
+              "message": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 1000
+              }
+            }
+          }
+        },
+        "diagnosticOverflow": {
+          "type": "boolean"
+        }
+      }
+    },
+    "eventType": null
+  },
+  "visualise_element_get": {
+    "input": {
+      "allOf": [
+        {
+          "type": "object",
+          "required": [
+            "contractVersion",
+            "projectId"
+          ],
+          "properties": {
+            "contractVersion": {
+              "type": "string",
+              "const": "2.0.0"
+            },
+            "projectId": {
+              "type": "string",
+              "description": "Stable, human-readable project slug. Lowercase alphanumerics and hyphens,\n3 to 64 characters, must start and end with an alphanumeric character.\n",
+              "pattern": "^[a-z0-9][a-z0-9-]{1,62}[a-z0-9]$",
+              "examples": [
+                "visualise-ai"
+              ]
+            }
+          }
+        }
+      ],
+      "type": "object",
+      "required": [
+        "target"
+      ],
+      "unevaluatedProperties": false,
+      "properties": {
+        "target": {
+          "oneOf": [
+            {
+              "type": "object",
+              "required": [
+                "type",
+                "id"
+              ],
+              "additionalProperties": false,
+              "properties": {
+                "type": {
+                  "const": "component"
+                },
+                "id": {
+                  "type": "string",
+                  "description": "Identifier of an architecture component, stable across snapshots. Lowercase\nalphanumerics plus `.`, `_` and `-`; must start and end with an alphanumeric\ncharacter. Dotted paths are a convention, not a hierarchy: the hierarchy is expressed\nexclusively through `parentComponentId`.\n",
+                  "pattern": "^[a-z0-9][a-z0-9._-]{0,126}[a-z0-9]$",
+                  "examples": [
+                    "shop-platform.orders.domain"
+                  ]
+                }
+              }
+            },
+            {
+              "type": "object",
+              "required": [
+                "type",
+                "id"
+              ],
+              "additionalProperties": false,
+              "properties": {
+                "type": {
+                  "const": "relationship"
+                },
+                "id": {
+                  "type": "string",
+                  "description": "Opaque, agent-assigned identifier for a domain object such as a plan, work step,\nfeedback item, diff, risk or relationship. Stable for the lifetime of the run.\n",
+                  "minLength": 1,
+                  "maxLength": 128,
+                  "examples": [
+                    "plan-2026-08-04-0001"
+                  ]
+                }
+              }
+            }
+          ]
+        },
+        "expectedModelRevision": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        }
+      }
+    },
+    "output": {
+      "allOf": [
+        {
+          "type": "object",
+          "required": [
+            "projectId",
+            "modelRevision",
+            "projectPosition"
+          ],
+          "properties": {
+            "projectId": {
+              "type": "string",
+              "description": "Stable, human-readable project slug. Lowercase alphanumerics and hyphens,\n3 to 64 characters, must start and end with an alphanumeric character.\n",
+              "pattern": "^[a-z0-9][a-z0-9-]{1,62}[a-z0-9]$",
+              "examples": [
+                "visualise-ai"
+              ]
+            },
+            "modelRevision": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 9007199254740991
+            },
+            "projectPosition": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 9007199254740991
+            }
+          }
+        }
+      ],
+      "type": "object",
+      "required": [
+        "element"
+      ],
+      "unevaluatedProperties": false,
+      "properties": {
+        "element": {
+          "oneOf": [
+            {
+              "type": "object",
+              "required": [
+                "type",
+                "value"
+              ],
+              "additionalProperties": false,
+              "properties": {
+                "type": {
+                  "const": "component"
+                },
+                "value": {
+                  "type": "object",
+                  "description": "One node of the application architecture. Components form a tree through\n`parentComponentId`; the root of a tree has `parentComponentId: null`. Arbitrary\nnesting depth is allowed, for example system -> service -> module -> module.\n",
+                  "properties": {
+                    "componentId": {
+                      "type": "string",
+                      "description": "Identifier of an architecture component, stable across snapshots. Lowercase\nalphanumerics plus `.`, `_` and `-`; must start and end with an alphanumeric\ncharacter. Dotted paths are a convention, not a hierarchy: the hierarchy is expressed\nexclusively through `parentComponentId`.\n",
+                      "pattern": "^[a-z0-9][a-z0-9._-]{0,126}[a-z0-9]$",
+                      "examples": [
+                        "shop-platform.orders.domain"
+                      ]
+                    },
+                    "name": {
+                      "type": "string",
+                      "description": "Human-readable display name shown on the architecture canvas.",
+                      "minLength": 1,
+                      "maxLength": 200
+                    },
+                    "kind": {
+                      "type": "string",
+                      "description": "Structural role of the component. `topic` models a single message topic as its own\nnode so that topic-level relationships stay visible.\n",
+                      "enum": [
+                        "system",
+                        "service",
+                        "module",
+                        "datastore",
+                        "queue",
+                        "topic",
+                        "ui",
+                        "external",
+                        "library"
+                      ]
+                    },
+                    "parentComponentId": {
+                      "description": "Parent node in the component hierarchy, or `null` for a root component. The value\nmust reference a `componentId` contained in the same architecture model.\n",
+                      "oneOf": [
+                        {
+                          "type": "string",
+                          "description": "Identifier of an architecture component, stable across snapshots. Lowercase\nalphanumerics plus `.`, `_` and `-`; must start and end with an alphanumeric\ncharacter. Dotted paths are a convention, not a hierarchy: the hierarchy is expressed\nexclusively through `parentComponentId`.\n",
+                          "pattern": "^[a-z0-9][a-z0-9._-]{0,126}[a-z0-9]$",
+                          "examples": [
+                            "shop-platform.orders.domain"
+                          ]
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "description": {
+                      "type": "string",
+                      "description": "Short explanation of the component's responsibility."
+                    },
+                    "technology": {
+                      "type": "object",
+                      "description": "Technology metadata of a component. Every field is optional; agents report what they\nknow and omit the rest.\n",
+                      "properties": {
+                        "language": {
+                          "type": "string",
+                          "description": "Primary implementation language, for example `Go` or `TypeScript`."
+                        },
+                        "framework": {
+                          "type": "string",
+                          "description": "Dominant framework or library, for example `React` or `chi`."
+                        },
+                        "runtime": {
+                          "type": "string",
+                          "description": "Execution runtime, for example `Node.js`, `JVM` or `PostgreSQL`."
+                        },
+                        "version": {
+                          "type": "string",
+                          "description": "Version of the language, framework or runtime, as reported."
+                        }
+                      },
+                      "additionalProperties": false
+                    },
+                    "tags": {
+                      "type": "array",
+                      "description": "Free-form labels for filtering and grouping on the canvas.",
+                      "items": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 64
+                      }
+                    }
+                  },
+                  "required": [
+                    "componentId",
+                    "name",
+                    "kind",
+                    "parentComponentId"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            },
+            {
+              "type": "object",
+              "required": [
+                "type",
+                "value"
+              ],
+              "additionalProperties": false,
+              "properties": {
+                "type": {
+                  "const": "relationship"
+                },
+                "value": {
+                  "type": "object",
+                  "description": "A typed, directed edge between two components.\n\nMessage topics are never aggregated server-side: **every NATS topic is its own\nrelationship** with its own `relationshipId`, `kind: nats_topic` and the topic name in\n`channel`. Two producers publishing to two topics therefore yield two relationships,\nnot one merged \"messaging\" edge.\n",
+                  "properties": {
+                    "relationshipId": {
+                      "type": "string",
+                      "description": "Opaque, agent-assigned identifier for a domain object such as a plan, work step,\nfeedback item, diff, risk or relationship. Stable for the lifetime of the run.\n",
+                      "minLength": 1,
+                      "maxLength": 128,
+                      "examples": [
+                        "plan-2026-08-04-0001"
+                      ]
+                    },
+                    "sourceComponentId": {
+                      "type": "string",
+                      "description": "Identifier of an architecture component, stable across snapshots. Lowercase\nalphanumerics plus `.`, `_` and `-`; must start and end with an alphanumeric\ncharacter. Dotted paths are a convention, not a hierarchy: the hierarchy is expressed\nexclusively through `parentComponentId`.\n",
+                      "pattern": "^[a-z0-9][a-z0-9._-]{0,126}[a-z0-9]$",
+                      "examples": [
+                        "shop-platform.orders.domain"
+                      ]
+                    },
+                    "targetComponentId": {
+                      "type": "string",
+                      "description": "Identifier of an architecture component, stable across snapshots. Lowercase\nalphanumerics plus `.`, `_` and `-`; must start and end with an alphanumeric\ncharacter. Dotted paths are a convention, not a hierarchy: the hierarchy is expressed\nexclusively through `parentComponentId`.\n",
+                      "pattern": "^[a-z0-9][a-z0-9._-]{0,126}[a-z0-9]$",
+                      "examples": [
+                        "shop-platform.orders.domain"
+                      ]
+                    },
+                    "kind": {
+                      "type": "string",
+                      "description": "Interaction type of the edge. `nats_topic` denotes exactly one topic, named in\n`channel`.\n",
+                      "enum": [
+                        "http",
+                        "grpc",
+                        "data",
+                        "async",
+                        "nats_topic",
+                        "dependency"
+                      ]
+                    },
+                    "label": {
+                      "type": "string",
+                      "description": "Short human-readable edge label for the canvas."
+                    },
+                    "protocol": {
+                      "type": "string",
+                      "description": "Concrete protocol, for example `HTTPS`, `gRPC/HTTP2` or `postgresql`."
+                    },
+                    "operation": {
+                      "type": "string",
+                      "description": "Concrete operation carried by the edge, for example `GET /orders` or\n`orders.v1.OrderService/PlaceOrder`.\n"
+                    },
+                    "channel": {
+                      "type": "string",
+                      "description": "Channel name for message-based edges. For `kind: nats_topic` this is the NATS\ntopic name and identifies the relationship semantically.\n"
+                    }
+                  },
+                  "required": [
+                    "relationshipId",
+                    "sourceComponentId",
+                    "targetComponentId",
+                    "kind"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          ]
+        }
+      }
+    },
+    "eventType": null
+  },
+  "visualise_context_read": {
+    "input": {
+      "allOf": [
+        {
+          "type": "object",
+          "required": [
+            "contractVersion",
+            "projectId"
+          ],
+          "properties": {
+            "contractVersion": {
+              "type": "string",
+              "const": "2.0.0"
+            },
+            "projectId": {
+              "type": "string",
+              "description": "Stable, human-readable project slug. Lowercase alphanumerics and hyphens,\n3 to 64 characters, must start and end with an alphanumeric character.\n",
+              "pattern": "^[a-z0-9][a-z0-9-]{1,62}[a-z0-9]$",
+              "examples": [
+                "visualise-ai"
+              ]
+            }
+          }
+        },
+        {
+          "type": "object",
+          "properties": {
+            "limit": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 200,
+              "default": 50
+            },
+            "cursor": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 2048
+            }
+          }
+        }
+      ],
+      "type": "object",
+      "required": [
+        "runId"
+      ],
+      "unevaluatedProperties": false,
+      "properties": {
+        "runId": {
+          "type": "string",
+          "description": "Identifier of one agent run inside a project. Same character rules as `ProjectId`.\nA run groups every agent, plan and work event of a single orchestrated session.\n",
+          "pattern": "^[a-z0-9][a-z0-9-]{1,62}[a-z0-9]$",
+          "examples": [
+            "run-2026-08-04-0001"
+          ]
+        }
+      }
+    },
+    "output": {
+      "allOf": [
+        {
+          "type": "object",
+          "required": [
+            "projectId",
+            "modelRevision",
+            "projectPosition"
+          ],
+          "properties": {
+            "projectId": {
+              "type": "string",
+              "description": "Stable, human-readable project slug. Lowercase alphanumerics and hyphens,\n3 to 64 characters, must start and end with an alphanumeric character.\n",
+              "pattern": "^[a-z0-9][a-z0-9-]{1,62}[a-z0-9]$",
+              "examples": [
+                "visualise-ai"
+              ]
+            },
+            "modelRevision": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 9007199254740991
+            },
+            "projectPosition": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 9007199254740991
+            }
+          }
+        }
+      ],
+      "type": "object",
+      "required": [
+        "runId",
+        "isOpen",
+        "items",
+        "nextCursor"
+      ],
+      "unevaluatedProperties": false,
+      "properties": {
+        "runId": {
+          "type": "string",
+          "description": "Identifier of one agent run inside a project. Same character rules as `ProjectId`.\nA run groups every agent, plan and work event of a single orchestrated session.\n",
+          "pattern": "^[a-z0-9][a-z0-9-]{1,62}[a-z0-9]$",
+          "examples": [
+            "run-2026-08-04-0001"
+          ]
+        },
+        "isOpen": {
+          "type": "boolean"
+        },
+        "nextCursor": {
+          "oneOf": [
+            {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 2048
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "items": {
+          "type": "array",
+          "maxItems": 200,
+          "items": {
+            "type": "object",
+            "required": [
+              "agent",
+              "scope",
+              "scopePosition",
+              "missingReferences"
+            ],
+            "additionalProperties": false,
+            "properties": {
+              "agent": {
+                "type": "object",
+                "description": "One node of the agent tree of a run. The tree is expressed through `parentAgentId`;\nthe list is flat.\n\nNothing here is derived: `status` stays empty until `agent.status_reported` arrives,\n`progress` stays `null` until the agent reported a number, and `finishedOutcome` stays\n`null` until `agent.finished`. Silence changes nothing.\n",
+                "properties": {
+                  "workScope": {
+                    "oneOf": [
+                      {
+                        "type": "object",
+                        "required": [
+                          "componentIds",
+                          "relationshipIds"
+                        ],
+                        "additionalProperties": false,
+                        "properties": {
+                          "componentIds": {
+                            "type": "array",
+                            "maxItems": 200,
+                            "uniqueItems": true,
+                            "items": {
+                              "type": "string",
+                              "description": "Identifier of an architecture component, stable across snapshots. Lowercase\nalphanumerics plus `.`, `_` and `-`; must start and end with an alphanumeric\ncharacter. Dotted paths are a convention, not a hierarchy: the hierarchy is expressed\nexclusively through `parentComponentId`.\n",
+                              "pattern": "^[a-z0-9][a-z0-9._-]{0,126}[a-z0-9]$",
+                              "examples": [
+                                "shop-platform.orders.domain"
+                              ]
+                            }
+                          },
+                          "relationshipIds": {
+                            "type": "array",
+                            "maxItems": 200,
+                            "uniqueItems": true,
+                            "items": {
+                              "type": "string",
+                              "description": "Opaque, agent-assigned identifier for a domain object such as a plan, work step,\nfeedback item, diff, risk or relationship. Stable for the lifetime of the run.\n",
+                              "minLength": 1,
+                              "maxLength": 128,
+                              "examples": [
+                                "plan-2026-08-04-0001"
+                              ]
+                            }
+                          }
+                        }
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "workScopePosition": {
+                    "oneOf": [
+                      {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 9007199254740991
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "missingScopeReferences": {
+                    "type": "object",
+                    "required": [
+                      "componentIds",
+                      "relationshipIds"
+                    ],
+                    "additionalProperties": false,
+                    "properties": {
+                      "componentIds": {
+                        "type": "array",
+                        "maxItems": 200,
+                        "uniqueItems": true,
+                        "items": {
+                          "type": "string",
+                          "description": "Identifier of an architecture component, stable across snapshots. Lowercase\nalphanumerics plus `.`, `_` and `-`; must start and end with an alphanumeric\ncharacter. Dotted paths are a convention, not a hierarchy: the hierarchy is expressed\nexclusively through `parentComponentId`.\n",
+                          "pattern": "^[a-z0-9][a-z0-9._-]{0,126}[a-z0-9]$",
+                          "examples": [
+                            "shop-platform.orders.domain"
+                          ]
+                        }
+                      },
+                      "relationshipIds": {
+                        "type": "array",
+                        "maxItems": 200,
+                        "uniqueItems": true,
+                        "items": {
+                          "type": "string",
+                          "description": "Opaque, agent-assigned identifier for a domain object such as a plan, work step,\nfeedback item, diff, risk or relationship. Stable for the lifetime of the run.\n",
+                          "minLength": 1,
+                          "maxLength": 128,
+                          "examples": [
+                            "plan-2026-08-04-0001"
+                          ]
+                        }
+                      }
+                    }
+                  },
+                  "agentId": {
+                    "type": "string",
+                    "description": "Identifier of the reporting agent, unique within a run. Same character rules as\n`ProjectId`.\n",
+                    "pattern": "^[a-z0-9][a-z0-9-]{1,62}[a-z0-9]$",
+                    "examples": [
+                      "subagent-openapi-contract"
+                    ]
+                  },
+                  "runId": {
+                    "type": "string",
+                    "description": "Identifier of one agent run inside a project. Same character rules as `ProjectId`.\nA run groups every agent, plan and work event of a single orchestrated session.\n",
+                    "pattern": "^[a-z0-9][a-z0-9-]{1,62}[a-z0-9]$",
+                    "examples": [
+                      "run-2026-08-04-0001"
+                    ]
+                  },
+                  "parentAgentId": {
+                    "description": "The delegating agent, `null` for the root orchestrator.",
+                    "oneOf": [
+                      {
+                        "type": "string",
+                        "description": "Identifier of the reporting agent, unique within a run. Same character rules as\n`ProjectId`.\n",
+                        "pattern": "^[a-z0-9][a-z0-9-]{1,62}[a-z0-9]$",
+                        "examples": [
+                          "subagent-openapi-contract"
+                        ]
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "role": {
+                    "type": "string",
+                    "description": "Position of the agent in the run hierarchy, as reported.",
+                    "enum": [
+                      "",
+                      "orchestrator",
+                      "subagent"
+                    ]
+                  },
+                  "displayName": {
+                    "type": "string",
+                    "description": "Name shown for this agent, empty when the agent never reported `agent.started`."
+                  },
+                  "assignedTask": {
+                    "type": "string",
+                    "description": "The task the agent was given, in its own words. Empty when never reported."
+                  },
+                  "status": {
+                    "type": "string",
+                    "description": "Last explicitly reported status. Empty means none was ever reported.",
+                    "enum": [
+                      "",
+                      "working",
+                      "waiting",
+                      "blocked",
+                      "idle",
+                      "done"
+                    ]
+                  },
+                  "statusNote": {
+                    "type": "string",
+                    "description": "Optional one-line explanation that came with the status."
+                  },
+                  "progress": {
+                    "description": "Self-assessed progress, `null` until the agent reported one.",
+                    "oneOf": [
+                      {
+                        "type": "object",
+                        "description": "Progress **as reported by the agent itself**. `scope` separates a subagent's own task\nfrom an orchestrator's estimate for the whole run; `basis` separates a free estimate\nfrom counted steps. The cockpit displays it as reported and checks nothing.\n",
+                        "properties": {
+                          "percent": {
+                            "type": "integer",
+                            "description": "Reported completion in percent.",
+                            "minimum": 0,
+                            "maximum": 100
+                          },
+                          "scope": {
+                            "description": "What the percentage refers to, `null` when it was not reported.",
+                            "oneOf": [
+                              {
+                                "type": "string",
+                                "enum": [
+                                  "own_task",
+                                  "overall_estimate"
+                                ]
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          },
+                          "basis": {
+                            "description": "How the number was derived, `null` when it was not reported.",
+                            "oneOf": [
+                              {
+                                "type": "string",
+                                "enum": [
+                                  "reported_estimate",
+                                  "completed_steps"
+                                ]
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          }
+                        },
+                        "required": [
+                          "percent",
+                          "scope",
+                          "basis"
+                        ],
+                        "additionalProperties": false
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "finishedOutcome": {
+                    "description": "Reported outcome of `agent.finished`, `null` while the agent has not finished.",
+                    "oneOf": [
+                      {
+                        "type": "string",
+                        "description": "Terminal outcome reported by an agent or for a run.",
+                        "enum": [
+                          "completed",
+                          "failed",
+                          "cancelled"
+                        ]
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "startedAt": {
+                    "description": "When the agent was first seen in this run.",
+                    "allOf": [
+                      {
+                        "type": "string",
+                        "format": "date-time",
+                        "description": "RFC 3339 timestamp. Agents must report in UTC (`Z` suffix).",
+                        "examples": [
+                          "2026-08-04T09:12:00Z"
+                        ]
+                      }
+                    ]
+                  },
+                  "lastEventAt": {
+                    "description": "When this agent last reported anything.",
+                    "allOf": [
+                      {
+                        "type": "string",
+                        "format": "date-time",
+                        "description": "RFC 3339 timestamp. Agents must report in UTC (`Z` suffix).",
+                        "examples": [
+                          "2026-08-04T09:12:00Z"
+                        ]
+                      }
+                    ]
+                  },
+                  "position": {
+                    "type": "integer",
+                    "format": "int64",
+                    "description": "Project position of the event that last wrote this row. It lets the UI reconcile a\nsingle node when a live event arrives instead of refetching the whole snapshot.\n",
+                    "minimum": 0,
+                    "examples": [
+                      11
+                    ]
+                  }
+                },
+                "required": [
+                  "agentId",
+                  "runId",
+                  "parentAgentId",
+                  "role",
+                  "displayName",
+                  "assignedTask",
+                  "status",
+                  "statusNote",
+                  "progress",
+                  "finishedOutcome",
+                  "startedAt",
+                  "lastEventAt",
+                  "position"
+                ],
+                "additionalProperties": false
+              },
+              "scope": {
+                "oneOf": [
+                  {
+                    "type": "object",
+                    "required": [
+                      "componentIds",
+                      "relationshipIds"
+                    ],
+                    "additionalProperties": false,
+                    "properties": {
+                      "componentIds": {
+                        "type": "array",
+                        "maxItems": 200,
+                        "uniqueItems": true,
+                        "items": {
+                          "type": "string",
+                          "description": "Identifier of an architecture component, stable across snapshots. Lowercase\nalphanumerics plus `.`, `_` and `-`; must start and end with an alphanumeric\ncharacter. Dotted paths are a convention, not a hierarchy: the hierarchy is expressed\nexclusively through `parentComponentId`.\n",
+                          "pattern": "^[a-z0-9][a-z0-9._-]{0,126}[a-z0-9]$",
+                          "examples": [
+                            "shop-platform.orders.domain"
+                          ]
+                        }
+                      },
+                      "relationshipIds": {
+                        "type": "array",
+                        "maxItems": 200,
+                        "uniqueItems": true,
+                        "items": {
+                          "type": "string",
+                          "description": "Opaque, agent-assigned identifier for a domain object such as a plan, work step,\nfeedback item, diff, risk or relationship. Stable for the lifetime of the run.\n",
+                          "minLength": 1,
+                          "maxLength": 128,
+                          "examples": [
+                            "plan-2026-08-04-0001"
+                          ]
+                        }
+                      }
+                    }
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "scopePosition": {
+                "oneOf": [
+                  {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "missingReferences": {
+                "type": "object",
+                "required": [
+                  "componentIds",
+                  "relationshipIds"
+                ],
+                "additionalProperties": false,
+                "properties": {
+                  "componentIds": {
+                    "type": "array",
+                    "maxItems": 200,
+                    "uniqueItems": true,
+                    "items": {
+                      "type": "string",
+                      "description": "Identifier of an architecture component, stable across snapshots. Lowercase\nalphanumerics plus `.`, `_` and `-`; must start and end with an alphanumeric\ncharacter. Dotted paths are a convention, not a hierarchy: the hierarchy is expressed\nexclusively through `parentComponentId`.\n",
+                      "pattern": "^[a-z0-9][a-z0-9._-]{0,126}[a-z0-9]$",
+                      "examples": [
+                        "shop-platform.orders.domain"
+                      ]
+                    }
+                  },
+                  "relationshipIds": {
+                    "type": "array",
+                    "maxItems": 200,
+                    "uniqueItems": true,
+                    "items": {
+                      "type": "string",
+                      "description": "Opaque, agent-assigned identifier for a domain object such as a plan, work step,\nfeedback item, diff, risk or relationship. Stable for the lifetime of the run.\n",
+                      "minLength": 1,
+                      "maxLength": 128,
+                      "examples": [
+                        "plan-2026-08-04-0001"
+                      ]
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "eventType": null
+  },
+  "visualise_context_open": {
+    "input": {
+      "allOf": [
+        {
+          "allOf": [
+            {
+              "type": "object",
+              "required": [
+                "contractVersion",
+                "projectId"
+              ],
+              "properties": {
+                "contractVersion": {
+                  "type": "string",
+                  "const": "2.0.0"
+                },
+                "projectId": {
+                  "type": "string",
+                  "description": "Stable, human-readable project slug. Lowercase alphanumerics and hyphens,\n3 to 64 characters, must start and end with an alphanumeric character.\n",
+                  "pattern": "^[a-z0-9][a-z0-9-]{1,62}[a-z0-9]$",
+                  "examples": [
+                    "visualise-ai"
+                  ]
+                }
+              }
+            }
+          ],
+          "type": "object",
+          "required": [
+            "clientEventId",
+            "runId",
+            "agentId",
+            "parentAgentId",
+            "occurredAt"
+          ],
+          "properties": {
+            "clientEventId": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "runId": {
+              "type": "string",
+              "description": "Identifier of one agent run inside a project. Same character rules as `ProjectId`.\nA run groups every agent, plan and work event of a single orchestrated session.\n",
+              "pattern": "^[a-z0-9][a-z0-9-]{1,62}[a-z0-9]$",
+              "examples": [
+                "run-2026-08-04-0001"
+              ]
+            },
+            "agentId": {
+              "type": "string",
+              "description": "Identifier of the reporting agent, unique within a run. Same character rules as\n`ProjectId`.\n",
+              "pattern": "^[a-z0-9][a-z0-9-]{1,62}[a-z0-9]$",
+              "examples": [
+                "subagent-openapi-contract"
+              ]
+            },
+            "parentAgentId": {
+              "oneOf": [
+                {
+                  "type": "string",
+                  "description": "Identifier of the reporting agent, unique within a run. Same character rules as\n`ProjectId`.\n",
+                  "pattern": "^[a-z0-9][a-z0-9-]{1,62}[a-z0-9]$",
+                  "examples": [
+                    "subagent-openapi-contract"
+                  ]
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "occurredAt": {
+              "type": "string",
+              "format": "date-time",
+              "pattern": "Z$"
+            }
+          }
+        }
+      ],
+      "type": "object",
+      "required": [
+        "role",
+        "displayName",
+        "assignedTask"
+      ],
+      "unevaluatedProperties": false,
+      "properties": {
+        "role": {
+          "enum": [
+            "orchestrator",
+            "subagent"
+          ]
+        },
+        "displayName": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 200
+        },
+        "assignedTask": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 4000
+        }
+      }
+    },
+    "output": {
+      "allOf": [
+        {
+          "type": "object",
+          "required": [
+            "projectId",
+            "modelRevision",
+            "projectPosition"
+          ],
+          "properties": {
+            "projectId": {
+              "type": "string",
+              "description": "Stable, human-readable project slug. Lowercase alphanumerics and hyphens,\n3 to 64 characters, must start and end with an alphanumeric character.\n",
+              "pattern": "^[a-z0-9][a-z0-9-]{1,62}[a-z0-9]$",
+              "examples": [
+                "visualise-ai"
+              ]
+            },
+            "modelRevision": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 9007199254740991
+            },
+            "projectPosition": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 9007199254740991
+            }
+          }
+        }
+      ],
+      "type": "object",
+      "required": [
+        "clientEventId",
+        "serverEventId",
+        "receivedAt",
+        "duplicate",
+        "viewRevision",
+        "runId",
+        "agentId",
+        "affected"
+      ],
+      "unevaluatedProperties": false,
+      "properties": {
+        "clientEventId": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "serverEventId": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "receivedAt": {
+          "type": "string",
+          "format": "date-time",
+          "pattern": "Z$"
+        },
+        "duplicate": {
+          "type": "boolean"
+        },
+        "viewRevision": {
+          "oneOf": [
+            {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 9007199254740991
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "runId": {
+          "type": "string",
+          "description": "Identifier of one agent run inside a project. Same character rules as `ProjectId`.\nA run groups every agent, plan and work event of a single orchestrated session.\n",
+          "pattern": "^[a-z0-9][a-z0-9-]{1,62}[a-z0-9]$",
+          "examples": [
+            "run-2026-08-04-0001"
+          ]
+        },
+        "agentId": {
+          "type": "string",
+          "description": "Identifier of the reporting agent, unique within a run. Same character rules as\n`ProjectId`.\n",
+          "pattern": "^[a-z0-9][a-z0-9-]{1,62}[a-z0-9]$",
+          "examples": [
+            "subagent-openapi-contract"
+          ]
+        },
+        "affected": {
+          "type": "object",
+          "required": [
+            "componentIds",
+            "relationshipIds"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "componentIds": {
+              "type": "array",
+              "maxItems": 200,
+              "uniqueItems": true,
+              "items": {
+                "type": "string",
+                "description": "Identifier of an architecture component, stable across snapshots. Lowercase\nalphanumerics plus `.`, `_` and `-`; must start and end with an alphanumeric\ncharacter. Dotted paths are a convention, not a hierarchy: the hierarchy is expressed\nexclusively through `parentComponentId`.\n",
+                "pattern": "^[a-z0-9][a-z0-9._-]{0,126}[a-z0-9]$",
+                "examples": [
+                  "shop-platform.orders.domain"
+                ]
+              }
+            },
+            "relationshipIds": {
+              "type": "array",
+              "maxItems": 200,
+              "uniqueItems": true,
+              "items": {
+                "type": "string",
+                "description": "Opaque, agent-assigned identifier for a domain object such as a plan, work step,\nfeedback item, diff, risk or relationship. Stable for the lifetime of the run.\n",
+                "minLength": 1,
+                "maxLength": 128,
+                "examples": [
+                  "plan-2026-08-04-0001"
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    "eventType": "context.opened"
+  },
+  "visualise_work_report": {
+    "input": {
+      "allOf": [
+        {
+          "allOf": [
+            {
+              "type": "object",
+              "required": [
+                "contractVersion",
+                "projectId"
+              ],
+              "properties": {
+                "contractVersion": {
+                  "type": "string",
+                  "const": "2.0.0"
+                },
+                "projectId": {
+                  "type": "string",
+                  "description": "Stable, human-readable project slug. Lowercase alphanumerics and hyphens,\n3 to 64 characters, must start and end with an alphanumeric character.\n",
+                  "pattern": "^[a-z0-9][a-z0-9-]{1,62}[a-z0-9]$",
+                  "examples": [
+                    "visualise-ai"
+                  ]
+                }
+              }
+            }
+          ],
+          "type": "object",
+          "required": [
+            "clientEventId",
+            "runId",
+            "agentId",
+            "parentAgentId",
+            "occurredAt"
+          ],
+          "properties": {
+            "clientEventId": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "runId": {
+              "type": "string",
+              "description": "Identifier of one agent run inside a project. Same character rules as `ProjectId`.\nA run groups every agent, plan and work event of a single orchestrated session.\n",
+              "pattern": "^[a-z0-9][a-z0-9-]{1,62}[a-z0-9]$",
+              "examples": [
+                "run-2026-08-04-0001"
+              ]
+            },
+            "agentId": {
+              "type": "string",
+              "description": "Identifier of the reporting agent, unique within a run. Same character rules as\n`ProjectId`.\n",
+              "pattern": "^[a-z0-9][a-z0-9-]{1,62}[a-z0-9]$",
+              "examples": [
+                "subagent-openapi-contract"
+              ]
+            },
+            "parentAgentId": {
+              "oneOf": [
+                {
+                  "type": "string",
+                  "description": "Identifier of the reporting agent, unique within a run. Same character rules as\n`ProjectId`.\n",
+                  "pattern": "^[a-z0-9][a-z0-9-]{1,62}[a-z0-9]$",
+                  "examples": [
+                    "subagent-openapi-contract"
+                  ]
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "occurredAt": {
+              "type": "string",
+              "format": "date-time",
+              "pattern": "Z$"
+            }
+          }
+        }
+      ],
+      "type": "object",
+      "required": [
+        "report"
+      ],
+      "unevaluatedProperties": false,
+      "properties": {
+        "report": {
+          "oneOf": [
+            {
+              "type": "object",
+              "required": [
+                "action",
+                "workStepId",
+                "title",
+                "componentIds"
+              ],
+              "additionalProperties": false,
+              "properties": {
+                "action": {
+                  "const": "step_start"
+                },
+                "workStepId": {
+                  "type": "string",
+                  "description": "Opaque, agent-assigned identifier for a domain object such as a plan, work step,\nfeedback item, diff, risk or relationship. Stable for the lifetime of the run.\n",
+                  "minLength": 1,
+                  "maxLength": 128,
+                  "examples": [
+                    "plan-2026-08-04-0001"
+                  ]
+                },
+                "title": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 300
+                },
+                "componentIds": {
+                  "type": "array",
+                  "maxItems": 200,
+                  "uniqueItems": true,
+                  "items": {
+                    "type": "string",
+                    "description": "Identifier of an architecture component, stable across snapshots. Lowercase\nalphanumerics plus `.`, `_` and `-`; must start and end with an alphanumeric\ncharacter. Dotted paths are a convention, not a hierarchy: the hierarchy is expressed\nexclusively through `parentComponentId`.\n",
+                    "pattern": "^[a-z0-9][a-z0-9._-]{0,126}[a-z0-9]$",
+                    "examples": [
+                      "shop-platform.orders.domain"
+                    ]
+                  }
+                }
+              }
+            },
+            {
+              "type": "object",
+              "required": [
+                "action",
+                "workStepId",
+                "summary"
+              ],
+              "additionalProperties": false,
+              "properties": {
+                "action": {
+                  "const": "step_complete"
+                },
+                "workStepId": {
+                  "type": "string",
+                  "description": "Opaque, agent-assigned identifier for a domain object such as a plan, work step,\nfeedback item, diff, risk or relationship. Stable for the lifetime of the run.\n",
+                  "minLength": 1,
+                  "maxLength": 128,
+                  "examples": [
+                    "plan-2026-08-04-0001"
+                  ]
+                },
+                "summary": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 4000
+                }
+              }
+            },
+            {
+              "type": "object",
+              "required": [
+                "action",
+                "status"
+              ],
+              "additionalProperties": false,
+              "properties": {
+                "action": {
+                  "const": "status"
+                },
+                "status": {
+                  "type": "string",
+                  "description": "Status as stated by the agent itself.",
+                  "enum": [
+                    "working",
+                    "waiting",
+                    "blocked",
+                    "idle",
+                    "done"
+                  ]
+                },
+                "note": {
+                  "type": "string",
+                  "maxLength": 4000
+                }
+              }
+            },
+            {
+              "type": "object",
+              "required": [
+                "action",
+                "percent",
+                "scope",
+                "basis"
+              ],
+              "additionalProperties": false,
+              "properties": {
+                "action": {
+                  "const": "progress"
+                },
+                "percent": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 100
+                },
+                "scope": {
+                  "type": "string",
+                  "description": "What the percentage refers to: the agent's own assigned task, or the agent's\nestimate for the overall run.\n",
+                  "enum": [
+                    "own_task",
+                    "overall_estimate"
+                  ]
+                },
+                "basis": {
+                  "type": "string",
+                  "description": "How the number was derived: a free estimate by the agent, or the ratio of completed\nplan or work steps.\n",
+                  "enum": [
+                    "reported_estimate",
+                    "completed_steps"
+                  ]
+                },
+                "note": {
+                  "type": "string",
+                  "maxLength": 4000
+                }
+              }
+            },
+            {
+              "type": "object",
+              "required": [
+                "action",
+                "outcome",
+                "summary"
+              ],
+              "additionalProperties": false,
+              "properties": {
+                "action": {
+                  "const": "agent_finish"
+                },
+                "outcome": {
+                  "type": "string",
+                  "description": "Terminal outcome reported by an agent or for a run.",
+                  "enum": [
+                    "completed",
+                    "failed",
+                    "cancelled"
+                  ]
+                },
+                "summary": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 4000
+                }
+              }
+            },
+            {
+              "type": "object",
+              "required": [
+                "action",
+                "outcome",
+                "summary"
+              ],
+              "additionalProperties": false,
+              "properties": {
+                "action": {
+                  "const": "run_finish"
+                },
+                "outcome": {
+                  "type": "string",
+                  "description": "Terminal outcome reported by an agent or for a run.",
+                  "enum": [
+                    "completed",
+                    "failed",
+                    "cancelled"
+                  ]
+                },
+                "summary": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 4000
+                }
+              }
+            }
+          ]
+        }
+      }
+    },
+    "output": {
+      "allOf": [
+        {
+          "type": "object",
+          "required": [
+            "projectId",
+            "modelRevision",
+            "projectPosition"
+          ],
+          "properties": {
+            "projectId": {
+              "type": "string",
+              "description": "Stable, human-readable project slug. Lowercase alphanumerics and hyphens,\n3 to 64 characters, must start and end with an alphanumeric character.\n",
+              "pattern": "^[a-z0-9][a-z0-9-]{1,62}[a-z0-9]$",
+              "examples": [
+                "visualise-ai"
+              ]
+            },
+            "modelRevision": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 9007199254740991
+            },
+            "projectPosition": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 9007199254740991
+            }
+          }
+        }
+      ],
+      "type": "object",
+      "required": [
+        "clientEventId",
+        "serverEventId",
+        "receivedAt",
+        "duplicate",
+        "viewRevision",
+        "runId",
+        "agentId",
+        "affected"
+      ],
+      "unevaluatedProperties": false,
+      "properties": {
+        "clientEventId": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "serverEventId": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "receivedAt": {
+          "type": "string",
+          "format": "date-time",
+          "pattern": "Z$"
+        },
+        "duplicate": {
+          "type": "boolean"
+        },
+        "viewRevision": {
+          "oneOf": [
+            {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 9007199254740991
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "runId": {
+          "type": "string",
+          "description": "Identifier of one agent run inside a project. Same character rules as `ProjectId`.\nA run groups every agent, plan and work event of a single orchestrated session.\n",
+          "pattern": "^[a-z0-9][a-z0-9-]{1,62}[a-z0-9]$",
+          "examples": [
+            "run-2026-08-04-0001"
+          ]
+        },
+        "agentId": {
+          "type": "string",
+          "description": "Identifier of the reporting agent, unique within a run. Same character rules as\n`ProjectId`.\n",
+          "pattern": "^[a-z0-9][a-z0-9-]{1,62}[a-z0-9]$",
+          "examples": [
+            "subagent-openapi-contract"
+          ]
+        },
+        "affected": {
+          "type": "object",
+          "required": [
+            "componentIds",
+            "relationshipIds"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "componentIds": {
+              "type": "array",
+              "maxItems": 200,
+              "uniqueItems": true,
+              "items": {
+                "type": "string",
+                "description": "Identifier of an architecture component, stable across snapshots. Lowercase\nalphanumerics plus `.`, `_` and `-`; must start and end with an alphanumeric\ncharacter. Dotted paths are a convention, not a hierarchy: the hierarchy is expressed\nexclusively through `parentComponentId`.\n",
+                "pattern": "^[a-z0-9][a-z0-9._-]{0,126}[a-z0-9]$",
+                "examples": [
+                  "shop-platform.orders.domain"
+                ]
+              }
+            },
+            "relationshipIds": {
+              "type": "array",
+              "maxItems": 200,
+              "uniqueItems": true,
+              "items": {
+                "type": "string",
+                "description": "Opaque, agent-assigned identifier for a domain object such as a plan, work step,\nfeedback item, diff, risk or relationship. Stable for the lifetime of the run.\n",
+                "minLength": 1,
+                "maxLength": 128,
+                "examples": [
+                  "plan-2026-08-04-0001"
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    "eventType": "work.reported"
+  },
+  "visualise_work_scope_set": {
+    "input": {
+      "allOf": [
+        {
+          "allOf": [
+            {
+              "type": "object",
+              "required": [
+                "contractVersion",
+                "projectId"
+              ],
+              "properties": {
+                "contractVersion": {
+                  "type": "string",
+                  "const": "2.0.0"
+                },
+                "projectId": {
+                  "type": "string",
+                  "description": "Stable, human-readable project slug. Lowercase alphanumerics and hyphens,\n3 to 64 characters, must start and end with an alphanumeric character.\n",
+                  "pattern": "^[a-z0-9][a-z0-9-]{1,62}[a-z0-9]$",
+                  "examples": [
+                    "visualise-ai"
+                  ]
+                }
+              }
+            }
+          ],
+          "type": "object",
+          "required": [
+            "clientEventId",
+            "runId",
+            "agentId",
+            "parentAgentId",
+            "occurredAt"
+          ],
+          "properties": {
+            "clientEventId": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "runId": {
+              "type": "string",
+              "description": "Identifier of one agent run inside a project. Same character rules as `ProjectId`.\nA run groups every agent, plan and work event of a single orchestrated session.\n",
+              "pattern": "^[a-z0-9][a-z0-9-]{1,62}[a-z0-9]$",
+              "examples": [
+                "run-2026-08-04-0001"
+              ]
+            },
+            "agentId": {
+              "type": "string",
+              "description": "Identifier of the reporting agent, unique within a run. Same character rules as\n`ProjectId`.\n",
+              "pattern": "^[a-z0-9][a-z0-9-]{1,62}[a-z0-9]$",
+              "examples": [
+                "subagent-openapi-contract"
+              ]
+            },
+            "parentAgentId": {
+              "oneOf": [
+                {
+                  "type": "string",
+                  "description": "Identifier of the reporting agent, unique within a run. Same character rules as\n`ProjectId`.\n",
+                  "pattern": "^[a-z0-9][a-z0-9-]{1,62}[a-z0-9]$",
+                  "examples": [
+                    "subagent-openapi-contract"
+                  ]
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "occurredAt": {
+              "type": "string",
+              "format": "date-time",
+              "pattern": "Z$"
+            }
+          }
+        }
+      ],
+      "type": "object",
+      "required": [
+        "scope"
+      ],
+      "unevaluatedProperties": false,
+      "properties": {
+        "scope": {
+          "type": "object",
+          "required": [
+            "componentIds",
+            "relationshipIds"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "componentIds": {
+              "type": "array",
+              "maxItems": 200,
+              "uniqueItems": true,
+              "items": {
+                "type": "string",
+                "description": "Identifier of an architecture component, stable across snapshots. Lowercase\nalphanumerics plus `.`, `_` and `-`; must start and end with an alphanumeric\ncharacter. Dotted paths are a convention, not a hierarchy: the hierarchy is expressed\nexclusively through `parentComponentId`.\n",
+                "pattern": "^[a-z0-9][a-z0-9._-]{0,126}[a-z0-9]$",
+                "examples": [
+                  "shop-platform.orders.domain"
+                ]
+              }
+            },
+            "relationshipIds": {
+              "type": "array",
+              "maxItems": 200,
+              "uniqueItems": true,
+              "items": {
+                "type": "string",
+                "description": "Opaque, agent-assigned identifier for a domain object such as a plan, work step,\nfeedback item, diff, risk or relationship. Stable for the lifetime of the run.\n",
+                "minLength": 1,
+                "maxLength": 128,
+                "examples": [
+                  "plan-2026-08-04-0001"
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    "output": {
+      "allOf": [
+        {
+          "type": "object",
+          "required": [
+            "projectId",
+            "modelRevision",
+            "projectPosition"
+          ],
+          "properties": {
+            "projectId": {
+              "type": "string",
+              "description": "Stable, human-readable project slug. Lowercase alphanumerics and hyphens,\n3 to 64 characters, must start and end with an alphanumeric character.\n",
+              "pattern": "^[a-z0-9][a-z0-9-]{1,62}[a-z0-9]$",
+              "examples": [
+                "visualise-ai"
+              ]
+            },
+            "modelRevision": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 9007199254740991
+            },
+            "projectPosition": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 9007199254740991
+            }
+          }
+        }
+      ],
+      "type": "object",
+      "required": [
+        "clientEventId",
+        "serverEventId",
+        "receivedAt",
+        "duplicate",
+        "viewRevision",
+        "runId",
+        "agentId",
+        "affected"
+      ],
+      "unevaluatedProperties": false,
+      "properties": {
+        "clientEventId": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "serverEventId": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "receivedAt": {
+          "type": "string",
+          "format": "date-time",
+          "pattern": "Z$"
+        },
+        "duplicate": {
+          "type": "boolean"
+        },
+        "viewRevision": {
+          "oneOf": [
+            {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 9007199254740991
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "runId": {
+          "type": "string",
+          "description": "Identifier of one agent run inside a project. Same character rules as `ProjectId`.\nA run groups every agent, plan and work event of a single orchestrated session.\n",
+          "pattern": "^[a-z0-9][a-z0-9-]{1,62}[a-z0-9]$",
+          "examples": [
+            "run-2026-08-04-0001"
+          ]
+        },
+        "agentId": {
+          "type": "string",
+          "description": "Identifier of the reporting agent, unique within a run. Same character rules as\n`ProjectId`.\n",
+          "pattern": "^[a-z0-9][a-z0-9-]{1,62}[a-z0-9]$",
+          "examples": [
+            "subagent-openapi-contract"
+          ]
+        },
+        "affected": {
+          "type": "object",
+          "required": [
+            "componentIds",
+            "relationshipIds"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "componentIds": {
+              "type": "array",
+              "maxItems": 200,
+              "uniqueItems": true,
+              "items": {
+                "type": "string",
+                "description": "Identifier of an architecture component, stable across snapshots. Lowercase\nalphanumerics plus `.`, `_` and `-`; must start and end with an alphanumeric\ncharacter. Dotted paths are a convention, not a hierarchy: the hierarchy is expressed\nexclusively through `parentComponentId`.\n",
+                "pattern": "^[a-z0-9][a-z0-9._-]{0,126}[a-z0-9]$",
+                "examples": [
+                  "shop-platform.orders.domain"
+                ]
+              }
+            },
+            "relationshipIds": {
+              "type": "array",
+              "maxItems": 200,
+              "uniqueItems": true,
+              "items": {
+                "type": "string",
+                "description": "Opaque, agent-assigned identifier for a domain object such as a plan, work step,\nfeedback item, diff, risk or relationship. Stable for the lifetime of the run.\n",
+                "minLength": 1,
+                "maxLength": 128,
+                "examples": [
+                  "plan-2026-08-04-0001"
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    "eventType": "work.scope_reported"
+  },
+  "visualise_model_mutate": {
+    "input": {
+      "type": "object",
+      "allOf": [
+        {
+          "allOf": [
+            {
+              "type": "object",
+              "required": [
+                "contractVersion",
+                "projectId"
+              ],
+              "properties": {
+                "contractVersion": {
+                  "type": "string",
+                  "const": "2.0.0"
+                },
+                "projectId": {
+                  "type": "string",
+                  "description": "Stable, human-readable project slug. Lowercase alphanumerics and hyphens,\n3 to 64 characters, must start and end with an alphanumeric character.\n",
+                  "pattern": "^[a-z0-9][a-z0-9-]{1,62}[a-z0-9]$",
+                  "examples": [
+                    "visualise-ai"
+                  ]
+                }
+              }
+            }
+          ],
+          "type": "object",
+          "required": [
+            "clientEventId",
+            "runId",
+            "agentId",
+            "parentAgentId",
+            "occurredAt"
+          ],
+          "properties": {
+            "clientEventId": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "runId": {
+              "type": "string",
+              "description": "Identifier of one agent run inside a project. Same character rules as `ProjectId`.\nA run groups every agent, plan and work event of a single orchestrated session.\n",
+              "pattern": "^[a-z0-9][a-z0-9-]{1,62}[a-z0-9]$",
+              "examples": [
+                "run-2026-08-04-0001"
+              ]
+            },
+            "agentId": {
+              "type": "string",
+              "description": "Identifier of the reporting agent, unique within a run. Same character rules as\n`ProjectId`.\n",
+              "pattern": "^[a-z0-9][a-z0-9-]{1,62}[a-z0-9]$",
+              "examples": [
+                "subagent-openapi-contract"
+              ]
+            },
+            "parentAgentId": {
+              "oneOf": [
+                {
+                  "type": "string",
+                  "description": "Identifier of the reporting agent, unique within a run. Same character rules as\n`ProjectId`.\n",
+                  "pattern": "^[a-z0-9][a-z0-9-]{1,62}[a-z0-9]$",
+                  "examples": [
+                    "subagent-openapi-contract"
+                  ]
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "occurredAt": {
+              "type": "string",
+              "format": "date-time",
+              "pattern": "Z$"
+            }
+          }
+        },
+        {
+          "description": "Open composition of the closed wire payload, without duplicated field shapes.",
+          "type": "object",
+          "required": [
+            "expectedModelRevision",
+            "operations"
+          ],
+          "properties": {
+            "expectedModelRevision": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 9007199254740991
+            },
+            "operations": {
+              "type": "array",
+              "minItems": 1,
+              "maxItems": 100,
+              "items": {
+                "oneOf": [
+                  {
+                    "type": "object",
+                    "required": [
+                      "op",
+                      "component"
+                    ],
+                    "additionalProperties": false,
+                    "properties": {
+                      "op": {
+                        "const": "component.add"
+                      },
+                      "component": {
+                        "allOf": [
+                          {
+                            "type": "object",
+                            "description": "One node of the application architecture. Components form a tree through\n`parentComponentId`; the root of a tree has `parentComponentId: null`. Arbitrary\nnesting depth is allowed, for example system -> service -> module -> module.\n",
+                            "properties": {
+                              "componentId": {
+                                "type": "string",
+                                "description": "Identifier of an architecture component, stable across snapshots. Lowercase\nalphanumerics plus `.`, `_` and `-`; must start and end with an alphanumeric\ncharacter. Dotted paths are a convention, not a hierarchy: the hierarchy is expressed\nexclusively through `parentComponentId`.\n",
+                                "pattern": "^[a-z0-9][a-z0-9._-]{0,126}[a-z0-9]$",
+                                "examples": [
+                                  "shop-platform.orders.domain"
+                                ]
+                              },
+                              "name": {
+                                "type": "string",
+                                "description": "Human-readable display name shown on the architecture canvas.",
+                                "minLength": 1,
+                                "maxLength": 200
+                              },
+                              "kind": {
+                                "type": "string",
+                                "description": "Structural role of the component. `topic` models a single message topic as its own\nnode so that topic-level relationships stay visible.\n",
+                                "enum": [
+                                  "system",
+                                  "service",
+                                  "module",
+                                  "datastore",
+                                  "queue",
+                                  "topic",
+                                  "ui",
+                                  "external",
+                                  "library"
+                                ]
+                              },
+                              "parentComponentId": {
+                                "description": "Parent node in the component hierarchy, or `null` for a root component. The value\nmust reference a `componentId` contained in the same architecture model.\n",
+                                "oneOf": [
+                                  {
+                                    "type": "string",
+                                    "description": "Identifier of an architecture component, stable across snapshots. Lowercase\nalphanumerics plus `.`, `_` and `-`; must start and end with an alphanumeric\ncharacter. Dotted paths are a convention, not a hierarchy: the hierarchy is expressed\nexclusively through `parentComponentId`.\n",
+                                    "pattern": "^[a-z0-9][a-z0-9._-]{0,126}[a-z0-9]$",
+                                    "examples": [
+                                      "shop-platform.orders.domain"
+                                    ]
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ]
+                              },
+                              "description": {
+                                "type": "string",
+                                "description": "Short explanation of the component's responsibility."
+                              },
+                              "technology": {
+                                "type": "object",
+                                "description": "Technology metadata of a component. Every field is optional; agents report what they\nknow and omit the rest.\n",
+                                "properties": {
+                                  "language": {
+                                    "type": "string",
+                                    "description": "Primary implementation language, for example `Go` or `TypeScript`."
+                                  },
+                                  "framework": {
+                                    "type": "string",
+                                    "description": "Dominant framework or library, for example `React` or `chi`."
+                                  },
+                                  "runtime": {
+                                    "type": "string",
+                                    "description": "Execution runtime, for example `Node.js`, `JVM` or `PostgreSQL`."
+                                  },
+                                  "version": {
+                                    "type": "string",
+                                    "description": "Version of the language, framework or runtime, as reported."
+                                  }
+                                },
+                                "additionalProperties": false
+                              },
+                              "tags": {
+                                "type": "array",
+                                "description": "Free-form labels for filtering and grouping on the canvas.",
+                                "items": {
+                                  "type": "string",
+                                  "minLength": 1,
+                                  "maxLength": 64
+                                }
+                              }
+                            },
+                            "required": [
+                              "componentId",
+                              "name",
+                              "kind",
+                              "parentComponentId"
+                            ],
+                            "additionalProperties": false
+                          }
+                        ],
+                        "type": "object",
+                        "properties": {
+                          "description": {
+                            "type": "string",
+                            "maxLength": 16000
+                          },
+                          "tags": {
+                            "type": "array",
+                            "maxItems": 100
+                          }
+                        }
+                      }
+                    }
+                  },
+                  {
+                    "type": "object",
+                    "required": [
+                      "op",
+                      "componentId",
+                      "set"
+                    ],
+                    "additionalProperties": false,
+                    "properties": {
+                      "op": {
+                        "const": "component.update"
+                      },
+                      "componentId": {
+                        "type": "string",
+                        "description": "Identifier of an architecture component, stable across snapshots. Lowercase\nalphanumerics plus `.`, `_` and `-`; must start and end with an alphanumeric\ncharacter. Dotted paths are a convention, not a hierarchy: the hierarchy is expressed\nexclusively through `parentComponentId`.\n",
+                        "pattern": "^[a-z0-9][a-z0-9._-]{0,126}[a-z0-9]$",
+                        "examples": [
+                          "shop-platform.orders.domain"
+                        ]
+                      },
+                      "set": {
+                        "type": "object",
+                        "minProperties": 1,
+                        "additionalProperties": false,
+                        "properties": {
+                          "name": {
+                            "type": "string",
+                            "description": "Human-readable display name shown on the architecture canvas.",
+                            "minLength": 1,
+                            "maxLength": 200
+                          },
+                          "kind": {
+                            "type": "string",
+                            "description": "Structural role of the component. `topic` models a single message topic as its own\nnode so that topic-level relationships stay visible.\n",
+                            "enum": [
+                              "system",
+                              "service",
+                              "module",
+                              "datastore",
+                              "queue",
+                              "topic",
+                              "ui",
+                              "external",
+                              "library"
+                            ]
+                          },
+                          "parentComponentId": {
+                            "oneOf": [
+                              {
+                                "type": "string",
+                                "description": "Identifier of an architecture component, stable across snapshots. Lowercase\nalphanumerics plus `.`, `_` and `-`; must start and end with an alphanumeric\ncharacter. Dotted paths are a convention, not a hierarchy: the hierarchy is expressed\nexclusively through `parentComponentId`.\n",
+                                "pattern": "^[a-z0-9][a-z0-9._-]{0,126}[a-z0-9]$",
+                                "examples": [
+                                  "shop-platform.orders.domain"
+                                ]
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          },
+                          "description": {
+                            "type": [
+                              "string",
+                              "null"
+                            ],
+                            "maxLength": 16000
+                          },
+                          "technology": {
+                            "oneOf": [
+                              {
+                                "type": "object",
+                                "description": "Technology metadata of a component. Every field is optional; agents report what they\nknow and omit the rest.\n",
+                                "properties": {
+                                  "language": {
+                                    "type": "string",
+                                    "description": "Primary implementation language, for example `Go` or `TypeScript`."
+                                  },
+                                  "framework": {
+                                    "type": "string",
+                                    "description": "Dominant framework or library, for example `React` or `chi`."
+                                  },
+                                  "runtime": {
+                                    "type": "string",
+                                    "description": "Execution runtime, for example `Node.js`, `JVM` or `PostgreSQL`."
+                                  },
+                                  "version": {
+                                    "type": "string",
+                                    "description": "Version of the language, framework or runtime, as reported."
+                                  }
+                                },
+                                "additionalProperties": false
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          },
+                          "tags": {
+                            "oneOf": [
+                              {
+                                "allOf": [
+                                  {
+                                    "type": "array",
+                                    "description": "Free-form labels for filtering and grouping on the canvas.",
+                                    "items": {
+                                      "type": "string",
+                                      "minLength": 1,
+                                      "maxLength": 64
+                                    }
+                                  }
+                                ],
+                                "maxItems": 100
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          }
+                        }
+                      }
+                    }
+                  },
+                  {
+                    "type": "object",
+                    "required": [
+                      "op",
+                      "componentId"
+                    ],
+                    "additionalProperties": false,
+                    "properties": {
+                      "op": {
+                        "const": "component.remove"
+                      },
+                      "componentId": {
+                        "type": "string",
+                        "description": "Identifier of an architecture component, stable across snapshots. Lowercase\nalphanumerics plus `.`, `_` and `-`; must start and end with an alphanumeric\ncharacter. Dotted paths are a convention, not a hierarchy: the hierarchy is expressed\nexclusively through `parentComponentId`.\n",
+                        "pattern": "^[a-z0-9][a-z0-9._-]{0,126}[a-z0-9]$",
+                        "examples": [
+                          "shop-platform.orders.domain"
+                        ]
+                      }
+                    }
+                  },
+                  {
+                    "type": "object",
+                    "required": [
+                      "op",
+                      "relationship"
+                    ],
+                    "additionalProperties": false,
+                    "properties": {
+                      "op": {
+                        "const": "relationship.add"
+                      },
+                      "relationship": {
+                        "allOf": [
+                          {
+                            "type": "object",
+                            "description": "A typed, directed edge between two components.\n\nMessage topics are never aggregated server-side: **every NATS topic is its own\nrelationship** with its own `relationshipId`, `kind: nats_topic` and the topic name in\n`channel`. Two producers publishing to two topics therefore yield two relationships,\nnot one merged \"messaging\" edge.\n",
+                            "properties": {
+                              "relationshipId": {
+                                "type": "string",
+                                "description": "Opaque, agent-assigned identifier for a domain object such as a plan, work step,\nfeedback item, diff, risk or relationship. Stable for the lifetime of the run.\n",
+                                "minLength": 1,
+                                "maxLength": 128,
+                                "examples": [
+                                  "plan-2026-08-04-0001"
+                                ]
+                              },
+                              "sourceComponentId": {
+                                "type": "string",
+                                "description": "Identifier of an architecture component, stable across snapshots. Lowercase\nalphanumerics plus `.`, `_` and `-`; must start and end with an alphanumeric\ncharacter. Dotted paths are a convention, not a hierarchy: the hierarchy is expressed\nexclusively through `parentComponentId`.\n",
+                                "pattern": "^[a-z0-9][a-z0-9._-]{0,126}[a-z0-9]$",
+                                "examples": [
+                                  "shop-platform.orders.domain"
+                                ]
+                              },
+                              "targetComponentId": {
+                                "type": "string",
+                                "description": "Identifier of an architecture component, stable across snapshots. Lowercase\nalphanumerics plus `.`, `_` and `-`; must start and end with an alphanumeric\ncharacter. Dotted paths are a convention, not a hierarchy: the hierarchy is expressed\nexclusively through `parentComponentId`.\n",
+                                "pattern": "^[a-z0-9][a-z0-9._-]{0,126}[a-z0-9]$",
+                                "examples": [
+                                  "shop-platform.orders.domain"
+                                ]
+                              },
+                              "kind": {
+                                "type": "string",
+                                "description": "Interaction type of the edge. `nats_topic` denotes exactly one topic, named in\n`channel`.\n",
+                                "enum": [
+                                  "http",
+                                  "grpc",
+                                  "data",
+                                  "async",
+                                  "nats_topic",
+                                  "dependency"
+                                ]
+                              },
+                              "label": {
+                                "type": "string",
+                                "description": "Short human-readable edge label for the canvas."
+                              },
+                              "protocol": {
+                                "type": "string",
+                                "description": "Concrete protocol, for example `HTTPS`, `gRPC/HTTP2` or `postgresql`."
+                              },
+                              "operation": {
+                                "type": "string",
+                                "description": "Concrete operation carried by the edge, for example `GET /orders` or\n`orders.v1.OrderService/PlaceOrder`.\n"
+                              },
+                              "channel": {
+                                "type": "string",
+                                "description": "Channel name for message-based edges. For `kind: nats_topic` this is the NATS\ntopic name and identifies the relationship semantically.\n"
+                              }
+                            },
+                            "required": [
+                              "relationshipId",
+                              "sourceComponentId",
+                              "targetComponentId",
+                              "kind"
+                            ],
+                            "additionalProperties": false
+                          }
+                        ],
+                        "type": "object",
+                        "properties": {
+                          "label": {
+                            "type": "string",
+                            "maxLength": 16000
+                          },
+                          "protocol": {
+                            "type": "string",
+                            "maxLength": 16000
+                          },
+                          "operation": {
+                            "type": "string",
+                            "maxLength": 16000
+                          },
+                          "channel": {
+                            "type": "string",
+                            "maxLength": 16000
+                          }
+                        }
+                      }
+                    }
+                  },
+                  {
+                    "type": "object",
+                    "required": [
+                      "op",
+                      "relationshipId",
+                      "set"
+                    ],
+                    "additionalProperties": false,
+                    "properties": {
+                      "op": {
+                        "const": "relationship.update"
+                      },
+                      "relationshipId": {
+                        "type": "string",
+                        "description": "Opaque, agent-assigned identifier for a domain object such as a plan, work step,\nfeedback item, diff, risk or relationship. Stable for the lifetime of the run.\n",
+                        "minLength": 1,
+                        "maxLength": 128,
+                        "examples": [
+                          "plan-2026-08-04-0001"
+                        ]
+                      },
+                      "set": {
+                        "type": "object",
+                        "minProperties": 1,
+                        "additionalProperties": false,
+                        "properties": {
+                          "sourceComponentId": {
+                            "type": "string",
+                            "description": "Identifier of an architecture component, stable across snapshots. Lowercase\nalphanumerics plus `.`, `_` and `-`; must start and end with an alphanumeric\ncharacter. Dotted paths are a convention, not a hierarchy: the hierarchy is expressed\nexclusively through `parentComponentId`.\n",
+                            "pattern": "^[a-z0-9][a-z0-9._-]{0,126}[a-z0-9]$",
+                            "examples": [
+                              "shop-platform.orders.domain"
+                            ]
+                          },
+                          "targetComponentId": {
+                            "type": "string",
+                            "description": "Identifier of an architecture component, stable across snapshots. Lowercase\nalphanumerics plus `.`, `_` and `-`; must start and end with an alphanumeric\ncharacter. Dotted paths are a convention, not a hierarchy: the hierarchy is expressed\nexclusively through `parentComponentId`.\n",
+                            "pattern": "^[a-z0-9][a-z0-9._-]{0,126}[a-z0-9]$",
+                            "examples": [
+                              "shop-platform.orders.domain"
+                            ]
+                          },
+                          "kind": {
+                            "type": "string",
+                            "description": "Interaction type of the edge. `nats_topic` denotes exactly one topic, named in\n`channel`.\n",
+                            "enum": [
+                              "http",
+                              "grpc",
+                              "data",
+                              "async",
+                              "nats_topic",
+                              "dependency"
+                            ]
+                          },
+                          "label": {
+                            "type": [
+                              "string",
+                              "null"
+                            ],
+                            "maxLength": 16000
+                          },
+                          "protocol": {
+                            "type": [
+                              "string",
+                              "null"
+                            ],
+                            "maxLength": 16000
+                          },
+                          "operation": {
+                            "type": [
+                              "string",
+                              "null"
+                            ],
+                            "maxLength": 16000
+                          },
+                          "channel": {
+                            "type": [
+                              "string",
+                              "null"
+                            ],
+                            "maxLength": 16000
+                          }
+                        }
+                      }
+                    }
+                  },
+                  {
+                    "type": "object",
+                    "required": [
+                      "op",
+                      "relationshipId"
+                    ],
+                    "additionalProperties": false,
+                    "properties": {
+                      "op": {
+                        "const": "relationship.remove"
+                      },
+                      "relationshipId": {
+                        "type": "string",
+                        "description": "Opaque, agent-assigned identifier for a domain object such as a plan, work step,\nfeedback item, diff, risk or relationship. Stable for the lifetime of the run.\n",
+                        "minLength": 1,
+                        "maxLength": 128,
+                        "examples": [
+                          "plan-2026-08-04-0001"
+                        ]
+                      }
+                    }
+                  }
+                ]
+              }
+            }
+          }
+        }
+      ],
+      "unevaluatedProperties": false
+    },
+    "output": {
+      "allOf": [
+        {
+          "type": "object",
+          "required": [
+            "projectId",
+            "modelRevision",
+            "projectPosition"
+          ],
+          "properties": {
+            "projectId": {
+              "type": "string",
+              "description": "Stable, human-readable project slug. Lowercase alphanumerics and hyphens,\n3 to 64 characters, must start and end with an alphanumeric character.\n",
+              "pattern": "^[a-z0-9][a-z0-9-]{1,62}[a-z0-9]$",
+              "examples": [
+                "visualise-ai"
+              ]
+            },
+            "modelRevision": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 9007199254740991
+            },
+            "projectPosition": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 9007199254740991
+            }
+          }
+        }
+      ],
+      "type": "object",
+      "required": [
+        "clientEventId",
+        "serverEventId",
+        "receivedAt",
+        "duplicate",
+        "viewRevision",
+        "runId",
+        "agentId",
+        "affected"
+      ],
+      "unevaluatedProperties": false,
+      "properties": {
+        "clientEventId": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "serverEventId": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "receivedAt": {
+          "type": "string",
+          "format": "date-time",
+          "pattern": "Z$"
+        },
+        "duplicate": {
+          "type": "boolean"
+        },
+        "viewRevision": {
+          "oneOf": [
+            {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 9007199254740991
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "runId": {
+          "type": "string",
+          "description": "Identifier of one agent run inside a project. Same character rules as `ProjectId`.\nA run groups every agent, plan and work event of a single orchestrated session.\n",
+          "pattern": "^[a-z0-9][a-z0-9-]{1,62}[a-z0-9]$",
+          "examples": [
+            "run-2026-08-04-0001"
+          ]
+        },
+        "agentId": {
+          "type": "string",
+          "description": "Identifier of the reporting agent, unique within a run. Same character rules as\n`ProjectId`.\n",
+          "pattern": "^[a-z0-9][a-z0-9-]{1,62}[a-z0-9]$",
+          "examples": [
+            "subagent-openapi-contract"
+          ]
+        },
+        "affected": {
+          "type": "object",
+          "required": [
+            "componentIds",
+            "relationshipIds"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "componentIds": {
+              "type": "array",
+              "maxItems": 200,
+              "uniqueItems": true,
+              "items": {
+                "type": "string",
+                "description": "Identifier of an architecture component, stable across snapshots. Lowercase\nalphanumerics plus `.`, `_` and `-`; must start and end with an alphanumeric\ncharacter. Dotted paths are a convention, not a hierarchy: the hierarchy is expressed\nexclusively through `parentComponentId`.\n",
+                "pattern": "^[a-z0-9][a-z0-9._-]{0,126}[a-z0-9]$",
+                "examples": [
+                  "shop-platform.orders.domain"
+                ]
+              }
+            },
+            "relationshipIds": {
+              "type": "array",
+              "maxItems": 200,
+              "uniqueItems": true,
+              "items": {
+                "type": "string",
+                "description": "Opaque, agent-assigned identifier for a domain object such as a plan, work step,\nfeedback item, diff, risk or relationship. Stable for the lifetime of the run.\n",
+                "minLength": 1,
+                "maxLength": 128,
+                "examples": [
+                  "plan-2026-08-04-0001"
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    "eventType": "model.mutation_applied"
+  },
+  "visualise_views_list": {
+    "input": {
+      "type": "object",
+      "allOf": [
+        {
+          "type": "object",
+          "required": [
+            "contractVersion",
+            "projectId"
+          ],
+          "properties": {
+            "contractVersion": {
+              "type": "string",
+              "const": "2.0.0"
+            },
+            "projectId": {
+              "type": "string",
+              "description": "Stable, human-readable project slug. Lowercase alphanumerics and hyphens,\n3 to 64 characters, must start and end with an alphanumeric character.\n",
+              "pattern": "^[a-z0-9][a-z0-9-]{1,62}[a-z0-9]$",
+              "examples": [
+                "visualise-ai"
+              ]
+            }
+          }
+        },
+        {
+          "type": "object",
+          "properties": {
+            "limit": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 200,
+              "default": 50
+            },
+            "cursor": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 2048
+            }
+          }
+        }
+      ],
+      "unevaluatedProperties": false
+    },
+    "output": {
+      "allOf": [
+        {
+          "type": "object",
+          "required": [
+            "projectId",
+            "modelRevision",
+            "projectPosition"
+          ],
+          "properties": {
+            "projectId": {
+              "type": "string",
+              "description": "Stable, human-readable project slug. Lowercase alphanumerics and hyphens,\n3 to 64 characters, must start and end with an alphanumeric character.\n",
+              "pattern": "^[a-z0-9][a-z0-9-]{1,62}[a-z0-9]$",
+              "examples": [
+                "visualise-ai"
+              ]
+            },
+            "modelRevision": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 9007199254740991
+            },
+            "projectPosition": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 9007199254740991
+            }
+          }
+        }
+      ],
+      "type": "object",
+      "required": [
+        "items",
+        "nextCursor"
+      ],
+      "unevaluatedProperties": false,
+      "properties": {
+        "nextCursor": {
+          "oneOf": [
+            {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 2048
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "items": {
+          "type": "array",
+          "maxItems": 200,
+          "items": {
+            "type": "object",
+            "required": [
+              "viewId",
+              "name",
+              "kind",
+              "viewRevision"
+            ],
+            "additionalProperties": false,
+            "properties": {
+              "viewId": {
+                "type": "string",
+                "description": "Opaque, agent-assigned identifier for a domain object such as a plan, work step,\nfeedback item, diff, risk or relationship. Stable for the lifetime of the run.\n",
+                "minLength": 1,
+                "maxLength": 128,
+                "examples": [
+                  "plan-2026-08-04-0001"
+                ]
+              },
+              "name": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 200
+              },
+              "kind": {
+                "const": "architecture"
+              },
+              "viewRevision": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9007199254740991
+              }
+            }
+          }
+        }
+      }
+    },
+    "eventType": null
+  },
+  "visualise_view_get": {
+    "input": {
+      "allOf": [
+        {
+          "type": "object",
+          "required": [
+            "contractVersion",
+            "projectId"
+          ],
+          "properties": {
+            "contractVersion": {
+              "type": "string",
+              "const": "2.0.0"
+            },
+            "projectId": {
+              "type": "string",
+              "description": "Stable, human-readable project slug. Lowercase alphanumerics and hyphens,\n3 to 64 characters, must start and end with an alphanumeric character.\n",
+              "pattern": "^[a-z0-9][a-z0-9-]{1,62}[a-z0-9]$",
+              "examples": [
+                "visualise-ai"
+              ]
+            }
+          }
+        }
+      ],
+      "type": "object",
+      "required": [
+        "viewId"
+      ],
+      "unevaluatedProperties": false,
+      "properties": {
+        "viewId": {
+          "type": "string",
+          "description": "Opaque, agent-assigned identifier for a domain object such as a plan, work step,\nfeedback item, diff, risk or relationship. Stable for the lifetime of the run.\n",
+          "minLength": 1,
+          "maxLength": 128,
+          "examples": [
+            "plan-2026-08-04-0001"
+          ]
+        }
+      }
+    },
+    "output": {
+      "allOf": [
+        {
+          "type": "object",
+          "required": [
+            "projectId",
+            "modelRevision",
+            "projectPosition"
+          ],
+          "properties": {
+            "projectId": {
+              "type": "string",
+              "description": "Stable, human-readable project slug. Lowercase alphanumerics and hyphens,\n3 to 64 characters, must start and end with an alphanumeric character.\n",
+              "pattern": "^[a-z0-9][a-z0-9-]{1,62}[a-z0-9]$",
+              "examples": [
+                "visualise-ai"
+              ]
+            },
+            "modelRevision": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 9007199254740991
+            },
+            "projectPosition": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 9007199254740991
+            }
+          }
+        }
+      ],
+      "type": "object",
+      "required": [
+        "view",
+        "viewRevision",
+        "missingReferences",
+        "boundaryRelationshipIds"
+      ],
+      "unevaluatedProperties": false,
+      "properties": {
+        "view": {
+          "type": "object",
+          "required": [
+            "viewId",
+            "name",
+            "kind",
+            "selection",
+            "orientation",
+            "collapsedComponentIds"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "viewId": {
+              "type": "string",
+              "description": "Opaque, agent-assigned identifier for a domain object such as a plan, work step,\nfeedback item, diff, risk or relationship. Stable for the lifetime of the run.\n",
+              "minLength": 1,
+              "maxLength": 128,
+              "examples": [
+                "plan-2026-08-04-0001"
+              ]
+            },
+            "name": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 200
+            },
+            "kind": {
+              "const": "architecture"
+            },
+            "selection": {
+              "oneOf": [
+                {
+                  "type": "object",
+                  "required": [
+                    "mode"
+                  ],
+                  "additionalProperties": false,
+                  "properties": {
+                    "mode": {
+                      "const": "all"
+                    }
+                  }
+                },
+                {
+                  "type": "object",
+                  "required": [
+                    "mode",
+                    "scope"
+                  ],
+                  "additionalProperties": false,
+                  "properties": {
+                    "mode": {
+                      "const": "explicit"
+                    },
+                    "scope": {
+                      "type": "object",
+                      "required": [
+                        "componentIds",
+                        "relationshipIds"
+                      ],
+                      "additionalProperties": false,
+                      "properties": {
+                        "componentIds": {
+                          "type": "array",
+                          "maxItems": 200,
+                          "uniqueItems": true,
+                          "items": {
+                            "type": "string",
+                            "description": "Identifier of an architecture component, stable across snapshots. Lowercase\nalphanumerics plus `.`, `_` and `-`; must start and end with an alphanumeric\ncharacter. Dotted paths are a convention, not a hierarchy: the hierarchy is expressed\nexclusively through `parentComponentId`.\n",
+                            "pattern": "^[a-z0-9][a-z0-9._-]{0,126}[a-z0-9]$",
+                            "examples": [
+                              "shop-platform.orders.domain"
+                            ]
+                          }
+                        },
+                        "relationshipIds": {
+                          "type": "array",
+                          "maxItems": 200,
+                          "uniqueItems": true,
+                          "items": {
+                            "type": "string",
+                            "description": "Opaque, agent-assigned identifier for a domain object such as a plan, work step,\nfeedback item, diff, risk or relationship. Stable for the lifetime of the run.\n",
+                            "minLength": 1,
+                            "maxLength": 128,
+                            "examples": [
+                              "plan-2026-08-04-0001"
+                            ]
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              ]
+            },
+            "orientation": {
+              "enum": [
+                "top-down",
+                "left-to-right"
+              ]
+            },
+            "collapsedComponentIds": {
+              "type": "array",
+              "maxItems": 200,
+              "uniqueItems": true,
+              "items": {
+                "type": "string",
+                "description": "Identifier of an architecture component, stable across snapshots. Lowercase\nalphanumerics plus `.`, `_` and `-`; must start and end with an alphanumeric\ncharacter. Dotted paths are a convention, not a hierarchy: the hierarchy is expressed\nexclusively through `parentComponentId`.\n",
+                "pattern": "^[a-z0-9][a-z0-9._-]{0,126}[a-z0-9]$",
+                "examples": [
+                  "shop-platform.orders.domain"
+                ]
+              }
+            }
+          }
+        },
+        "viewRevision": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "missingReferences": {
+          "description": "Union of up to 200 selected and 200 collapsed component IDs.",
+          "type": "object",
+          "required": [
+            "componentIds",
+            "relationshipIds"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "componentIds": {
+              "type": "array",
+              "maxItems": 400,
+              "uniqueItems": true,
+              "items": {
+                "type": "string",
+                "description": "Identifier of an architecture component, stable across snapshots. Lowercase\nalphanumerics plus `.`, `_` and `-`; must start and end with an alphanumeric\ncharacter. Dotted paths are a convention, not a hierarchy: the hierarchy is expressed\nexclusively through `parentComponentId`.\n",
+                "pattern": "^[a-z0-9][a-z0-9._-]{0,126}[a-z0-9]$",
+                "examples": [
+                  "shop-platform.orders.domain"
+                ]
+              }
+            },
+            "relationshipIds": {
+              "type": "array",
+              "maxItems": 200,
+              "uniqueItems": true,
+              "items": {
+                "type": "string",
+                "description": "Opaque, agent-assigned identifier for a domain object such as a plan, work step,\nfeedback item, diff, risk or relationship. Stable for the lifetime of the run.\n",
+                "minLength": 1,
+                "maxLength": 128,
+                "examples": [
+                  "plan-2026-08-04-0001"
+                ]
+              }
+            }
+          }
+        },
+        "boundaryRelationshipIds": {
+          "description": "Existing selected edges omitted because an endpoint is outside the resolved selection.",
+          "type": "array",
+          "maxItems": 200,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "description": "Opaque, agent-assigned identifier for a domain object such as a plan, work step,\nfeedback item, diff, risk or relationship. Stable for the lifetime of the run.\n",
+            "minLength": 1,
+            "maxLength": 128,
+            "examples": [
+              "plan-2026-08-04-0001"
+            ]
+          }
+        }
+      }
+    },
+    "eventType": null
+  },
+  "visualise_view_put": {
+    "input": {
+      "allOf": [
+        {
+          "allOf": [
+            {
+              "type": "object",
+              "required": [
+                "contractVersion",
+                "projectId"
+              ],
+              "properties": {
+                "contractVersion": {
+                  "type": "string",
+                  "const": "2.0.0"
+                },
+                "projectId": {
+                  "type": "string",
+                  "description": "Stable, human-readable project slug. Lowercase alphanumerics and hyphens,\n3 to 64 characters, must start and end with an alphanumeric character.\n",
+                  "pattern": "^[a-z0-9][a-z0-9-]{1,62}[a-z0-9]$",
+                  "examples": [
+                    "visualise-ai"
+                  ]
+                }
+              }
+            }
+          ],
+          "type": "object",
+          "required": [
+            "clientEventId",
+            "runId",
+            "agentId",
+            "parentAgentId",
+            "occurredAt"
+          ],
+          "properties": {
+            "clientEventId": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "runId": {
+              "type": "string",
+              "description": "Identifier of one agent run inside a project. Same character rules as `ProjectId`.\nA run groups every agent, plan and work event of a single orchestrated session.\n",
+              "pattern": "^[a-z0-9][a-z0-9-]{1,62}[a-z0-9]$",
+              "examples": [
+                "run-2026-08-04-0001"
+              ]
+            },
+            "agentId": {
+              "type": "string",
+              "description": "Identifier of the reporting agent, unique within a run. Same character rules as\n`ProjectId`.\n",
+              "pattern": "^[a-z0-9][a-z0-9-]{1,62}[a-z0-9]$",
+              "examples": [
+                "subagent-openapi-contract"
+              ]
+            },
+            "parentAgentId": {
+              "oneOf": [
+                {
+                  "type": "string",
+                  "description": "Identifier of the reporting agent, unique within a run. Same character rules as\n`ProjectId`.\n",
+                  "pattern": "^[a-z0-9][a-z0-9-]{1,62}[a-z0-9]$",
+                  "examples": [
+                    "subagent-openapi-contract"
+                  ]
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "occurredAt": {
+              "type": "string",
+              "format": "date-time",
+              "pattern": "Z$"
+            }
+          }
+        }
+      ],
+      "type": "object",
+      "required": [
+        "expectedModelRevision",
+        "expectedViewRevision",
+        "view"
+      ],
+      "unevaluatedProperties": false,
+      "properties": {
+        "expectedModelRevision": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "expectedViewRevision": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "view": {
+          "type": "object",
+          "required": [
+            "viewId",
+            "name",
+            "kind",
+            "selection",
+            "orientation",
+            "collapsedComponentIds"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "viewId": {
+              "type": "string",
+              "description": "Opaque, agent-assigned identifier for a domain object such as a plan, work step,\nfeedback item, diff, risk or relationship. Stable for the lifetime of the run.\n",
+              "minLength": 1,
+              "maxLength": 128,
+              "examples": [
+                "plan-2026-08-04-0001"
+              ]
+            },
+            "name": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 200
+            },
+            "kind": {
+              "const": "architecture"
+            },
+            "selection": {
+              "oneOf": [
+                {
+                  "type": "object",
+                  "required": [
+                    "mode"
+                  ],
+                  "additionalProperties": false,
+                  "properties": {
+                    "mode": {
+                      "const": "all"
+                    }
+                  }
+                },
+                {
+                  "type": "object",
+                  "required": [
+                    "mode",
+                    "scope"
+                  ],
+                  "additionalProperties": false,
+                  "properties": {
+                    "mode": {
+                      "const": "explicit"
+                    },
+                    "scope": {
+                      "type": "object",
+                      "required": [
+                        "componentIds",
+                        "relationshipIds"
+                      ],
+                      "additionalProperties": false,
+                      "properties": {
+                        "componentIds": {
+                          "type": "array",
+                          "maxItems": 200,
+                          "uniqueItems": true,
+                          "items": {
+                            "type": "string",
+                            "description": "Identifier of an architecture component, stable across snapshots. Lowercase\nalphanumerics plus `.`, `_` and `-`; must start and end with an alphanumeric\ncharacter. Dotted paths are a convention, not a hierarchy: the hierarchy is expressed\nexclusively through `parentComponentId`.\n",
+                            "pattern": "^[a-z0-9][a-z0-9._-]{0,126}[a-z0-9]$",
+                            "examples": [
+                              "shop-platform.orders.domain"
+                            ]
+                          }
+                        },
+                        "relationshipIds": {
+                          "type": "array",
+                          "maxItems": 200,
+                          "uniqueItems": true,
+                          "items": {
+                            "type": "string",
+                            "description": "Opaque, agent-assigned identifier for a domain object such as a plan, work step,\nfeedback item, diff, risk or relationship. Stable for the lifetime of the run.\n",
+                            "minLength": 1,
+                            "maxLength": 128,
+                            "examples": [
+                              "plan-2026-08-04-0001"
+                            ]
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              ]
+            },
+            "orientation": {
+              "enum": [
+                "top-down",
+                "left-to-right"
+              ]
+            },
+            "collapsedComponentIds": {
+              "type": "array",
+              "maxItems": 200,
+              "uniqueItems": true,
+              "items": {
+                "type": "string",
+                "description": "Identifier of an architecture component, stable across snapshots. Lowercase\nalphanumerics plus `.`, `_` and `-`; must start and end with an alphanumeric\ncharacter. Dotted paths are a convention, not a hierarchy: the hierarchy is expressed\nexclusively through `parentComponentId`.\n",
+                "pattern": "^[a-z0-9][a-z0-9._-]{0,126}[a-z0-9]$",
+                "examples": [
+                  "shop-platform.orders.domain"
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    "output": {
+      "allOf": [
+        {
+          "type": "object",
+          "required": [
+            "projectId",
+            "modelRevision",
+            "projectPosition"
+          ],
+          "properties": {
+            "projectId": {
+              "type": "string",
+              "description": "Stable, human-readable project slug. Lowercase alphanumerics and hyphens,\n3 to 64 characters, must start and end with an alphanumeric character.\n",
+              "pattern": "^[a-z0-9][a-z0-9-]{1,62}[a-z0-9]$",
+              "examples": [
+                "visualise-ai"
+              ]
+            },
+            "modelRevision": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 9007199254740991
+            },
+            "projectPosition": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 9007199254740991
+            }
+          }
+        }
+      ],
+      "type": "object",
+      "required": [
+        "clientEventId",
+        "serverEventId",
+        "receivedAt",
+        "duplicate",
+        "viewRevision",
+        "runId",
+        "agentId",
+        "affected"
+      ],
+      "unevaluatedProperties": false,
+      "properties": {
+        "clientEventId": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "serverEventId": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "receivedAt": {
+          "type": "string",
+          "format": "date-time",
+          "pattern": "Z$"
+        },
+        "duplicate": {
+          "type": "boolean"
+        },
+        "viewRevision": {
+          "oneOf": [
+            {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 9007199254740991
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "runId": {
+          "type": "string",
+          "description": "Identifier of one agent run inside a project. Same character rules as `ProjectId`.\nA run groups every agent, plan and work event of a single orchestrated session.\n",
+          "pattern": "^[a-z0-9][a-z0-9-]{1,62}[a-z0-9]$",
+          "examples": [
+            "run-2026-08-04-0001"
+          ]
+        },
+        "agentId": {
+          "type": "string",
+          "description": "Identifier of the reporting agent, unique within a run. Same character rules as\n`ProjectId`.\n",
+          "pattern": "^[a-z0-9][a-z0-9-]{1,62}[a-z0-9]$",
+          "examples": [
+            "subagent-openapi-contract"
+          ]
+        },
+        "affected": {
+          "type": "object",
+          "required": [
+            "componentIds",
+            "relationshipIds"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "componentIds": {
+              "type": "array",
+              "maxItems": 200,
+              "uniqueItems": true,
+              "items": {
+                "type": "string",
+                "description": "Identifier of an architecture component, stable across snapshots. Lowercase\nalphanumerics plus `.`, `_` and `-`; must start and end with an alphanumeric\ncharacter. Dotted paths are a convention, not a hierarchy: the hierarchy is expressed\nexclusively through `parentComponentId`.\n",
+                "pattern": "^[a-z0-9][a-z0-9._-]{0,126}[a-z0-9]$",
+                "examples": [
+                  "shop-platform.orders.domain"
+                ]
+              }
+            },
+            "relationshipIds": {
+              "type": "array",
+              "maxItems": 200,
+              "uniqueItems": true,
+              "items": {
+                "type": "string",
+                "description": "Opaque, agent-assigned identifier for a domain object such as a plan, work step,\nfeedback item, diff, risk or relationship. Stable for the lifetime of the run.\n",
+                "minLength": 1,
+                "maxLength": 128,
+                "examples": [
+                  "plan-2026-08-04-0001"
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    "eventType": "view.saved"
+  },
+  "visualise_view_remove": {
+    "input": {
+      "allOf": [
+        {
+          "allOf": [
+            {
+              "type": "object",
+              "required": [
+                "contractVersion",
+                "projectId"
+              ],
+              "properties": {
+                "contractVersion": {
+                  "type": "string",
+                  "const": "2.0.0"
+                },
+                "projectId": {
+                  "type": "string",
+                  "description": "Stable, human-readable project slug. Lowercase alphanumerics and hyphens,\n3 to 64 characters, must start and end with an alphanumeric character.\n",
+                  "pattern": "^[a-z0-9][a-z0-9-]{1,62}[a-z0-9]$",
+                  "examples": [
+                    "visualise-ai"
+                  ]
+                }
+              }
+            }
+          ],
+          "type": "object",
+          "required": [
+            "clientEventId",
+            "runId",
+            "agentId",
+            "parentAgentId",
+            "occurredAt"
+          ],
+          "properties": {
+            "clientEventId": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "runId": {
+              "type": "string",
+              "description": "Identifier of one agent run inside a project. Same character rules as `ProjectId`.\nA run groups every agent, plan and work event of a single orchestrated session.\n",
+              "pattern": "^[a-z0-9][a-z0-9-]{1,62}[a-z0-9]$",
+              "examples": [
+                "run-2026-08-04-0001"
+              ]
+            },
+            "agentId": {
+              "type": "string",
+              "description": "Identifier of the reporting agent, unique within a run. Same character rules as\n`ProjectId`.\n",
+              "pattern": "^[a-z0-9][a-z0-9-]{1,62}[a-z0-9]$",
+              "examples": [
+                "subagent-openapi-contract"
+              ]
+            },
+            "parentAgentId": {
+              "oneOf": [
+                {
+                  "type": "string",
+                  "description": "Identifier of the reporting agent, unique within a run. Same character rules as\n`ProjectId`.\n",
+                  "pattern": "^[a-z0-9][a-z0-9-]{1,62}[a-z0-9]$",
+                  "examples": [
+                    "subagent-openapi-contract"
+                  ]
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "occurredAt": {
+              "type": "string",
+              "format": "date-time",
+              "pattern": "Z$"
+            }
+          }
+        }
+      ],
+      "type": "object",
+      "required": [
+        "expectedViewRevision",
+        "viewId"
+      ],
+      "unevaluatedProperties": false,
+      "properties": {
+        "expectedViewRevision": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "viewId": {
+          "type": "string",
+          "description": "Opaque, agent-assigned identifier for a domain object such as a plan, work step,\nfeedback item, diff, risk or relationship. Stable for the lifetime of the run.\n",
+          "minLength": 1,
+          "maxLength": 128,
+          "examples": [
+            "plan-2026-08-04-0001"
+          ]
+        }
+      }
+    },
+    "output": {
+      "allOf": [
+        {
+          "type": "object",
+          "required": [
+            "projectId",
+            "modelRevision",
+            "projectPosition"
+          ],
+          "properties": {
+            "projectId": {
+              "type": "string",
+              "description": "Stable, human-readable project slug. Lowercase alphanumerics and hyphens,\n3 to 64 characters, must start and end with an alphanumeric character.\n",
+              "pattern": "^[a-z0-9][a-z0-9-]{1,62}[a-z0-9]$",
+              "examples": [
+                "visualise-ai"
+              ]
+            },
+            "modelRevision": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 9007199254740991
+            },
+            "projectPosition": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 9007199254740991
+            }
+          }
+        }
+      ],
+      "type": "object",
+      "required": [
+        "clientEventId",
+        "serverEventId",
+        "receivedAt",
+        "duplicate",
+        "viewRevision",
+        "runId",
+        "agentId",
+        "affected"
+      ],
+      "unevaluatedProperties": false,
+      "properties": {
+        "clientEventId": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "serverEventId": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "receivedAt": {
+          "type": "string",
+          "format": "date-time",
+          "pattern": "Z$"
+        },
+        "duplicate": {
+          "type": "boolean"
+        },
+        "viewRevision": {
+          "oneOf": [
+            {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 9007199254740991
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "runId": {
+          "type": "string",
+          "description": "Identifier of one agent run inside a project. Same character rules as `ProjectId`.\nA run groups every agent, plan and work event of a single orchestrated session.\n",
+          "pattern": "^[a-z0-9][a-z0-9-]{1,62}[a-z0-9]$",
+          "examples": [
+            "run-2026-08-04-0001"
+          ]
+        },
+        "agentId": {
+          "type": "string",
+          "description": "Identifier of the reporting agent, unique within a run. Same character rules as\n`ProjectId`.\n",
+          "pattern": "^[a-z0-9][a-z0-9-]{1,62}[a-z0-9]$",
+          "examples": [
+            "subagent-openapi-contract"
+          ]
+        },
+        "affected": {
+          "type": "object",
+          "required": [
+            "componentIds",
+            "relationshipIds"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "componentIds": {
+              "type": "array",
+              "maxItems": 200,
+              "uniqueItems": true,
+              "items": {
+                "type": "string",
+                "description": "Identifier of an architecture component, stable across snapshots. Lowercase\nalphanumerics plus `.`, `_` and `-`; must start and end with an alphanumeric\ncharacter. Dotted paths are a convention, not a hierarchy: the hierarchy is expressed\nexclusively through `parentComponentId`.\n",
+                "pattern": "^[a-z0-9][a-z0-9._-]{0,126}[a-z0-9]$",
+                "examples": [
+                  "shop-platform.orders.domain"
+                ]
+              }
+            },
+            "relationshipIds": {
+              "type": "array",
+              "maxItems": 200,
+              "uniqueItems": true,
+              "items": {
+                "type": "string",
+                "description": "Opaque, agent-assigned identifier for a domain object such as a plan, work step,\nfeedback item, diff, risk or relationship. Stable for the lifetime of the run.\n",
+                "minLength": 1,
+                "maxLength": 128,
+                "examples": [
+                  "plan-2026-08-04-0001"
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    "eventType": "view.removed"
+  },
+  "visualise_view_render": {
+    "input": {
+      "allOf": [
+        {
+          "type": "object",
+          "required": [
+            "contractVersion",
+            "projectId"
+          ],
+          "properties": {
+            "contractVersion": {
+              "type": "string",
+              "const": "2.0.0"
+            },
+            "projectId": {
+              "type": "string",
+              "description": "Stable, human-readable project slug. Lowercase alphanumerics and hyphens,\n3 to 64 characters, must start and end with an alphanumeric character.\n",
+              "pattern": "^[a-z0-9][a-z0-9-]{1,62}[a-z0-9]$",
+              "examples": [
+                "visualise-ai"
+              ]
+            }
+          }
+        }
+      ],
+      "type": "object",
+      "required": [
+        "viewId",
+        "expectedModelRevision",
+        "expectedViewRevision",
+        "viewport",
+        "detailLevel"
+      ],
+      "unevaluatedProperties": false,
+      "properties": {
+        "viewId": {
+          "type": "string",
+          "description": "Opaque, agent-assigned identifier for a domain object such as a plan, work step,\nfeedback item, diff, risk or relationship. Stable for the lifetime of the run.\n",
+          "minLength": 1,
+          "maxLength": 128,
+          "examples": [
+            "plan-2026-08-04-0001"
+          ]
+        },
+        "expectedModelRevision": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "expectedViewRevision": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "viewport": {
+          "type": "object",
+          "required": [
+            "width",
+            "height",
+            "pixelRatio"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "width": {
+              "type": "integer",
+              "minimum": 320,
+              "maximum": 3840
+            },
+            "height": {
+              "type": "integer",
+              "minimum": 240,
+              "maximum": 2160
+            },
+            "pixelRatio": {
+              "enum": [
+                1,
+                2
+              ]
+            }
+          }
+        },
+        "detailLevel": {
+          "enum": [
+            "map",
+            "readable",
+            "standard",
+            "full"
+          ]
+        }
+      }
+    },
+    "output": {
+      "description": "Metadata for exactly one PNG MCP image content block; not the image bytes.",
+      "allOf": [
+        {
+          "type": "object",
+          "required": [
+            "projectId",
+            "modelRevision",
+            "projectPosition"
+          ],
+          "properties": {
+            "projectId": {
+              "type": "string",
+              "description": "Stable, human-readable project slug. Lowercase alphanumerics and hyphens,\n3 to 64 characters, must start and end with an alphanumeric character.\n",
+              "pattern": "^[a-z0-9][a-z0-9-]{1,62}[a-z0-9]$",
+              "examples": [
+                "visualise-ai"
+              ]
+            },
+            "modelRevision": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 9007199254740991
+            },
+            "projectPosition": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 9007199254740991
+            }
+          }
+        }
+      ],
+      "type": "object",
+      "required": [
+        "viewId",
+        "viewRevision",
+        "renderedAt",
+        "viewport",
+        "detailLevel",
+        "mimeType",
+        "byteLength",
+        "missingReferences",
+        "boundaryRelationshipIds",
+        "visibleIds",
+        "clipped"
+      ],
+      "unevaluatedProperties": false,
+      "properties": {
+        "viewId": {
+          "type": "string",
+          "description": "Opaque, agent-assigned identifier for a domain object such as a plan, work step,\nfeedback item, diff, risk or relationship. Stable for the lifetime of the run.\n",
+          "minLength": 1,
+          "maxLength": 128,
+          "examples": [
+            "plan-2026-08-04-0001"
+          ]
+        },
+        "viewRevision": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "renderedAt": {
+          "type": "string",
+          "format": "date-time",
+          "pattern": "Z$"
+        },
+        "viewport": {
+          "type": "object",
+          "required": [
+            "width",
+            "height",
+            "pixelRatio"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "width": {
+              "type": "integer",
+              "minimum": 320,
+              "maximum": 3840
+            },
+            "height": {
+              "type": "integer",
+              "minimum": 240,
+              "maximum": 2160
+            },
+            "pixelRatio": {
+              "enum": [
+                1,
+                2
+              ]
+            }
+          }
+        },
+        "mimeType": {
+          "const": "image/png"
+        },
+        "byteLength": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 4194304
+        },
+        "missingReferences": {
+          "description": "Union of up to 200 selected and 200 collapsed component IDs.",
+          "type": "object",
+          "required": [
+            "componentIds",
+            "relationshipIds"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "componentIds": {
+              "type": "array",
+              "maxItems": 400,
+              "uniqueItems": true,
+              "items": {
+                "type": "string",
+                "description": "Identifier of an architecture component, stable across snapshots. Lowercase\nalphanumerics plus `.`, `_` and `-`; must start and end with an alphanumeric\ncharacter. Dotted paths are a convention, not a hierarchy: the hierarchy is expressed\nexclusively through `parentComponentId`.\n",
+                "pattern": "^[a-z0-9][a-z0-9._-]{0,126}[a-z0-9]$",
+                "examples": [
+                  "shop-platform.orders.domain"
+                ]
+              }
+            },
+            "relationshipIds": {
+              "type": "array",
+              "maxItems": 200,
+              "uniqueItems": true,
+              "items": {
+                "type": "string",
+                "description": "Opaque, agent-assigned identifier for a domain object such as a plan, work step,\nfeedback item, diff, risk or relationship. Stable for the lifetime of the run.\n",
+                "minLength": 1,
+                "maxLength": 128,
+                "examples": [
+                  "plan-2026-08-04-0001"
+                ]
+              }
+            }
+          }
+        },
+        "boundaryRelationshipIds": {
+          "description": "Existing selected edges omitted because an endpoint is outside the resolved selection.",
+          "type": "array",
+          "maxItems": 200,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "description": "Opaque, agent-assigned identifier for a domain object such as a plan, work step,\nfeedback item, diff, risk or relationship. Stable for the lifetime of the run.\n",
+            "minLength": 1,
+            "maxLength": 128,
+            "examples": [
+              "plan-2026-08-04-0001"
+            ]
+          }
+        },
+        "detailLevel": {
+          "enum": [
+            "map",
+            "readable",
+            "standard",
+            "full"
+          ]
+        },
+        "visibleIds": {
+          "description": "At most 200 visible IDs per kind; overflow is reported through clipped.",
+          "additionalProperties": false,
+          "type": "object",
+          "required": [
+            "componentIds",
+            "relationshipIds"
+          ],
+          "properties": {
+            "componentIds": {
+              "type": "array",
+              "maxItems": 200,
+              "uniqueItems": true,
+              "items": {
+                "type": "string",
+                "description": "Identifier of an architecture component, stable across snapshots. Lowercase\nalphanumerics plus `.`, `_` and `-`; must start and end with an alphanumeric\ncharacter. Dotted paths are a convention, not a hierarchy: the hierarchy is expressed\nexclusively through `parentComponentId`.\n",
+                "pattern": "^[a-z0-9][a-z0-9._-]{0,126}[a-z0-9]$",
+                "examples": [
+                  "shop-platform.orders.domain"
+                ]
+              }
+            },
+            "relationshipIds": {
+              "type": "array",
+              "maxItems": 200,
+              "uniqueItems": true,
+              "items": {
+                "type": "string",
+                "description": "Opaque, agent-assigned identifier for a domain object such as a plan, work step,\nfeedback item, diff, risk or relationship. Stable for the lifetime of the run.\n",
+                "minLength": 1,
+                "maxLength": 128,
+                "examples": [
+                  "plan-2026-08-04-0001"
+                ]
+              }
+            }
+          }
+        },
+        "clipped": {
+          "type": "boolean"
+        }
+      }
+    },
+    "eventType": null
+  },
+  "error": {
+    "type": "object",
+    "required": [
+      "code",
+      "message",
+      "fields"
+    ],
+    "additionalProperties": false,
+    "properties": {
+      "code": {
+        "enum": [
+          "invalid_input",
+          "unsupported_contract_version",
+          "project_not_found",
+          "run_not_found",
+          "element_not_found",
+          "element_exists",
+          "view_not_found",
+          "reference_invalid",
+          "revision_conflict",
+          "stale_cursor",
+          "client_event_id_conflict",
+          "run_not_started",
+          "run_already_finished",
+          "unknown_agent",
+          "parent_agent_unknown",
+          "agent_already_started",
+          "run_already_started",
+          "terminal_event_not_allowed",
+          "correction_target_unknown",
+          "response_too_large",
+          "render_failed",
+          "render_timeout",
+          "cancelled",
+          "work_step_not_started",
+          "work_step_already_started",
+          "internal_error"
+        ]
+      },
+      "message": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 2000
+      },
+      "fields": {
+        "type": "array",
+        "maxItems": 100,
+        "items": {
+          "type": "object",
+          "required": [
+            "pointer",
+            "message"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "pointer": {
+              "type": "string",
+              "pattern": "^(/([^~/]|~[01])*)*$",
+              "maxLength": 2048
+            },
+            "message": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 1000
+            }
+          }
+        }
+      },
+      "currentModelRevision": {
+        "type": "integer",
+        "minimum": 0,
+        "maximum": 9007199254740991
+      },
+      "currentViewRevision": {
+        "type": "integer",
+        "minimum": 0,
+        "maximum": 9007199254740991
+      },
+      "existingProjectPosition": {
+        "type": "integer",
+        "minimum": 0,
+        "maximum": 9007199254740991
+      }
+    }
+  }
+}

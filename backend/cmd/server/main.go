@@ -19,6 +19,7 @@ import (
 	"github.com/risqyy/visualise-ai/backend/internal/httpapi"
 	"github.com/risqyy/visualise-ai/backend/internal/ingest"
 	"github.com/risqyy/visualise-ai/backend/internal/logging"
+	"github.com/risqyy/visualise-ai/backend/internal/mcptools"
 	"github.com/risqyy/visualise-ai/backend/internal/mcptransport"
 	"github.com/risqyy/visualise-ai/backend/internal/readapi"
 	"github.com/risqyy/visualise-ai/backend/internal/sse"
@@ -78,7 +79,16 @@ func run() error {
 		return err
 	}
 
+	commandService, err := ingest.NewService(ingest.HandlerOptions{Store: store.New(db), Publisher: broker, MaxEventBytes: cfg.MaxEventBytes, Logger: logger})
+	if err != nil {
+		return err
+	}
+	domainTools, err := mcptools.New(db, commandService)
+	if err != nil {
+		return err
+	}
 	mcpHandler, err := mcptransport.New(mcptransport.Options{
+		Register:       domainTools.Register,
 		Version:        version,
 		AllowedHosts:   cfg.MCPAllowedHosts,
 		AllowedOrigins: cfg.MCPAllowedOrigins,

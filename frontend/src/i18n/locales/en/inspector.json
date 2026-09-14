@@ -73,7 +73,10 @@
     "riskReported": "Risk reported",
     "runFinished": "Run finished",
     "workStepCompleted": "Work step completed",
-    "workStepStarted": "Work step started"
+    "workStepStarted": "Work step started",
+    "contextOpened": "Work context opened",
+    "workReported": "Work reported",
+    "workScopeReported": "Work scope reported"
   },
   "feedback": {
     "emptyDescription": "For this component no feedback.published was reported in this run.",
