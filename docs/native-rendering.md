@@ -126,12 +126,31 @@ PNG capture failures. A frontend browser test alone does not exercise the
 backend container's Chromium process.
 
 The tested runtime is nonroot Alpine 3.24, Chromium 152.0.7977.82, Noto fonts
-and chromedp 0.14.2. It requires only the GPU-specific sandbox workaround
-documented in [ADR 0034](decisions/0034-native-headless-view-rendering.md).
+and chromedp 0.14.2. Compose supplies the pinned seccomp profile under
+`deploy/chromium/`, which permits the namespace operations needed by Chromium's
+sandbox while retaining the remaining Docker syscall restrictions. The
+GPU-specific workaround and runtime trade-offs are documented in
+[ADR 0034](decisions/0034-native-headless-view-rendering.md).
 Compose readiness does not depend on fetching the frontend during backend
 startup, avoiding its frontend→healthy-backend dependency cycle.
 
 ## Verification
+
+Check the shipped browser's actual sandbox state inside a running deployment:
+
+```sh
+docker compose exec -T backend sh -s \
+  < backend/scripts/verify-chromium-sandbox.sh
+```
+
+The probe requires nonroot execution, zero effective capabilities and container
+seccomp filtering. It opens Chromium's own `chrome://sandbox` page and requires
+the Namespace first layer, PID/network namespaces, Seccomp-BPF and TSYNC to be
+active. Missing status or launch failure is fatal. It has a 20-second deadline
+with a five-second kill grace, kills its browser process group and removes its
+temporary profile. BusyBox's watchdog may remain until that bounded deadline.
+It does not inspect a model or call the API. CI runs this alongside the native
+PNG acceptance test; both must pass on the deployment host.
 
 Go tests cover exact snapshot counters, provider mismatch guards, capture and
 browser errors, PNG dimensions/size, metadata size, deadline/cancellation,

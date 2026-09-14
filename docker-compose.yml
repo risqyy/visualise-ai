@@ -28,6 +28,8 @@ services:
     # No `ports:` on purpose — PostgreSQL stays internal.
 
   backend:
+    security_opt:
+      - seccomp=./deploy/chromium/seccomp-profile.json
     init: true
     shm_size: 256mb
     build:

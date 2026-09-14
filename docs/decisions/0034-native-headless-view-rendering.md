@@ -42,6 +42,23 @@ On the tested Docker runtime, Chromium 152's GPU sandbox rejected a new syscall.
 Disabling only the unused GPU sandbox allowed rendering; the renderer sandbox is
 not explicitly disabled. Do not replace this with a blanket `--no-sandbox`.
 
+CI subsequently exposed a separate startup failure: Chromium could not enter a
+new PID/network namespace (`Operation not permitted`) before its zygote started.
+Source-build and image-override Compose deployments use the base file's
+[vendored seccomp profile](../../deploy/chromium/README.md): Docker 28.0.4's
+pinned default plus Playwright's single allow rule for `clone`, `setns` and
+`unshare`. Every original filter remains, including `clone3` returning `ENOSYS`
+without `CAP_SYS_ADMIN`. This narrowly identified syscall exception applies to
+the whole backend container; its nonroot user, capabilities, remaining seccomp
+filters and existing Chromium flags are unchanged. It neither grants
+`SYS_ADMIN` nor uses an unconfined or privileged container.
+
+The namespace error alone does not distinguish seccomp from a host AppArmor or
+user-namespace policy denial. The controlled CI rerun must verify this profile
+with actual PNG capture and the browser's sandbox status; host policy remains a
+separate diagnostic boundary. Vendoring also requires deliberate review when
+updating Docker's default profile instead of silently inheriting newer rules.
+
 Fresh processes cost startup time and the runtime image gains Chromium's sizeable
 dependencies. In exchange, no shared browser profile or previous request can
 affect a capture, and failure cleanup stays local to one request. A separate SVG
