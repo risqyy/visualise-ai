@@ -178,7 +178,7 @@ export const MAX_CANVAS_RELATIONSHIP_ADJUNCT_LENGTH = 24
 
 /**
  * Returns the bounded detail allowed on a normal canvas label. Long reported
- * discriminators remain available through the label title, focus state and
+ * discriminators remain available through the label title, accessible name and
  * relationship inspector instead of colliding with nodes and other edges.
  */
 export function shortRelationshipDiscriminator(

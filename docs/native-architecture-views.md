@@ -11,6 +11,17 @@ or reloaded. Orientation and collapsed-container defaults come from the saved
 definition; camera, drag, disclosure, expanded relationship bundles and selection
 are remembered separately for each view during the current app session.
 
+Click a component, or focus it and press Enter or Space, to highlight its direct
+incoming and outgoing relationships. Unrelated lines fade. All members of a
+bundle are included; a collapsed container represents its hidden endpoints.
+Selecting the component again or pressing Escape on the focused node clears the
+selection. This leaves node positions, camera and reported work states intact.
+
+Relationship labels stay bounded even when focused or selected. Activate a label
+to read its full reported values in the inspector. Where labels would overlap
+each other or component text, they move into free space with dotted leaders back
+to their routes. The native PNG renderer uses the same placement rules.
+
 An explicit view contains its selected components and their structural ancestors.
 It only draws selected relationships whose endpoints were explicitly selected.
 Missing IDs and relationships that now cross the boundary appear as diagnostics.

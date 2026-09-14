@@ -170,6 +170,10 @@ export interface RelationshipEdgeData extends Record<string, unknown> {
   onSelectRelationship?: (relationshipId: Identifier | null) => void
   /** URL-backed relationship selection used for immediate rendering. */
   selectedRelationshipId?: Identifier | null
+  /** Visible component selection, purely a presentation concern. */
+  selectedComponentId?: ComponentId | null
+  /** Collision-free HTML label centres, shared by canvas and native export. */
+  labelPositions?: Record<string, { x: number; y: number }>
 }
 
 export type ArchitectureEdge = Edge<RelationshipEdgeData, typeof RELATIONSHIP_EDGE_TYPE>
