@@ -44,7 +44,7 @@ export const EVENT_SOURCE_CLOSED = 2
 
 export interface LiveStreamOptions {
   projectId: ProjectId
-  /** Called for every parsed event, in the order the server sent them. */
+  /** Called once per new project position, in the order the server sent them. */
   onEvent: (event: StreamedEvent) => void
   onStateChange?: (state: LiveConnectionState) => void
   /** Injected in tests. Defaults to the browser `EventSource`. */
@@ -98,6 +98,7 @@ export function connectLiveStream(options: LiveStreamOptions): LiveStreamHandle 
   } = options
 
   let source: EventSourceLike | null = null
+  let detachSource: (() => void) | null = null
   let lastPosition: number | null = initialPosition
   let failedAttempts = 0
   let state: LiveConnectionState = 'connecting'
@@ -111,6 +112,7 @@ export function connectLiveStream(options: LiveStreamOptions): LiveStreamHandle 
   }
 
   function handleOpen() {
+    if (closed) return
     failedAttempts = 0
     setState('live')
   }
@@ -132,20 +134,18 @@ export function connectLiveStream(options: LiveStreamOptions): LiveStreamHandle 
   }
 
   function handleMessage(event: Event) {
+    if (closed) return
     const parsed = parseStreamedEvent(event)
-    if (!parsed) return
+    if (!parsed || parsed.projectId !== projectId || parsed.position <= (lastPosition ?? 0)) return
 
-    lastPosition = Math.max(lastPosition ?? 0, parsed.position)
     onEvent(parsed)
+    lastPosition = parsed.position
   }
 
   function teardown() {
-    if (!source) return
-    source.removeEventListener('open', handleOpen)
-    source.removeEventListener('error', handleError)
-    for (const type of EVENT_TYPES) source.removeEventListener(type, handleMessage)
-    source.close()
     source = null
+    detachSource?.()
+    detachSource = null
   }
 
   function scheduleReconnect() {
@@ -157,12 +157,27 @@ export function connectLiveStream(options: LiveStreamOptions): LiveStreamHandle 
   }
 
   function open() {
-    source = createEventSource(streamUrl(projectId, lastPosition))
-    source.addEventListener('open', handleOpen)
-    source.addEventListener('error', handleError)
+    const openedSource = createEventSource(streamUrl(projectId, lastPosition))
+    source = openedSource
+    // Already queued callbacks can outlive listener removal, including across
+    // manual reconnects. Only the currently owned source may publish anything.
+    const guard = (listener: (event: Event) => void) => (event: Event) => {
+      if (!closed && source === openedSource) listener(event)
+    }
+    const onOpen = guard(handleOpen)
+    const onError = guard(handleError)
+    const onMessage = guard(handleMessage)
+    openedSource.addEventListener('open', onOpen)
+    openedSource.addEventListener('error', onError)
     // The server sets `event:` to the event type, so a `message` listener would
     // never fire: subscribe to every type of the closed catalogue instead.
-    for (const type of EVENT_TYPES) source.addEventListener(type, handleMessage)
+    for (const type of EVENT_TYPES) openedSource.addEventListener(type, onMessage)
+    detachSource = () => {
+      openedSource.removeEventListener('open', onOpen)
+      openedSource.removeEventListener('error', onError)
+      for (const type of EVENT_TYPES) openedSource.removeEventListener(type, onMessage)
+      openedSource.close()
+    }
   }
 
   open()
