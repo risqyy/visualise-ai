@@ -19,6 +19,7 @@ import (
 	"github.com/risqyy/visualise-ai/backend/internal/httpapi"
 	"github.com/risqyy/visualise-ai/backend/internal/ingest"
 	"github.com/risqyy/visualise-ai/backend/internal/logging"
+	"github.com/risqyy/visualise-ai/backend/internal/mcptransport"
 	"github.com/risqyy/visualise-ai/backend/internal/readapi"
 	"github.com/risqyy/visualise-ai/backend/internal/sse"
 	"github.com/risqyy/visualise-ai/backend/internal/store"
@@ -77,7 +78,18 @@ func run() error {
 		return err
 	}
 
+	mcpHandler, err := mcptransport.New(mcptransport.Options{
+		Version:        version,
+		AllowedHosts:   cfg.MCPAllowedHosts,
+		AllowedOrigins: cfg.MCPAllowedOrigins,
+		RequestTimeout: cfg.MCPRequestTimeout,
+		SessionTimeout: cfg.MCPSessionTimeout,
+	})
+	if err != nil {
+		return err
+	}
 	router := httpapi.New(httpapi.Options{
+		MCP:     mcpHandler,
 		Logger:  logger,
 		Health:  checker,
 		Version: version,
@@ -129,6 +141,9 @@ func run() error {
 
 	shutdownCtx, cancel := context.WithTimeout(context.Background(), cfg.ShutdownTimeout)
 	defer cancel()
+	if err := mcpHandler.Shutdown(shutdownCtx); err != nil {
+		return err
+	}
 	if err := server.Shutdown(shutdownCtx); err != nil {
 		return err
 	}

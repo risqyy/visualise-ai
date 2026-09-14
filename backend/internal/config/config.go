@@ -27,7 +27,11 @@ type Config struct {
 	// MaxEventBytes is the maximum accepted size of a single ingested event.
 	MaxEventBytes int64
 	// ShutdownTimeout bounds the graceful shutdown of in-flight requests.
-	ShutdownTimeout time.Duration
+	ShutdownTimeout   time.Duration
+	MCPAllowedHosts   []string
+	MCPAllowedOrigins []string
+	MCPRequestTimeout time.Duration
+	MCPSessionTimeout time.Duration
 }
 
 // Default values are chosen so that `docker compose up` works unconfigured.
@@ -74,6 +78,20 @@ func Load() (Config, error) {
 		return Config{}, err
 	}
 
+	cfg.MCPAllowedHosts = strings.Split(envString("MCP_ALLOWED_HOSTS", "localhost:8080,127.0.0.1:8080,[::1]:8080"), ",")
+	cfg.MCPAllowedOrigins = strings.Split(envString("MCP_ALLOWED_ORIGINS", "http://localhost:8080,http://127.0.0.1:8080,http://[::1]:8080"), ",")
+	for i := range cfg.MCPAllowedHosts {
+		cfg.MCPAllowedHosts[i] = strings.TrimSpace(cfg.MCPAllowedHosts[i])
+	}
+	for i := range cfg.MCPAllowedOrigins {
+		cfg.MCPAllowedOrigins[i] = strings.TrimSpace(cfg.MCPAllowedOrigins[i])
+	}
+	if cfg.MCPRequestTimeout, err = envDuration("MCP_REQUEST_TIMEOUT", 45*time.Second); err != nil {
+		return Config{}, err
+	}
+	if cfg.MCPSessionTimeout, err = envDuration("MCP_SESSION_TIMEOUT", 5*time.Minute); err != nil {
+		return Config{}, err
+	}
 	return cfg, nil
 }
 
