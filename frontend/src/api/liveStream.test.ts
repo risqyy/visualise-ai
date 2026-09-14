@@ -55,6 +55,7 @@ describe('affectedQueryKeys', () => {
     expect(affectedQueryKeys(event)).toEqual([
       queryKeys.architecture(PROJECT_ID),
       queryKeys.components(PROJECT_ID),
+      queryKeys.runScope(PROJECT_ID),
     ])
   })
 

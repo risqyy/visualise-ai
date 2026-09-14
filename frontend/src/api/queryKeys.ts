@@ -61,6 +61,7 @@ export const queryKeys = {
     [...queryKeys.runs(projectId), 'current'] as const,
 
   /** Scope of one run: prefix of run detail, agents and plans. */
+  runScope: (projectId: ProjectId) => [...queryKeys.project(projectId), 'run'] as const,
   run: (projectId: ProjectId, runId: RunId) =>
     [...queryKeys.project(projectId), 'run', runId] as const,
 

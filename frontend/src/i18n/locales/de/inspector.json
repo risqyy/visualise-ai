@@ -57,7 +57,7 @@
     "agentProgressReported": "Fortschritt gemeldet",
     "agentStarted": "Agent gestartet",
     "agentStatusReported": "Status gemeldet",
-    "modelMutationApplied": "Modell�nderung angewendet",
+    "modelMutationApplied": "Modelländerung angewendet",
     "architectureSnapshotPublished": "Architektur-Snapshot veröffentlicht",
     "componentChangeApplied": "Komponentenänderung angewandt",
     "componentChangePlanned": "Komponentenänderung geplant",
@@ -140,5 +140,9 @@
     "currentRun": "Aktueller Run",
     "history": "Historie",
     "label": "Belegquelle"
+  },
+  "contributions": {
+    "label": "Gemeldete Beiträge",
+    "note": "Modelländerungen werden direkt angewandt. Arbeitsbereiche werden separat gemeldet und belegen keine Codeänderungen."
   }
 }

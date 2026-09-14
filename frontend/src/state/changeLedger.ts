@@ -1,5 +1,6 @@
 import type {
   AgentId,
+  ArchitectureResponse,
   ChangeOperation,
   Component,
   Identifier,
@@ -73,7 +74,9 @@ export interface LedgerChange {
   occurredAt: Timestamp
   position: number
   /** The reported descriptor, exactly as it arrived. */
-  snapshot: Component | Relationship
+  snapshot: Component | Relationship | null
+  /** Typed patches/removals may carry no complete descriptor. */
+  directMutation?: boolean
   /** `true` once a `retraction.issued` withdrew the reporting event. */
   retracted: boolean
   /** `true` once a `correction.issued` replaced the reporting event. */
@@ -101,13 +104,48 @@ export interface ChangeLedger {
   history: readonly LedgerChange[]
   /** Work steps that are started and not completed, keyed by `workStepId`. */
   openWorkSteps: Readonly<Record<Identifier, LedgerWorkStep>>
+  /** Last observed complete descriptors; never fabricated from an ID-only removal. */
+  descriptors: Readonly<Record<string, Component | Relationship>>
+  modelPosition: number
+  workScopes: Readonly<Record<string, LedgerWorkScope>>
+  terminalAgents: Readonly<Record<string, number>>
+  terminalRuns: Readonly<Record<string, number>>
+  agentStatuses: Readonly<Record<string, { status: string; position: number }>>
 }
+
+export interface LedgerWorkScope {
+  agentId: AgentId
+  runId: RunId
+  componentIds: readonly string[]
+  relationshipIds: readonly string[]
+  position: number
+  occurredAt: Timestamp
+}
+
+export const contributionKey = (runId: RunId, id: string): string => `${runId}\u0000${id}`
 
 export const EMPTY_LEDGER: ChangeLedger = {
   projectId: null,
   lastPosition: 0,
   history: [],
   openWorkSteps: {},
+  descriptors: {},
+  modelPosition: 0,
+  workScopes: {},
+  terminalAgents: {},
+  terminalRuns: {},
+  agentStatuses: {},
+}
+
+/** Capture only a snapshot that preceded this event. A newer GET cannot tell
+ * us what a removed element used to look like. Replay advances this map itself. */
+export function observeModel(ledger: ChangeLedger, model: ArchitectureResponse, beforePosition: number): ChangeLedger {
+  if (!Number.isFinite(model.projectPosition)) return ledger
+  if (model.projectPosition >= beforePosition || model.projectPosition < ledger.modelPosition) return ledger
+  return { ...ledger, modelPosition: model.projectPosition, descriptors: Object.fromEntries([
+    ...model.components.map((one) => [`component:${one.componentId}`, one] as const),
+    ...model.relationships.map((one) => [`relationship:${one.relationshipId}`, one] as const),
+  ]) }
 }
 
 /** Guards against a pathological chain of corrections correcting corrections. */
@@ -139,13 +177,52 @@ function applyEvent(
   depth: number,
 ): ChangeLedger {
   switch (event.type) {
+    case 'model.mutation_applied': {
+      let next = ledger
+      const descriptors = { ...ledger.descriptors }
+      for (const operation of event.payload.operations) {
+        const targetKind = operation.op.startsWith('component.') ? 'component' : 'relationship'
+        const targetId = 'component' in operation ? operation.component.componentId
+          : 'relationship' in operation ? operation.relationship.relationshipId
+            : 'componentId' in operation ? operation.componentId : operation.relationshipId
+        const key = `${targetKind}:${targetId}`
+        const previous = descriptors[key] ?? null
+        const snapshot = 'component' in operation ? operation.component
+          : 'relationship' in operation ? operation.relationship
+            : 'set' in operation && previous ? patchDescriptor(previous, operation.set) : previous
+        const action = operation.op.endsWith('.remove') ? 'remove' : operation.op.endsWith('.add') ? 'add' : 'modify'
+        next = appendChange(next, event, {
+          changeId: null, targetKind, targetId, operation: action, phase: 'applied', snapshot, directMutation: true,
+        })
+        if (action === 'remove') delete descriptors[key]
+        else if (snapshot) descriptors[key] = snapshot
+      }
+      return { ...next, descriptors, modelPosition: event.position }
+    }
+    case 'work.scope_reported':
+      return { ...ledger, workScopes: { ...ledger.workScopes,
+        [contributionKey(event.runId, event.agentId)]: { ...event.payload.scope,
+          agentId: event.agentId, runId: event.runId, position: event.position, occurredAt: event.occurredAt },
+      } }
+    case 'work.reported': {
+      const report = event.payload.report
+      if (report.action === 'step_start') return applyEvent(ledger, { ...event, type: 'work.step_started', payload: report } as unknown as StreamedEvent, depth)
+      if (report.action === 'step_complete') return withoutWorkStep(ledger, event.runId, report.workStepId)
+      if (report.action === 'status') return reportStatus(ledger, event, report.status)
+      if (report.action === 'agent_finish') return finishAgent(ledger, event)
+      if (report.action === 'run_finish') return finishRun(ledger, event)
+      return ledger
+    }
+    case 'agent.finished': return finishAgent(ledger, event)
+    case 'agent.status_reported': return reportStatus(ledger, event, event.payload.status)
+    case 'run.finished': return finishRun(ledger, event)
     case 'work.step_started': {
       const { workStepId, title, componentIds } = event.payload
       return {
         ...ledger,
         openWorkSteps: {
           ...ledger.openWorkSteps,
-          [workStepId]: {
+          [contributionKey(event.runId, workStepId)]: {
             workStepId,
             clientEventId: event.clientEventId,
             title,
@@ -160,7 +237,7 @@ function applyEvent(
     }
 
     case 'work.step_completed':
-      return withoutWorkStep(ledger, event.payload.workStepId)
+      return withoutWorkStep(ledger, event.runId, event.payload.workStepId)
 
     case 'component.change_planned':
       return appendChange(ledger, event, {
@@ -207,7 +284,10 @@ function applyEvent(
     // derived from them would contradict what is now on screen. Open work steps
     // survive: a work step is a statement about an agent, not about the model.
     case 'architecture.snapshot_published':
-      return { ...ledger, history: [] }
+      return { ...ledger, history: [], modelPosition: event.position, descriptors: Object.fromEntries([
+        ...event.payload.components.map((one) => [`component:${one.componentId}`, one] as const),
+        ...event.payload.relationships.map((one) => [`relationship:${one.relationshipId}`, one] as const),
+      ]) }
 
     // The log stays append-only: a retraction never deletes, it marks.
     case 'retraction.issued': {
@@ -251,7 +331,8 @@ interface ChangeFields {
   targetId: string
   operation: ChangeOperation
   phase: ChangePhase
-  snapshot: Component | Relationship
+  snapshot: Component | Relationship | null
+  directMutation?: boolean
 }
 
 function appendChange(
@@ -269,17 +350,29 @@ function appendChange(
     retracted: false,
     superseded: false,
   }
-  const history = [...ledger.history, entry]
+  let history = [...ledger.history, entry]
+  if (history.length > HISTORY_LIMIT) {
+    const cutoff = history[history.length - HISTORY_LIMIT - 1]!.position
+    history = history.filter((one) => one.position > cutoff)
+  }
+  const descriptors = { ...ledger.descriptors }
+  if (fields.phase === 'applied') {
+    const key = `${fields.targetKind}:${fields.targetId}`
+    if (fields.operation === 'remove') delete descriptors[key]
+    else if (fields.snapshot) descriptors[key] = fields.snapshot
+  }
   return {
     ...ledger,
-    history: history.length > HISTORY_LIMIT ? history.slice(-HISTORY_LIMIT) : history,
+    history, descriptors,
+    modelPosition: fields.phase === 'applied' ? event.position : ledger.modelPosition,
   }
 }
 
-function withoutWorkStep(ledger: ChangeLedger, workStepId: Identifier): ChangeLedger {
-  if (!(workStepId in ledger.openWorkSteps)) return ledger
+function withoutWorkStep(ledger: ChangeLedger, runId: RunId, workStepId: Identifier): ChangeLedger {
+  const key = contributionKey(runId, workStepId)
+  if (!(key in ledger.openWorkSteps)) return ledger
   const openWorkSteps = { ...ledger.openWorkSteps }
-  delete openWorkSteps[workStepId]
+  delete openWorkSteps[key]
   return { ...ledger, openWorkSteps }
 }
 
@@ -288,7 +381,26 @@ function withoutWorkStepOfEvent(ledger: ChangeLedger, clientEventId: Uuid): Chan
   const match = Object.values(ledger.openWorkSteps).find(
     (step) => step.clientEventId === clientEventId,
   )
-  return match ? withoutWorkStep(ledger, match.workStepId) : ledger
+  return match ? withoutWorkStep(ledger, match.runId, match.workStepId) : ledger
+}
+
+function patchDescriptor(previous: Component | Relationship, patch: object): Component | Relationship {
+  const next = { ...previous } as Record<string, unknown>
+  for (const [key, value] of Object.entries(patch)) {
+    if (value === null) delete next[key]
+    else next[key] = value
+  }
+  return next as Component | Relationship
+}
+
+function finishAgent(ledger: ChangeLedger, event: StreamedEvent): ChangeLedger {
+  return { ...ledger, terminalAgents: { ...ledger.terminalAgents, [contributionKey(event.runId, event.agentId)]: event.position } }
+}
+function finishRun(ledger: ChangeLedger, event: StreamedEvent): ChangeLedger {
+  return { ...ledger, terminalRuns: { ...ledger.terminalRuns, [event.runId]: event.position } }
+}
+function reportStatus(ledger: ChangeLedger, event: StreamedEvent, status: string): ChangeLedger {
+  return { ...ledger, agentStatuses: { ...ledger.agentStatuses, [contributionKey(event.runId, event.agentId)]: { status, position: event.position } } }
 }
 
 // ---------------------------------------------------------------------------
@@ -311,7 +423,8 @@ export function recentAppliedChanges(
   limit = RECENT_APPLIED_LIMIT,
 ): LedgerChange[] {
   const applied = standingChanges(ledger).filter((entry) => entry.phase === 'applied')
-  return applied.slice(-limit)
+  const positions = [...new Set(applied.map((one) => one.position))].slice(-limit)
+  return applied.filter((one) => positions.includes(one.position))
 }
 
 /** Open work steps, sorted by position so the result is order-independent. */

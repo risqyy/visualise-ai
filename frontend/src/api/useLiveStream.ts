@@ -11,7 +11,8 @@ import {
   type EventSourceLike,
   type LiveStreamHandle,
 } from './liveStream'
-import type { ProjectId, StreamedEvent } from './types'
+import type { ArchitectureResponse, ProjectId, StreamedEvent } from './types'
+import { queryKeys } from './queryKeys'
 
 /**
  * Applies one live event to the client state.
@@ -31,7 +32,7 @@ import type { ProjectId, StreamedEvent } from './types'
  *    and never enters the cache.
  */
 export function applyLiveEvent(queryClient: QueryClient, event: StreamedEvent): void {
-  ingestLiveEvent(event)
+  ingestLiveEvent(event, queryClient.getQueryData<ArchitectureResponse>(queryKeys.architecture(event.projectId)))
   for (const queryKey of affectedQueryKeys(event)) {
     void queryClient.invalidateQueries({ queryKey })
   }

@@ -98,7 +98,9 @@
       "remove": "entfernen"
     },
     "proposalNote": "Vorschlag: nicht Teil des angewandten Architekturmodells.",
-    "workStepRunning": "Arbeitsschritt läuft: {{title}}"
+    "workStepRunning": "Arbeitsschritt läuft: {{title}}",
+    "workScopeReported": "Explizit gemeldeter Arbeitsbereich",
+    "workScopeEnded": "Erhaltener Arbeitsbereich · Agent oder Lauf beendet"
   },
   "pane": {
     "emptyDescription": "Das Modell erscheint, sobald ein Agent architecture.snapshot_published sendet.",
