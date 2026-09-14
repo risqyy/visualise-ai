@@ -1,5 +1,5 @@
 {
-  "_reason": "schemaVersion 2.0 is not accepted by v0",
+  "_reason": "Legacy agent.started requires schemaVersion 1.0; schemaVersion 2.0 is reserved for the six typed command events",
   "schemaVersion": "2.0",
   "clientEventId": "6b6e9b6a-4f5f-4a1f-9b7d-2f0f2a5b1c02",
   "projectId": "demo-shop",

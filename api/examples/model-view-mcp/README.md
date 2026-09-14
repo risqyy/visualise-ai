@@ -1,7 +1,8 @@
 # One complete model-command sequence
 
-This is the #76 implementation example, not a claim that the running server
-already exposes these tools. The [contract](../../../docs/model-view-mcp-contract.md)
+This #76 contract example is implemented by the current source-built server.
+The [executable SDK flow](../../../docs/mcp-domain-tools.md#executable-client)
+also saves a view, reads exact revisions and produces native PNG feedback. The [contract](../../../docs/model-view-mcp-contract.md)
 defines the semantics; [cases.json](cases.json) contains schema-validated tool
 inputs/results. Revision/position values below form one consistent timeline.
 

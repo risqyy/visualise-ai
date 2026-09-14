@@ -90,10 +90,10 @@ jobs:
           path: e2e/playwright-report/
           retention-days: 14
 
-      # Traces, screenshots and videos of failed tests. Only produced on
-      # failure, so the step is a no-op on a green run.
-      - name: Upload failure artefacts
-        if: failure()
+      # Keep successful PNGs/client outputs and failure traces/videos.
+      # Raw measurement attachments are retained in the HTML report above.
+      - name: Upload acceptance artefacts
+        if: always()
         uses: actions/upload-artifact@v5
         with:
           name: playwright-test-results

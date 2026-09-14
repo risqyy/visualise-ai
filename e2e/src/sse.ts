@@ -14,6 +14,8 @@
  */
 
 export interface SseFrame {
+  /** Original published payload, retained for independent receipt identity checks. */
+  event: Record<string, unknown>
   /** Project position, from the `id:` field. */
   position: number
   /** Event type, from the `event:` field. */
@@ -100,6 +102,7 @@ export class SseRecorder {
     }
 
     this.frames.push({
+      event: decoded,
       position: Number(id),
       type: type ?? '',
       payloadPosition: typeof decoded.position === 'number' ? decoded.position : Number.NaN,

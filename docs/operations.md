@@ -11,12 +11,12 @@ Authentifizierung.
 
 | Werkzeug | Wofür | Anmerkung |
 | --- | --- | --- |
-| Docker Engine | Betrieb | Zuletzt geprüft mit 29.5 |
-| Docker Compose | Betrieb | Als Plugin (`docker compose …`), nicht als altes `docker-compose`. Zuletzt geprüft mit 5.1 |
+| Docker Engine | Betrieb | Lokale #83-Abnahme: 27.5.1 |
+| Docker Compose | Betrieb | Als Plugin (`docker compose …`), nicht als altes `docker-compose`. Lokale #83-Abnahme: 2.32.4-desktop.1 |
 
-Mehr ist für den Betrieb **nicht** nötig. Backend, Frontend und Simulator werden
-im Container gebaut; Go und Node brauchst du nur, wenn du am Quellcode arbeitest
-oder den Simulator direkt vom Host aus startest (siehe
+Mehr ist für den Betrieb **nicht** nötig. Compose baut Backend und Frontend
+im Container. Der Simulator läuft auf dem Host; dafür und für den ausführbaren
+SDK-Client brauchst du Node. Go und Node sind außerdem Entwicklungswerkzeuge (siehe
 [Demo ausführen](#demo-ausfuehren) und den Abschnitt „Lokale Entwicklung" im
 [README](../README.md#lokale-entwicklung)).
 
@@ -96,7 +96,7 @@ rechts nach einem Klick auf eine Komponente.
 
 | Szenario | Projekt | Zeigt |
 | --- | --- | --- |
-| `full` | `visualise-ai` | Den repräsentativen Run: 62 Events, jeden Eventtyp außer dem optionalen `run.finished` |
+| `full` | `visualise-ai` | Den repräsentativen Run: 62 Events, jeden Legacy-Eventtyp außer dem optionalen `run.finished` |
 | `retry` | `visualise-ai-retry` | `201`, danach eine byte-identische Wiederholung mit `200 duplicate: true` und **derselben** Position |
 | `conflict` | `visualise-ai-conflict` | Dieselbe `clientEventId` mit anderem Inhalt: `409 client_event_id_conflict` |
 | `self` | `visualise-ai-self` | Dieses Repository selbst: 122 Events, 28 Komponenten, 35 Beziehungen, 10 Agents, 7 Diffs — nichts davon erfunden |
@@ -124,8 +124,8 @@ npm run simulate -- --scenario self
 
 **Alle vier Szenarien setzen ein leeres Projekt voraus.** Gegen eine bereits
 gefüllte Datenbank ist die erste Zustellung berechtigterweise ein Duplikat — das
-ist korrektes Verhalten, aber nicht das, was die Szenarien behaupten. Vor einem
-Wiederholungslauf also:
+ist korrektes Verhalten, aber nicht das, was die Szenarien behaupten. Nur bei
+einem ausdrücklich entbehrlichen Demo-/Teststack vor einem Wiederholungslauf:
 
 ```bash
 docker compose down -v && docker compose up --build -d
@@ -158,6 +158,12 @@ Checkout funktionieren.
 | `DATABASE_CONNECT_TIMEOUT` | Wie lange das Backend beim Start auf PostgreSQL wartet, bevor es scheitert. Go-Duration (`60s`, `2m`). | `60s` | Auf langsamen Rechnern erhöhen |
 | `MAX_EVENT_BYTES` | Maximale Größe eines einzelnen ingestierten Events in Bytes | `2097152` (2 MiB) | Wenn Agents größere Snapshots oder Diffs melden — siehe die Warnung unten |
 | `SHUTDOWN_TIMEOUT` | Kulanzfrist für laufende Requests beim Herunterfahren. Go-Duration. | `15s` | Selten |
+| `MCP_ALLOWED_HOSTS` | Kommagetrennte exakte `host[:port]`-Werte, ohne Wildcards | Compose: `localhost`, `127.0.0.1`, `[::1]`, jeweils mit `FRONTEND_HTTP_PORT` | Eigener Hostname oder privater Reverse Proxy |
+| `MCP_ALLOWED_ORIGINS` | Exakte Origins einschließlich Schema und externem Port, ohne Pfad | Compose: `http://` plus dieselben Hosts/Ports | Browserzugriff über einen anderen Origin |
+| `MCP_REQUEST_TIMEOUT` | Deadline eines MCP-Methodenaufrufs | `45s` | Bei bewusst anderen Transportgrenzen |
+| `MCP_SESSION_TIMEOUT` | SDK-Session-Timeout; kein fachlicher Run-Timeout | `5m` | Bei bewusst anderer Session-Lebensdauer |
+| `RENDER_ENTRY_URL` | Vertrauenswürdiger Produktions-Frontend-Einstieg | Compose setzt `http://frontend:8080/render.html`; direktes Backend ohne Wert bietet nur 13 Tools | Direkter Backendbetrieb außerhalb Compose |
+| `RENDER_BROWSER_PATH` | Chromium-Binary | `/usr/bin/chromium` | Eigene lokale Installation außerhalb Compose |
 | `DATABASE_URL` | Vollständiger PostgreSQL-DSN. Wird von `docker-compose.yml` aus den `POSTGRES_*`-Werten zusammengesetzt. | zusammengesetzt | Nur, wenn das Backend auf eine andere Datenbank zeigen soll |
 
 `HTTP_ADDR` (Listen-Adresse des Backends, `:8080`) wird von
@@ -174,14 +180,65 @@ normale lokale Start baut weiterhin aus `./backend` und `./frontend`.
 > nie. Hebe beide Werte gemeinsam an und halte `MAX_REQUEST_BODY_SIZE`
 > oberhalb von `MAX_EVENT_BYTES`.
 >
-> Nginx antwortet in diesem Fall ebenfalls mit `application/problem+json` und
+> Für REST antwortet Nginx in diesem Fall ebenfalls mit `application/problem+json` und
 > `code: event_too_large`, damit ein Agent die Ablehnung genauso auswerten kann
 > wie die des Backends.
+
+## MCP-Zugang und natives Rendern
+
+Source-built Compose bietet unter `http://localhost:8080/mcp` 14 Tools mit dem
+offiziellen Go-SDK 1.7.0. Der geprüfte TypeScript-Client verwendet SDK 1.30.0.
+Der zustandsbehaftete Transport handelt 2025-11-25 aus und unterstützt die
+in [ADR 0030](decisions/0030-official-mcp-http-transport.md) genannten älteren
+Versionen, jedoch nicht 2026-07-28 in diesem Modus. Die Domainversion ist
+unabhängig davon `contractVersion: "2.0.0"`. Konfiguration und ausführbarer
+PNG-Ablauf stehen in [MCP domain tools](mcp-domain-tools.md).
+
+Host und Origin müssen zur **externen** URL passen; Port 8101 ist nicht Port
+8080. Nginx reicht den ursprünglichen Host samt Port weiter. Ein nativer Client
+ohne Origin ist zulässig, muss aber den erlaubten Host verwenden. Diese Checks
+sind keine Authentifizierung. Für einen absichtlich im privaten Netz verwendeten
+Host etwa `cockpit.lan:8101` setzt man zusätzlich zum veröffentlichten Port:
+
+```dotenv
+FRONTEND_HTTP_PORT=8101
+MCP_ALLOWED_HOSTS=cockpit.lan:8101
+MCP_ALLOWED_ORIGINS=http://cockpit.lan:8101
+```
+
+MCP akzeptiert unabhängig von `MAX_EVENT_BYTES` höchstens 1 MiB Request-Body;
+strukturierte Ergebnisse haben ebenfalls höchstens 1 MiB. Auch die sechs
+typisierten REST-Kommandos mit `schemaVersion: "2.0"` haben zusätzlich zum
+konfigurierbaren Eventlimit eine feste 1-MiB-Grenze. Ein PNG darf dekodiert
+höchstens 4 MiB groß sein. Eine MCP-Anfrage oberhalb des Nginx-Limits liefert
+HTTP 413 als einfachen Text; sie ist kein REST-Problem und kein Domain-Receipt.
+Ein Toolfehler verwendet `isError: true` und die strukturierte Error-Form.
+
+Das Backend-Image enthält Chromium und Fonts, läuft als Nicht-Root und benötigt
+keinen geöffneten Nutzerbrowser. Compose setzt `init: true` und 256 MiB Shared
+Memory für die Browserprozesse. Der Renderer lädt ausschließlich den
+konfigurierten Einstieg und rendert mit der nativen React/ELK-Pipeline. Ohne
+`RENDER_ENTRY_URL` wird das Render-Tool im direkten Backendbetrieb nicht angeboten.
+
+Compose verwendet für den Backend-Service das versionierte Seccomp-Profil unter
+`deploy/chromium/`. Dieses Verzeichnis muss auch bei Image-Override-Deployments
+neben den Compose-Dateien vorhanden sein. Profilpflege und die Prüfung des
+tatsächlich aktiven Chromium-Sandboxzustands beschreibt
+[natives Rendering](native-rendering.md).
+
+Pro Backend sind zwei Renderjobs gleichzeitig erlaubt, ohne Warteschlange.
+Die feste Deadline beträgt 30 Sekunden einschließlich Snapshot und Browserstart;
+ein früherer Request-Abbruch beendet den Job. Größen-/Detailgrenzen und die
+Bedeutung von `clipped` und tatsächlich sichtbaren IDs stehen unter
+[natives Rendering](native-rendering.md). Diese Grenzen und Session-Timeouts
+ändern keinen Arbeitsstatus. Modelländerungen sind keine Codeänderungen.
 
 ## Veröffentlichte Docker-Hub-Images
 
 Der Release-Workflow
 ([`.github/workflows/release-dockerhub.yml`](../.github/workflows/release-dockerhub.yml))
+beschreibt die Veröffentlichung; die neuen MCP-/Render-Fähigkeiten gelten hier
+für den Quell-Build und dürfen nicht für ältere Images vorausgesetzt werden. Er
 reagiert ausschließlich auf Tags der Form `v<major>.<minor>.<patch>` mit
 optionalem Prerelease, beispielsweise `v1.2.3` oder `v1.2.3-rc.1`. Branch- und
 Pull-Request-Ereignisse veröffentlichen nichts.
@@ -240,8 +297,10 @@ Das offizielle PostgreSQL-Image initialisiert Nutzer und Datenbank nur, wenn das
 Volume `pgdata` leer ist. Änderst du `POSTGRES_USER`, `POSTGRES_PASSWORD` oder
 `POSTGRES_DB` später, ändert sich zwar die vom Compose gebaute `DATABASE_URL`,
 nicht aber die Datenbank — das Backend kann sich dann nicht mehr anmelden und
-wird nie bereit. Wer diese Werte ändern will, muss das Volume neu anlegen
-(`docker compose down -v`) und verliert dabei alle Daten.
+wird nie bereit. Bestehende Zugangsdaten werden mit PostgreSQL-Werkzeugen
+geändert und anschließend in der Backend-Konfiguration angepasst. Das Volume
+wird bei einem Upgrade nicht neu angelegt. `down -v` ist nur für entbehrliche
+Testdaten geeignet und löscht alle Daten.
 
 ## Healthchecks und Readiness
 
@@ -294,8 +353,30 @@ Der Event Log ist append-only und die Audit-Quelle; es gibt in v0 kein
 Löschen einzelner Events, keinen Export und kein Backup-Kommando. Wer die Daten
 sichern will, sichert das Volume mit Docker-Bordmitteln.
 
-`down -v` ist der reguläre Weg, um Simulator und End-to-End-Test wieder auf
-einen definierten Anfangszustand zu bringen.
+`down -v` ist ausschließlich für entbehrliche Simulator-/Abnahmefixtures geeignet,
+niemals ein Upgrade-Schritt. Verwende dafür einen eigenen Compose-Projektnamen.
+
+### Upgrade vorhandener Projekte
+
+Vor einem Upgrade Daten sichern und das vorhandene PostgreSQL-Volume behalten:
+`docker compose up --build -d` aktualisiert die Anwendungscontainer. Die
+wiederholbare Startup-Migration erhält Eventlog und Projektionen. Bestehende
+Projekte beginnen die neue Revisionszählung bei Modellrevision 0 mit festgehaltener
+Aktivierungsposition; akzeptierte Revisionen werden bei Neustarts nicht zurückgesetzt.
+
+Aktuelle und historisch materialisierte Element-IDs bleiben reserviert. Geplante,
+nie materialisierte IDs bleiben verfügbar; gelöschte Views behalten Tombstones.
+Fehlende Referenzen, Zyklen und mehrdeutige historische Wiederverwendung bleiben
+diagnostizierbar, statt durch Migration stillschweigend repariert zu werden.
+Neue Modellschreibvorgänge müssen einen gültigen Gesamtgraphen ergeben. Ein
+expliziter Reparaturbatch oder ein gültiger Ersatzsnapshot korrigiert Altdaten,
+ohne historische Identitäten umzubenennen oder die Historie zu löschen.
+
+Arbeitsschritt-Zuordnungen werden pro Run aus zuordenbaren akzeptierten Starts
+und wirksamen Korrekturen rekonstruiert. Nicht zuordenbare Altverknüpfungen bleiben
+als Evidenz mit leerer Run-ID erhalten. Es gibt keinen allgemeinen Log-Replay-
+oder automatischen Graphreparatur-Befehl. Details:
+[Modellmigration](model-command-implementation.md), [Arbeitskontext](mcp-domain-tools.md).
 
 ## Portkonflikte
 
@@ -317,10 +398,14 @@ Compose-Projektnamen, damit sich Container und Volumes nicht überschreiben:
 
 ```bash
 FRONTEND_HTTP_PORT=8101 docker compose -p mein-stack up --build -d
-FRONTEND_HTTP_PORT=8101 docker compose -p mein-stack down -v
+FRONTEND_HTTP_PORT=8101 docker compose -p mein-stack down
 ```
 
 ## End-to-End-Abnahme (Playwright)
+
+Den belegten lokalen Stand und Messbedingungen dokumentiert die
+[Abnahmematrix](epic-75-acceptance.md). Ein lokaler Lauf ist kein Nachweis einer
+Remote-CI-Ausführung oder einer veröffentlichten Release-Version.
 
 Der verpflichtende Abnahmetest läuft in Chromium bei 1920 × 1080 gegen das echte
 Compose-System aus leerer Datenbank:
@@ -347,6 +432,6 @@ Entwicklungs-Stack auf `8080` weder benutzt noch beim Aufräumen löscht.
 | `docker compose up` scheitert mit „port is already allocated" | Port 8080 belegt — siehe [Portkonflikte](#portkonflikte) |
 | `frontend` startet nicht, `backend` bleibt `starting` oder `unhealthy` | Das Backend wird nicht bereit. `docker compose logs backend` zeigt den Grund: ungültige Konfiguration, gescheiterte Migration oder keine Datenbankverbindung |
 | Oberfläche lädt, zeigt aber keine Projekte | Die Datenbank ist leer. Das ist der korrekte Zustand — führe die [Demo](#demo-ausfuehren) aus oder lass einen Agenten melden |
-| Simulator meldet `200 duplicate: true` statt `201` | Die Datenbank ist nicht leer. `docker compose down -v` und neu starten |
+| Simulator meldet `200 duplicate: true` statt `201` | Das Projekt ist bereits befüllt. Nur einen entbehrlichen Demo-Stack mit `down -v` leeren; produktive Daten behalten |
 | Ingestion antwortet `422 unknown_agent` | Der meldende Agent hat vorher kein `agent.started` gesendet — siehe [Agent-Integration](./agent-integration.md#lifecycle) |
 | SSE-Stream bleibt still, obwohl Events ankommen | Der Stream wurde ohne Cursor geöffnet und beginnt am Live-Ende. Für Historie `lastEventPosition=0` setzen — siehe [SSE](./agent-integration.md#sse-stream-und-reconnect) |

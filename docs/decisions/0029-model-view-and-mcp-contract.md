@@ -1,5 +1,10 @@
 # 29. Project model, saved views and MCP commands
 
+Current implementation status: the integrated source-built Compose deployment
+implements all 14 tools, including native views and PNG feedback. This ADR
+retains its original decision/delivery context; see [current usage](../mcp-domain-tools.md)
+and [local acceptance](../epic-75-acceptance.md) for present capabilities and evidence.
+
 - **Status:** accepted implementation contract; runtime delivery belongs to #77–#83
 - **Date:** 2026-09-14
 - **Issue:** #76, epic #75

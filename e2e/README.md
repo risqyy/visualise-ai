@@ -185,3 +185,63 @@ Run `npx playwright test 16-native-views.spec.ts` with the same isolated Compose
 settings described above. Successful runs retain `native-detail-view.png` and
 `native-complete-view.png` in the test output directory. Local camera state is
 session-only; reload assertions cover the URL view/selection and saved defaults.
+
+## Complete MCP recovery acceptance (#83)
+
+`tests/17-mcp-command-recovery.spec.ts` adds two independently initialized SDK
+clients racing one model CAS, followed by explicit reread/reconciliation. Its
+lost-response transport override sends the real request through Nginx, consumes
+and discards the committed response bytes, then throws before the SDK sees them.
+An independent model read and published SSE event establish the original commit.
+A newly initialized client retries the identical full command/key and must
+recover the original server event ID, timestamp, ownership, revisions and affected
+IDs. Retrying again after explicit run closure preserves that same receipt.
+
+A rejected node-plus-invalid-edge batch is checked against the model/head and
+single ordered SSE publication stream, plus a native browser status barrier and
+active DOM observer: no partial node can be drawn. The test registers a root and
+two workers, reports overlapping scope, status, progress and owned step completion,
+then closes the run explicitly. Observed new event types must exactly cover the
+generated command catalogue. Together with the simulator's closed legacy catalogue,
+the mandatory suite covers both generations of events.
+
+Test 15 now records Chromium's actual EventSource frames using CDP. Offline
+emulation alone does not reliably close an established stream; `Page.stopLoading`
+explicitly aborts the browser request while offline. A missed committed mutation
+must be absent before reconnect, replayed once afterward and followed by another
+live mutation. Both streams must return 200 and received positions must be gapless
+from the initial hydration snapshot through the continued live event.
+
+The documented client is also executed by the mandatory suite:
+
+```bash
+npm --prefix e2e ci
+MCP_URL=http://localhost:8080/mcp node e2e/examples/native-feedback.mjs
+```
+
+`MCP_OUTPUT_DIR` optionally selects its output directory. By default the example
+writes PNGs and matching JSON metadata under `e2e/test-results/client-example/`.
+The process creates a unique project/run, renders without a user page, corrects
+one model label, renders again and explicitly closes the run. This demonstrates
+model feedback, not automated quality judgment or a repository code change.
+
+The existing full `npm test` gate includes all MCP, native render and saved-view
+tests. Successful PNGs and client outputs are uploaded with `test-results` on every CI
+run; failure traces/videos remain included. Raw measurement attachments are
+retained in the separately uploaded HTML report. This canonical local run also
+exports named JSON files under `test-results/acceptance-evidence`. Timings use `performance.now`:
+render roundtrip samples and distinct mutation-to-observed-canvas scenarios carry
+raw values, sample count, median/range, model/viewport/detail, SDK/browser/font,
+OS/Docker and fresh-versus-reused-stack conditions. These are local observations,
+not an SLA or a repeated identical-write benchmark.
+
+Run a complete isolated source-build acceptance with a disposable project/port:
+
+```bash
+E2E_COMPOSE_PROJECT=vai-epic75-i83 FRONTEND_HTTP_PORT=18183 E2E_KEEP_STACK=1 npm --prefix e2e test
+```
+
+Leave `E2E_SKIP_COMPOSE` unset for final acceptance. This deletes only the selected
+acceptance project's volume, builds the current source and starts fresh. Never
+select a user's existing deployment project. See
+[the acceptance evidence and limits](../docs/epic-75-acceptance.md).

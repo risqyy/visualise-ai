@@ -1,7 +1,8 @@
 # Model, view and MCP implementation contract
 
-This is the accepted #76 specification for #77–#83, **not the currently available
-API**. See [ADR 0029](decisions/0029-model-view-and-mcp-contract.md). Structural
+This is the accepted #76 specification implemented by the current source-built
+server. [Current usage](mcp-domain-tools.md) and [local acceptance](epic-75-acceptance.md)
+describe deployment and measured evidence. See [ADR 0029](decisions/0029-model-view-and-mcp-contract.md). Structural
 definitions and exact tool names live in
 [`api/model-view-mcp.schema.yaml`](../api/model-view-mcp.schema.yaml) and
 [`api/model-view-mcp.tools.yaml`](../api/model-view-mcp.tools.yaml). Checked
@@ -278,7 +279,9 @@ state or emits synthetic activity.
 
 ## Existing data and REST compatibility
 
-Current code inspection at base `53f9a84` found:
+Historical planning baseline: code inspection at `53f9a84` found the behavior
+below. The required integrations are now implemented; this table preserves the
+original comparison, not a list of outstanding work.
 
 | Current behavior | Required integration / example |
 | --- | --- |
@@ -341,6 +344,9 @@ capabilities or an inferred implementation order**. Their priority is **OPEN**.
 | #81 | Native frontend renderer and exact model/view revision image feedback; actual image/revision checks |
 | #82 | Saved view persistence, shared references, local state per view and view tools; common view schema fixed here |
 | #83 | Compose/proxy end-to-end flow including conflict/retry, concurrent scopes, SSE reconnect, views and render; integration docs |
+
+Historical delivery sequencing (the integrated endpoint now uses persisted views
+and advertises all 14 tools in source-built Compose):
 
 #81 and #82 share the view schema and resolution rules above. #81 may test a
 fixture view through the same resolver while #82 implements persistence; the

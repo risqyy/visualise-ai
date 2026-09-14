@@ -1,6 +1,6 @@
 /**
- * The catalogue is closed and the simulator has to exercise all of it: whatever
- * the contract allows, the E2E test in #14 must be able to see happen.
+ * The legacy catalogue is closed and this schemaVersion 1.0 simulator exercises
+ * all of it. The six 2.0 command events are exercised by the real MCP E2E suite.
  *
  * The expected set is read from `api/openapi.yaml` rather than restated here, so
  * adding a 21st event type to the contract fails this test until the scenario
@@ -23,7 +23,7 @@ const typesOf = (finish: boolean): Set<string> =>
   new Set(buildFullScenario({ ...base, finish }).steps.map((step) => step.event.type))
 
 describe('event catalogue coverage', () => {
-  it('covers every type of the published catalogue', () => {
+  it('covers every type of the published legacy catalogue', () => {
     const covered = typesOf(true)
     const missing = contract.eventTypes.filter((type) => !covered.has(type))
 

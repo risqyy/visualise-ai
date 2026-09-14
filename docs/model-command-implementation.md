@@ -1,10 +1,10 @@
 # Atomic model command implementation (#77)
 
 The `model.mutation_applied` REST event (`schemaVersion: "2.0"`) and its shared
-`ingest.Service.Submit` entry point are implemented. This does not register MCP
-transport/tools or the prospective context, work, scope and view commands.
-`MV_*` generated schemas describe those later adapters; schema availability is
-not a capability advertisement. ADR 0029 remains the behavioral authority.
+`ingest.Service.Submit` entry point are implemented. The integrated source also exposes MCP, context/work/scope commands, saved
+views and native rendering. [Current workflow](mcp-domain-tools.md) describes
+available capabilities. ADR 0029 remains the behavioral authority; this document
+records the model transaction and migration implementation.
 
 The store serializes new commands with legacy events on the project row. It
 checks full command replay identity before lifecycle and CAS, then applies the
@@ -17,7 +17,7 @@ while receipt `affected` IDs remain the explicit typed mutation targets.
 `Store.ReadModel` returns native descriptors, bounded integrity diagnostics and
 both counters from one repeatable-read transaction. The existing architecture
 read also returns `modelRevision` and reads its head, graph and proposals in one
-snapshot. Collection pagination and bounded MCP read responses belong to #79.
+snapshot. MCP collection pagination and response bounds share this consistent boundary.
 
 Migration preserves the current projection and log. Each existing project starts
 at revision zero with its activation position recorded. It reserves currently
@@ -35,12 +35,12 @@ explicit batch or valid replacement snapshot. Corrections retain the original
 lifecycle before projection. Post-run corrections remain supported. Retractions
 change evidence/proposals only and do not advance model revision.
 
-The frontend changes here only keep the expanded contract buildable: event
-registration, one architecture/component-cache invalidation per mutation, a
-localized history label and revision-bearing fixtures. Scope presentation,
-canvas interaction and complete live behavior remain #80.
+The integrated frontend applies model batches atomically and shares work
+evidence, history and identities across saved views. View writes use the same
+append lock with independent CAS/revision, durable tombstones and one post-commit
+event. They never advance model revision.
 
-Validation uses an isolated PostgreSQL container (`vai-epic75-i77-test`, loopback
+The original #77 validation used an isolated PostgreSQL container (`vai-epic75-i77-test`, loopback
 port 55477, database `issue77`, no shared volumes):
 
 ```powershell
@@ -60,3 +60,10 @@ npm test
 Contract generation: `npm --prefix api run generate:model-contract` followed by
 `npm --prefix frontend run generate:contract`. The API test command rejects
 generated-schema/embedded-copy drift. Frozen source schemas are not edited.
+
+For upgrades retain the PostgreSQL volume. Repeatable startup migration never
+clears accepted history, resets activated revisions or unreserves retired IDs.
+Legacy invalid data stays diagnosable; migration does not repair it or invent
+historical revisions. Work-step associations are reconstructed from attributable
+accepted history; unattributable links remain preserved. See
+[operations](operations.md) and [acceptance](epic-75-acceptance.md).
