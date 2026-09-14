@@ -187,3 +187,10 @@ npm test
 `npm run dev` im `frontend/` startet Vite auf Port 5173 und proxyt `/api`,
 `/healthz` und `/readyz` an ein Backend auf `localhost:8080`, sodass die Pfade
 denen der Compose-Bereitstellung entsprechen.
+
+## Lizenz
+
+Visualise AI steht unter der [MIT-Lizenz](LICENSE).
+Drittquellen behalten ihre jeweiligen Lizenzen; für das Chromium-Seccomp-Profil
+gelten die separaten Lizenz- und Herkunftshinweise in
+[`deploy/chromium/`](deploy/chromium/).
