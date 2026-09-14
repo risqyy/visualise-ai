@@ -1,48 +1,68 @@
 import { create } from 'zustand'
 
 import type { LiveConnectionState } from '@/api/liveStream'
+import type { ProjectId } from '@/api/types'
+
+interface ProjectReception {
+  /** Highest position processed for this project, never a cross-project cursor. */
+  lastEventPosition: number | null
+  lastEventAt: number | null
+  appliedEventCount: number
+}
 
 /**
- * Connection state of the SSE stream.
- *
- * Deliberately a tiny store and **not** a query: the connection is not a read
- * model. Keeping it out of the query cache is what guarantees that a dropped
- * stream cannot invalidate, reset or otherwise destroy the data the user is
- * currently looking at — the cockpit keeps showing the last loaded snapshot and
- * merely says that it is no longer live.
+ * The active stream's status and reception metadata, outside the query cache.
+ * Project cursors live only for this page session, alongside their change ledgers.
+ * A fresh page starts at the live tail; returning to a watched project replays its gap.
  */
-export interface LiveConnectionStore {
+export interface LiveConnectionStore extends ProjectReception {
+  projectId: ProjectId | null
   state: LiveConnectionState
-  /** Highest project position the client has processed. */
-  lastEventPosition: number | null
-  /** Wall-clock time of the last received event, for the header. */
-  lastEventAt: number | null
-  /** Number of events applied since the page was opened. */
-  appliedEventCount: number
-
-  setState: (state: LiveConnectionState) => void
-  recordEvent: (position: number) => void
+  projects: ReadonlyMap<ProjectId, ProjectReception>
+  activate: (projectId: ProjectId) => void
+  deactivate: (projectId: ProjectId) => void
+  setState: (projectId: ProjectId, state: LiveConnectionState) => void
+  recordEvent: (projectId: ProjectId, position: number) => void
   reset: () => void
 }
 
-const initial = {
-  state: 'connecting' as LiveConnectionState,
+const emptyReception: ProjectReception = {
   lastEventPosition: null,
   lastEventAt: null,
   appliedEventCount: 0,
 }
 
+const initial = {
+  ...emptyReception,
+  projectId: null,
+  state: 'connecting' as LiveConnectionState,
+  projects: new Map<ProjectId, ProjectReception>(),
+}
+
 export const useLiveConnectionStore = create<LiveConnectionStore>((set) => ({
   ...initial,
 
-  setState: (state) => set({ state }),
+  activate: (projectId) => set((current) => ({
+    ...(current.projects.get(projectId) ?? emptyReception),
+    projectId,
+    state: 'connecting',
+  })),
 
-  recordEvent: (position) =>
-    set((current) => ({
-      lastEventPosition: Math.max(current.lastEventPosition ?? 0, position),
+  deactivate: (projectId) => set((current) => current.projectId === projectId
+    ? { ...emptyReception, projectId: null, state: 'offline' }
+    : current),
+
+  setState: (projectId, state) => set((current) => current.projectId === projectId ? { state } : current),
+
+  recordEvent: (projectId, position) => set((current) => {
+    if (current.projectId !== projectId || position <= (current.lastEventPosition ?? 0)) return current
+    const reception = {
+      lastEventPosition: position,
       lastEventAt: Date.now(),
       appliedEventCount: current.appliedEventCount + 1,
-    })),
+    }
+    return { ...reception, projects: new Map(current.projects).set(projectId, reception) }
+  }),
 
   reset: () => set({ ...initial }),
 }))
