@@ -1,0 +1,5 @@
+html, body, #root { width: 100%; height: 100%; margin: 0; overflow: hidden; }
+#root { background: var(--canvas); }
+/* Captures are still images. Native transient hover/focus transitions must not
+   race screenshot capture; layout, colours and geometry remain native. */
+#root *, #root *::before, #root *::after { animation: none !important; transition: none !important; }

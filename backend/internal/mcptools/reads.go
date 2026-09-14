@@ -76,7 +76,7 @@ func (s *Service) read(ctx context.Context, name string, args map[string]any) (a
 		return s.page(args, cursor{Operation: name, Project: project, Snapshot: decimal(snapshot.ProjectPosition)}, counters(project, snapshot.ModelRevision, snapshot.ProjectPosition), items)
 
 	case "visualise_discover":
-		return map[string]any{"contractVersion": "2.0.0", "tools": Names(), "viewKinds": []string{"architecture"}, "limits": map[string]int{"maxOperations": 100, "maxPageSize": 200, "maxRequestBytes": 1048576, "maxStructuredResponseBytes": 1048576, "maxImageBytes": 4194304}}, nil
+		return map[string]any{"contractVersion": "2.0.0", "tools": s.Names(), "viewKinds": []string{"architecture"}, "limits": map[string]int{"maxOperations": 100, "maxPageSize": 200, "maxRequestBytes": 1048576, "maxStructuredResponseBytes": 1048576, "maxImageBytes": 4194304}}, nil
 	case "visualise_projects_list":
 		ids := []string{}
 		if err := s.db.WithContext(ctx).Model(&store.Project{}).Order("project_id").Pluck("project_id", &ids).Error; err != nil {

@@ -22,6 +22,7 @@ import (
 	"github.com/risqyy/visualise-ai/backend/internal/mcptools"
 	"github.com/risqyy/visualise-ai/backend/internal/mcptransport"
 	"github.com/risqyy/visualise-ai/backend/internal/readapi"
+	"github.com/risqyy/visualise-ai/backend/internal/render"
 	"github.com/risqyy/visualise-ai/backend/internal/sse"
 	"github.com/risqyy/visualise-ai/backend/internal/store"
 )
@@ -83,7 +84,22 @@ func run() error {
 	if err != nil {
 		return err
 	}
-	domainTools, err := mcptools.New(db, commandService)
+	var renderer *render.Service
+	toolOptions := mcptools.Options{}
+	if cfg.RenderEntryURL != "" {
+		browser, err := render.NewChromium(cfg.RenderBrowserPath, cfg.RenderEntryURL)
+		if err != nil {
+			return err
+		}
+		renderer = render.New(store.New(db), browser)
+		toolOptions.Renderer = renderer
+		defer func() {
+			cleanup, cancel := context.WithTimeout(context.Background(), cfg.ShutdownTimeout)
+			defer cancel()
+			_ = renderer.Shutdown(cleanup)
+		}()
+	}
+	domainTools, err := mcptools.New(db, commandService, toolOptions)
 	if err != nil {
 		return err
 	}
@@ -151,6 +167,11 @@ func run() error {
 
 	shutdownCtx, cancel := context.WithTimeout(context.Background(), cfg.ShutdownTimeout)
 	defer cancel()
+	if renderer != nil {
+		if err := renderer.Shutdown(shutdownCtx); err != nil {
+			return err
+		}
+	}
 	if err := mcpHandler.Shutdown(shutdownCtx); err != nil {
 		return err
 	}

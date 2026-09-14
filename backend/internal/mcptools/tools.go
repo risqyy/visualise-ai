@@ -52,16 +52,23 @@ var definitions = []definition{
 }
 
 type Service struct {
-	errorOutput     map[string]any
+	renderer        Renderer
 	db              *gorm.DB
 	ingest          *ingest.Service
 	specs           map[string]toolSpec
 	inputs, outputs map[string]*jsonschema.Schema
+	errorOutput     map[string]any
 	cursorKey       [32]byte
 }
 
-func New(db *gorm.DB, commandService *ingest.Service) (*Service, error) {
+func New(db *gorm.DB, commandService *ingest.Service, options ...Options) (*Service, error) {
 	s := &Service{db: db, ingest: commandService, specs: map[string]toolSpec{}, inputs: map[string]*jsonschema.Schema{}, outputs: map[string]*jsonschema.Schema{}}
+	if len(options) > 1 {
+		return nil, fmt.Errorf("expected at most one MCP options value")
+	}
+	if len(options) == 1 {
+		s.renderer = options[0].Renderer
+	}
 	if _, err := rand.Read(s.cursorKey[:]); err != nil {
 		return nil, err
 	}
@@ -72,7 +79,7 @@ func New(db *gorm.DB, commandService *ingest.Service) (*Service, error) {
 	if err := json.Unmarshal(documents["error"], &s.errorOutput); err != nil {
 		return nil, err
 	}
-	for _, def := range definitions {
+	for _, def := range s.availableDefinitions() {
 		var spec toolSpec
 		if err := json.Unmarshal(documents[def.Name], &spec); err != nil {
 			return nil, err
@@ -106,9 +113,12 @@ func Names() []string {
 	return names
 }
 func (s *Service) Register(server *mcp.Server) error {
-	for _, def := range definitions {
+	for _, def := range s.availableDefinitions() {
 		spec := s.specs[def.Name]
 		closed, destructive := false, def.Name == "visualise_model_mutate" || def.Name == "visualise_view_remove"
+		// Both existing structured success and error payloads are real wire outputs.
+		// Some official SDK clients validate structuredContent even when isError is
+		// true. Advertise both; s.outputs still validates successful results strictly.
 		output := map[string]any{"type": "object", "anyOf": []any{spec.Output, s.errorOutput}}
 		server.AddTool(&mcp.Tool{Name: def.Name, Description: def.Description, InputSchema: spec.Input, OutputSchema: output, Annotations: &mcp.ToolAnnotations{ReadOnlyHint: def.ReadOnly, IdempotentHint: true, DestructiveHint: &destructive, OpenWorldHint: &closed}}, func(ctx context.Context, req *mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 			return s.call(ctx, def.Name, req.Params.Arguments), nil
@@ -137,6 +147,9 @@ func (s *Service) call(ctx context.Context, name string, raw json.RawMessage) *m
 	}
 	if err := s.inputs[name].Validate(args); err != nil {
 		return errorResult(err)
+	}
+	if name == renderDefinition.Name {
+		return s.callRender(ctx, raw)
 	}
 	var result any
 	var err error
