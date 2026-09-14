@@ -2,6 +2,7 @@ package readapi
 
 import (
 	"context"
+	"database/sql"
 	"errors"
 
 	"gorm.io/gorm"
@@ -32,6 +33,20 @@ type ComponentQuery struct {
 // problems, pending changes. Every collection is loaded through its join table
 // in one statement — there is no query per row and no JSONB scan over `events`.
 func (s *Service) Component(ctx context.Context, projectID, componentID string, query ComponentQuery) (ComponentResponse, error) {
+	var response ComponentResponse
+	err := s.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		snapshotService := *s
+		snapshotService.db = tx
+		var err error
+		response, err = snapshotService.component(ctx, projectID, componentID, query)
+		return err
+	}, &sql.TxOptions{Isolation: sql.LevelRepeatableRead, ReadOnly: true})
+	return response, err
+}
+
+// component reads the head, selected run and every evidence collection through
+// the caller's snapshot, so projectPosition describes the complete response.
+func (s *Service) component(ctx context.Context, projectID, componentID string, query ComponentQuery) (ComponentResponse, error) {
 	project, err := s.project(ctx, projectID)
 	if err != nil {
 		return ComponentResponse{}, err
