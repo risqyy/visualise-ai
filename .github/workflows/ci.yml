@@ -47,6 +47,22 @@ jobs:
   backend:
     name: backend (go)
     runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_USER: test
+          POSTGRES_PASSWORD: test
+          POSTGRES_DB: test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U test -d test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 12
+    env:
+      TEST_DATABASE_URL: postgres://test:test@127.0.0.1:5432/test?sslmode=disable
     steps:
       - uses: actions/checkout@v5
         with:
@@ -59,7 +75,16 @@ jobs:
         working-directory: backend
       - run: go vet ./...
         working-directory: backend
-      - run: go test ./...
+      - name: Test all packages against PostgreSQL
+        shell: bash
+        run: |
+          if [[ ! "${TEST_DATABASE_URL:-}" =~ [^[:space:]] ]]; then
+            echo "::error::TEST_DATABASE_URL is required for PostgreSQL-backed tests."
+            exit 1
+          fi
+          # Store and MCP fixtures share the default schema. Keep packages
+          # serial so truncation/migration cannot invalidate another suite.
+          go test -count=1 -p 1 ./...
         working-directory: backend
 
   frontend:
