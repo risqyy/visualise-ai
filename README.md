@@ -158,30 +158,47 @@ Sicherheitseigenschaft und keine Bequemlichkeit ist, steht in
 
 Nur nötig, wenn du am Code arbeitest; für den reinen Betrieb genügt Docker.
 
+Voraussetzungen: Bash (unter Windows zum Beispiel Git Bash), Go gemäß
+[`backend/go.mod`](backend/go.mod) (aktuell 1.25.7), Node 24 mit npm wie in
+der [CI](.github/workflows/ci.yml) sowie laufendes Docker mit Compose v2
+für Datenbank- und E2E-Tests. Der Frontend-Container baut separat mit Node 22.
+
+**Backend:** Die [Backend-Testanleitung](backend/README.md) führt vom
+Repository-Root durch Build, Vet und die vollständige Testsuite mit einer
+separaten PostgreSQL-17-Testdatenbank. Ohne `TEST_DATABASE_URL` überspringt
+`go test ./...` die Datenbanktests.
+
+Die weiteren Prüfungen ebenfalls im Repository-Root starten. Jede Klammer
+öffnet eine Subshell; danach bleibt das Arbeitsverzeichnis der Repository-Root.
+
 ```bash
-# Backend (Go 1.25.7, siehe backend/go.mod)
-cd backend
-go build ./... && go vet ./... && go test ./...
+# Frontend
+(
+  cd frontend &&
+  npm ci &&
+  npm run lint && npm run typecheck && npm test && npm run build
+)
 
-# Frontend (Node 22, wie im Container-Build)
-cd frontend
-npm ci
-npm run lint && npm run typecheck && npm run test && npm run build
-
-# Simulator (Node 22)
-cd simulator
-npm ci
-npm run lint && npm run typecheck && npm test
+# Simulator
+(
+  cd simulator &&
+  npm ci &&
+  npm run lint && npm run typecheck && npm test
+)
 
 # Vertrag
-cd api
-npm ci
-npm test
+(
+  cd api &&
+  npm ci &&
+  npm test
+)
 
-# End-to-End-Abnahme (braucht Docker; siehe e2e/README.md)
-cd e2e
-npm install && npx playwright install chromium
-npm test
+# End-to-End-Abnahme (Details: e2e/README.md)
+(
+  cd e2e &&
+  npm ci && npx playwright install --with-deps chromium &&
+  npm test
+)
 ```
 
 `npm run dev` im `frontend/` startet Vite auf Port 5173 und proxyt `/api`,
