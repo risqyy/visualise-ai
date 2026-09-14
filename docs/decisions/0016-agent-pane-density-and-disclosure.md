@@ -55,7 +55,8 @@ reported word is the only thing the pane knows; deriving from anything else
 would produce a claim the data does not support.
 
 The word "inactive" does not appear in the interface. A compact row says what
-the agent reported — `fertig`, `untätig`, `kein Status gemeldet` — and the test
+the agent reported — `fertig`, `untätig`, `kein Status gemeldet` ("done", "idle",
+"no status reported") — and the test
 that forbids the derived-verdict vocabulary covers the new markup too.
 
 Compact is a *smaller rendering of the same row*, not a smaller row: the agent,

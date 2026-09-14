@@ -74,7 +74,7 @@ starts at the live tail instead of replaying the project — `liveOnly` in
 ledger therefore describes **what the cockpit watched happen**: opening it
 mid-run shows the applied model and the pending proposals from the read model,
 and every further state as its event arrives. That is exactly what "kürzlich
-angewandt" claims and no more. Asking for a full replay (`?lastEventPosition=0`)
+angewandt" ("recently applied") claims and no more. Asking for a full replay (`?lastEventPosition=0`)
 on every page load was rejected: it would fire an invalidation per historical
 event on every open, and it would change the streaming behaviour of every pane,
 not just this one. Replayed events after a *reconnect* are folded in
@@ -138,7 +138,8 @@ a **line style** (border style on a box, dash pattern on a line). They come from
 renders them rather than adding new ones.
 
 The label is not just the state, it is the state **plus the operation** —
-`geplant · hinzufügen` versus `geplant · entfernen`. Those two are the same
+`geplant · hinzufügen` ("planned · add") versus `geplant · entfernen`
+("planned · remove"). Those two are the same
 colour and the same border style on purpose: they are the same *phase*. What
 tells them apart is a word, and `changeOverlays.test.ts` asserts precisely that
 by comparing the two while checking that their state and border style are equal.
@@ -158,10 +159,12 @@ fighting over one.
 ### Status is a phase of work, never a verdict
 
 `WORK_STATE_DISCLAIMER` says it and the legend shows it; this package had to keep
-it true in the new strings. Red means "wird entfernt", green means "angewandt".
+it true in the new strings. Red means "wird entfernt" ("being removed"), green
+means "angewandt" ("applied").
 `CHANGE_OPERATION_LABELS` are the three contract operations in plain German and
 nothing else, and a test asserts that the overlay text contains no word from a
-list of verdicts (`Fehler`, `falsch`, `schlecht`, `Risiko`, …). The cockpit
+list of verdicts (`Fehler`, `falsch`, `schlecht`, `Risiko`, … — "error", "wrong",
+"bad", "risk"). The cockpit
 performs no drift evaluation — the human reviewer judges (epic #1).
 
 One consequence is worth stating because it looks like an omission: a **planned

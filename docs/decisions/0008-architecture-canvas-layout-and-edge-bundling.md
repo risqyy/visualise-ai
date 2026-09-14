@@ -172,7 +172,7 @@ transient, not persisted, and never into the query cache or the domain model
 positions in, a render-only result out. Nothing writes back. Edges whose
 endpoint was dragged lose their ELK route and fall back to a plain orthogonal
 connection, so a moved node never drags a stale polyline behind it. The toolbar
-offers "Positionen zurücksetzen", which is a no-op on the model by construction.
+offers "Positionen zurücksetzen" ("Reset positions"), which is a no-op on the model by construction.
 
 ### The camera moves by itself only while the surface is still settling
 

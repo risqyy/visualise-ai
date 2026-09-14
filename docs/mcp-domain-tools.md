@@ -24,7 +24,7 @@ from the official SDK and connects with `Client.connect`; the SDK owns initializ
 session/version headers and `tools/list` validation. Do not handcraft session IDs.
 Native clients can omit Origin; browser clients must match the configured exact
 Origin. Host includes the externally published port. These allowlists are not
-credentials. See [operations](operations.md#mcp-zugang-und-natives-rendern).
+credentials. See [operations](operations.md#mcp-access-and-native-rendering).
 
 ## A fresh client
 

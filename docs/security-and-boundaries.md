@@ -1,165 +1,155 @@
-# Vertrauensgrenze und Produktgrenzen
+# Trust boundary and product boundaries
 
-Was dieses System schützt, was es ausdrücklich nicht schützt, und wo v0 endet.
-Lies diesen Text, bevor du das Cockpit jemand anderem zugänglich machst.
+What this system protects, what it explicitly does not protect, and where v0 ends.
+Read this before making the cockpit accessible to anyone else.
 
-## Nur lokal oder im privaten Netzwerk
+## Local machines or private networks only
 
-**v0 hat keine Authentifizierung, keine Autorisierung und keine Multi-Tenancy.**
-Der OpenAPI-Vertrag sagt das explizit: `security: []` — keine Operation
-verlangt Credentials. Das ist kein Versäumnis, sondern eine bewusste
-v0-Entscheidung.
+**v0 has no authentication, authorization, or multi-tenancy.**
+The OpenAPI contract states this explicitly: `security: []` — no operation
+requires credentials. This is a deliberate v0 decision, not an omission.
 
-Daraus folgt unmittelbar:
+The immediate consequences are:
 
-- **Nicht ins öffentliche Internet stellen.** Kein Port-Forwarding, kein
-  öffentlicher Reverse Proxy, kein Tunnel.
-- Wer den veröffentlichten Port erreicht, hat vollen Lese- **und** Schreibzugriff.
-- Ein privates Netzwerk ist die äußere Grenze. Innerhalb davon gibt es keine
-  weitere.
+- **Do not expose it to the public internet.** No port forwarding, public
+  reverse proxy, or tunnel.
+- Anyone who can reach the published port has full read **and** write access.
+- A private network is the outer boundary. There is no further boundary within it.
 
-### Es gibt keine Mandantentrennung
+### There is no tenant isolation
 
-„Projekt" ist eine Gliederung, keine Grenze. `projectId` ist ein vom Agenten
-frei gewähltes Kürzel, und die Ingestion prüft nur seine Form, nicht seine
-Herkunft. **Wer den Ingestion-Endpunkt erreicht, kann in jedes Projekt
-schreiben** — auch in ein bereits bestehendes, dessen ID er kennt oder errät.
-Genauso kann jeder, der die Oberfläche erreicht, jedes Projekt lesen.
+A "project" is an organizational unit, not a boundary. `projectId` is an
+identifier freely chosen by the agent, and ingestion checks only its format,
+not its origin. **Anyone who can reach the ingestion endpoint can write to any
+project**, including an existing project whose ID they know or guess.
+Likewise, anyone who can reach the UI can read every project.
 
-Read Models sind zwar strikt projektbezogen — keine Antwort enthält je eine
-Zeile eines anderen Projekts, selbst wenn zwei Projekte dieselbe Run-, Agent-
-oder Komponenten-ID benutzen. Das ist Korrektheit der Auslieferung, keine
-Zugriffskontrolle.
+Read models are strictly scoped to a project: no response ever contains a row
+from another project, even when two projects use the same run, agent, or
+component ID. This ensures correct delivery, not access control.
 
-## Nginx ist der einzige Einstiegspunkt
+## Nginx is the only entry point
 
-Von den drei Compose-Services veröffentlicht nur `frontend` einen Host-Port.
-`backend` und `postgres` haben bewusst keinen `ports:`-Eintrag und sind
-ausschließlich aus dem Compose-Netzwerk erreichbar.
+Of the three Compose services, only `frontend` publishes a host port.
+`backend` and `postgres` deliberately have no `ports:` entry and are reachable
+only from the Compose network.
 
-Das hat zwei Konsequenzen, die zusammengehören:
+This has two related consequences:
 
-- Die gesamte Angriffsfläche des Systems ist ein einziger Port. Was Nginx nicht
-  weiterreicht, existiert von außen nicht.
-- PostgreSQL für ein Debugging zugänglich zu machen, verlangt eine ausdrückliche
-  Änderung an `docker-compose.yml`. Das ist Absicht: es soll nicht versehentlich
-  passieren.
+- The system's entire external attack surface is a single port. Anything Nginx
+  does not forward is unavailable from outside.
+- Making PostgreSQL accessible for debugging requires an explicit change to
+  `docker-compose.yml`. This is intentional: it should not happen accidentally.
 
-Die Routen, die Nginx weiterreicht, stehen im
-[README](../README.md#netzwerktopologie).
+The routes Nginx forwards are listed in the
+[README](../README.md#network-topology).
 
-## MCP und native Bilder
+## MCP and native images
 
-MCP prüft den exakten Host einschließlich Port und, falls vorhanden, den Origin.
-Native Clients dürfen Origin weglassen. Diese Prüfungen begrenzen unerwünschte
-Browser-/Host-Zugriffe, sind jedoch keine Authentifizierung: Ein Client mit
-passenden Headern erhält dieselben Projektzugriffe wie REST.
+MCP checks the exact Host, including its port, and the Origin when present.
+Native clients may omit Origin. These checks limit unwanted browser/host
+access, but they are not authentication: a client with matching headers gets
+the same project access as REST.
 
-Der Renderer startet seinen eigenen gebündelten Chromium-Prozess als Nicht-Root
-und lädt einen konfigurierten internen Frontend-Einstieg. Modellfelder bestimmen
-keine Navigations-URL. Zwei parallele Jobs, 30 Sekunden Deadline und feste
-Antwortgrenzen begrenzen den Ressourcenverbrauch. Ein Nutzerbrowser oder dessen
-Session/Kamera wird dafür nicht verwendet. Bilder sind native Architekturansichten;
-UML-/PlantUML-Parität und eine automatische Qualitätsbewertung sind nicht enthalten.
+The renderer starts its own bundled Chromium process as a non-root user and
+loads a configured internal frontend entry point. Model fields do not determine
+the navigation URL. Two concurrent jobs, a 30-second deadline, and fixed response
+limits bound resource use. No user browser, session, or camera is used for this.
+Images are native architecture views; UML/PlantUML parity and automatic quality
+assessment are not included.
 
-Das [versionierte Seccomp-Profil](../deploy/chromium/README.md) ergänzt das
-Docker-28.0.4-Profil um Freigaben für `clone`, `setns` und `unshare`. Diese Ausnahme
-gilt für den gesamten Backend-Container; sie fügt keine Capabilities hinzu und
-verwendet weder einen privilegierten Container noch `seccomp=unconfined`.
-AppArmor und die User-Namespace-Regeln des Hosts bleiben wirksam.
+The [versioned seccomp profile](../deploy/chromium/README.md) extends the
+Docker 28.0.4 profile with permissions for `clone`, `setns`, and `unshare`.
+This exception applies to the entire backend container; it adds no capabilities
+and uses neither a privileged container nor `seccomp=unconfined`.
+AppArmor and the host's user namespace rules remain in effect.
 
-## Agent-Feedback ist nicht vertrauenswürdiger Input
+## Agent feedback is untrusted input
 
-`feedback.published` trägt Markdown, das ein Agent geschrieben hat. Dessen
-eigene Eingaben sind Webseiten, Werkzeugausgaben und Dateien — allesamt
-außerhalb der Vertrauensgrenze dieses Systems. Der Vertrag sagt das in
-denselben Worten und verlagert die Verantwortung ausdrücklich zum Client:
-`FeedbackEntry.body` ist „untrusted markdown … handed through verbatim —
-sanitising it before rendering is the client's job".
+`feedback.published` carries Markdown written by an agent. The agent's own
+inputs include web pages, tool outputs, and files, all outside this system's
+trust boundary. The contract says so explicitly and assigns responsibility
+to the client: `FeedbackEntry.body` is "untrusted markdown … handed through
+verbatim — sanitising it before rendering is the client's job".
 
-Das Cockpit rendert diesen Text in denselben Origin, der auch mit der Read API
-spricht. Es sanitisiert ihn deshalb vor dem Rendern mit `rehype-sanitize` gegen
-eine **Allow-List**: Was nicht aufgeführt ist, wird entfernt. Ein nicht
-vorhergesehener Vektor scheitert damit standardmäßig, statt daran zu scheitern,
-dass jemand ihn vorhergesehen hat.
+The cockpit renders this text in the same origin that communicates with the
+Read API. It therefore sanitizes it before rendering with `rehype-sanitize`
+using an **allowlist**: anything not listed is removed. An unforeseen vector
+is rejected by default, without someone having to anticipate it.
 
-> **`frontend/src/components/workspace/inspector/sanitizeSchema.ts` ist eine
-> Sicherheitskontrolle, keine Formatierungsoption.** Ein zusätzlicher Eintrag in
-> `tagNames` oder in `protocols` erweitert unmittelbar, was ein Agent in den
-> Origin des Cockpits rendern darf. Eine Änderung an dieser Datei verlangt
-> dieselbe Sorgfalt wie eine Änderung an einer Authentifizierungsregel.
+> **`frontend/src/components/workspace/inspector/sanitizeSchema.ts` is a
+> security control, not a formatting option.** Adding an entry to `tagNames`
+> or `protocols` directly expands what an agent may render in the cockpit's
+> origin. A change to this file requires the same care as a change to an
+> authentication rule.
 
-Die Begründung der Pipeline im Detail — warum sanitisiert wird und nicht auf
-das Parsen von HTML verzichtet — steht in
+The detailed rationale for the pipeline, including why it sanitizes rather
+than refusing to parse HTML, is in
 [ADR 0012](./decisions/0012-component-inspector-and-markdown-safety.md).
 
-## Was v0 ausdrücklich nicht kann
+## What v0 explicitly does not support
 
-Diese Punkte sind keine offenen Aufgaben, sondern gezogene Grenzen. Wenn ein
-Nutzer eines davon erwartet, ist die Erwartung falsch, nicht das System.
+These are defined boundaries, not pending tasks. If a user expects one of
+these capabilities, that expectation is outside the system's scope.
 
-| Nicht in v0 | Bedeutung |
+| Outside v0 | Meaning |
 | --- | --- |
-| **Repository-Zugriff** | Das System liest kein Repository. Jeder Diff, jeder Dateipfad und jede Architektur ist das, was ein Agent gemeldet hat — nicht das, was in einem Repository steht. Nichts wird verifiziert. |
-| **GitHub-, GitLab- oder Gitea-Anbindung** | Keine Integration, keine Commits, keine Pull Requests, keine Webhooks. Siehe [`RepositoryProvider`-Grenze](#repositoryprovider-grenze). |
-| **Authentifizierung und Autorisierung** | Siehe oben. |
-| **Multi-Tenancy** | Siehe oben. |
-| **Programmablauf-Visualisierung** | Das Cockpit zeigt die Architektur und die gemeldete Arbeit daran, keine Aufruf- oder Kontrollflüsse. |
-| **Steuerung des Agenten** | Read-only und beobachtend. Es gibt keinen Rückkanal zum Agenten: kein Stoppen, kein Umlenken, kein Genehmigen. |
-| **Prompting aus der Anwendung heraus** | Es gibt kein Eingabefeld, das beim Agenten landet. |
-| **Bewertung, ob die Arbeit richtig ist** | Das System führt keine Qualitäts- oder Driftbewertung durch. `risk.reported` und `problem.reported` sind Aussagen des Agenten über sich selbst. Der Mensch urteilt. |
+| **Repository access** | The system does not read a repository. Every diff, file path, and architecture is what an agent reported, not what exists in a repository. Nothing is verified. |
+| **GitHub, GitLab, or Gitea integration** | No integration, commits, pull requests, or webhooks. See the [`RepositoryProvider` boundary](#repositoryprovider-boundary). |
+| **Authentication and authorization** | See above. |
+| **Multi-tenancy** | See above. |
+| **Program execution visualization** | The cockpit shows architecture and reported work on it, not call flows or control flows. |
+| **Agent control** | Read-only observation. There is no channel back to the agent: no stopping, redirecting, or approving. |
+| **Prompting from the application** | There is no input field that sends anything to the agent. |
+| **Judging whether work is correct** | The system performs no quality or drift assessment. `risk.reported` and `problem.reported` are the agent's own reports about its work. The human judges. |
 
-Ebenfalls nicht abgeleitet, sondern nur gemeldet: der Status. Es gibt keine
-Stall-Erkennung und keine zeitbasierte Ableitung von Arbeit. Transport- und
-Render-Timeouts begrenzen Ressourcen, ohne den Run-Status zu verändern. Ein Run ohne Terminalevent
-bleibt offen und zeigt seinen letzten gemeldeten Stand. Details im
-[Lifecycle-Abschnitt](./agent-integration.md#lifecycle).
+Status is also reported, never inferred. There is no stall detection or
+time-based inference of work. Transport and render timeouts bound resource use
+without changing run status. A run without a terminal event remains open and
+shows its last reported state. See the
+[lifecycle section](./agent-integration.md#lifecycle).
 
-Zwei technische Grenzen desselben Zuschnitts: es gibt genau **eine**
-Backend-Instanz — der SSE-Broker läuft im Prozess, eine zweite Instanz würde die
-Live-Hälfte der Streams brechen — und das Cockpit ist Desktop-only mit
-verbindlicher Abnahme bei 1920 × 1080 in Chromium.
+Two further technical boundaries: there is exactly **one** backend instance.
+The SSE broker runs in-process, so a second instance would break live stream
+delivery. The cockpit is desktop-only, with mandatory acceptance testing at
+1920 × 1080 in Chromium.
 
-<a id="repositoryprovider-grenze"></a>
+<a id="repositoryprovider-boundary"></a>
 
-## Die `RepositoryProvider`-Grenze
+## The `RepositoryProvider` boundary
 
-v0 enthält **keinen** Repository-Zugriff und **keine** `RepositoryProvider`-
-Schnittstelle. Es gibt nichts zu implementieren und nichts zu konfigurieren;
-dieser Abschnitt beschreibt ausschließlich, *wo* eine spätere Anbindung an
-GitHub, GitLab oder Gitea andocken würde und welche Annahmen heute schon so
-getroffen wurden, dass sie das nicht verbauen.
+v0 includes **no** repository access and **no** `RepositoryProvider` interface.
+There is nothing to implement or configure. This section describes only
+*where* future GitHub, GitLab, or Gitea integration would connect and which
+existing assumptions keep that option open.
 
-**Die Stelle.** Alles, was das Cockpit über den Code weiß, kommt heute als
-gemeldeter Inhalt in einem Event: `diff.reported` trägt den Unified Diff und den
-Dateipfad, `architecture.snapshot_published` trägt das Modell. Eine
-Repository-Anbindung würde genau hier ansetzen — als **Auflöser einer
-Meldung gegen ein Repository**, nicht als zweite Datenquelle neben dem Event
-Log. Der Event Log bliebe die Wahrheit darüber, *was der Agent behauptet hat*;
-ein Provider könnte danebenstellen, *was im Repository tatsächlich steht*.
+**The integration point.** Everything the cockpit knows about code currently
+arrives as reported event content: `diff.reported` carries the unified diff and
+file path; `architecture.snapshot_published` carries the model. Repository
+integration would connect here, as a **resolver that checks a report against
+a repository**, not as a second data source alongside the event log. The event
+log would remain the record of *what the agent claimed*; a provider could show
+*what actually exists in the repository* alongside it.
 
-**Die Annahmen, die das offenhalten:**
+**The assumptions that keep this possible:**
 
-- **Diffs sind repository-relativ und unified.** `filePath` ist per Schema
-  repository-relativ; absolute Pfade und `..`-Segmente werden abgelehnt. Ein
-  gemeldeter Pfad ist damit ohne Umrechnung gegen einen Repository-Baum
-  auflösbar. Der Diff selbst ist unified — dasselbe Format, das jeder Forge
-  ausliefert.
-- **Ein Diff-Event trägt genau eine Datei.** Es gibt keine gebündelten
-  Mehrdateien-Diffs, die erst zerlegt werden müssten. Die logische Änderung
-  wird über `changeId` zusammengehalten.
-- **Komponenten tragen keine Repository-Identität.** Eine `componentId` ist ein
-  vom Agenten vergebenes, stabiles Kürzel; das Modell kennt weder Repository-URL
-  noch Branch noch Commit. Die Architektur ist damit nicht an ein Repository
-  gebunden und muss auch nicht daraus abgeleitet werden. Eine spätere Zuordnung
-  wäre eine zusätzliche Beziehung, keine Änderung am Modell.
-- **Der Event Log ist die Audit-Quelle.** Er ist append-only und im Code
-  erzwungen; Korrekturen und Rücknahmen sind neue Events mit Verweis auf das
-  Original, nie Bearbeitungen. Ein späterer Provider kann also nichts
-  überschreiben — er kann nur ergänzen. Das ist die Eigenschaft, die eine
-  Anbindung ungefährlich macht.
+- **Diffs use repository-relative paths and unified format.** The schema requires
+  `filePath` to be repository-relative; absolute paths and `..` segments are
+  rejected. A reported path can therefore be resolved against a repository tree
+  without conversion. The diff itself is unified, the format every forge provides.
+- **Each diff event carries exactly one file.** There are no bundled multi-file
+  diffs to split first. `changeId` groups the logical change.
+- **Components carry no repository identity.** A `componentId` is a stable
+  identifier assigned by the agent; the model has no repository URL, branch,
+  or commit. The architecture is therefore not tied to a repository and need
+  not be derived from one. A future mapping would be an additional relationship,
+  not a change to the model.
+- **The event log is the audit source.** It is append-only, enforced in code;
+  corrections and retractions are new events referencing the original, never
+  edits. A future provider therefore cannot overwrite anything; it can only
+  add information. This property makes integration safe.
 
-Was bewusst **nicht** festgelegt ist: die Signatur einer solchen Schnittstelle,
-ihr Ort im Code, ihr Transport und ihre Authentifizierung gegenüber der Forge.
-Diese Entscheidungen gehören in das Issue, das die Anbindung tatsächlich baut,
-und werden hier nicht vorweggenommen.
+The interface signature, its location in the code, its transport, and its
+authentication with the forge are deliberately **not** specified. These
+decisions belong in the issue that implements the integration and are not
+made in advance here.
