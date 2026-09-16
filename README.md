@@ -18,6 +18,7 @@ is correct.
 
 | Document | Contents |
 | --- | --- |
+| [`docs/getting-started.md`](docs/getting-started.md) | Connect an agent or set up the demo without learning the event contract |
 | [`docs/operations.md`](docs/operations.md) | Prerequisites, Compose startup, all environment variables, health checks, persistence, simulator, end-to-end tests |
 | [`docs/mcp-domain-tools.md`](docs/mcp-domain-tools.md) | Verified SDK client: read, mutate atomically, save a view, inspect a native PNG |
 | [`docs/epic-75-acceptance.md`](docs/epic-75-acceptance.md) | Local acceptance results, measurement conditions, and remaining limits |

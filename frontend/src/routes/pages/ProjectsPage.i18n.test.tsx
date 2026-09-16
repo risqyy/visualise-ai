@@ -56,6 +56,7 @@ describe('project list — languages', () => {
     expect(
       await screen.findByRole('link', { name: `Open project ${PROJECT_ID}` }),
     ).toBeVisible()
+    expect(screen.queryByRole('link', { name: 'Connect agent' })).not.toBeInTheDocument()
   })
 
   it('leaves reported project data identical in both languages', async () => {
@@ -102,7 +103,7 @@ describe('project list — loading, empty and error states', () => {
     expect(await screen.findByText('Noch keine Projekte gemeldet')).toBeVisible()
     expect(
       screen.getByText(
-        'Ein Projekt entsteht, sobald ein Agent das erste Ereignis an /api/v1/events sendet.',
+        'Dieses Cockpit beobachtet die von Agenten gemeldete Arbeit. Noch hat kein Agent ein Projekt gemeldet. Verbinden Sie einen Agenten oder richten Sie die Demo ein, um Ihr erstes Projekt zu sehen.',
       ),
     ).toBeVisible()
   })
@@ -116,9 +117,23 @@ describe('project list — loading, empty and error states', () => {
     expect(await screen.findByText('No projects reported yet')).toBeVisible()
     expect(
       screen.getByText(
-        'A project appears as soon as an agent sends its first event to /api/v1/events.',
+        'This cockpit observes work reported by agents. No agent has reported a project yet. Connect an agent or set up the demo to see your first project.',
       ),
     ).toBeVisible()
+  })
+
+  it.each(['de', 'en'] as const)('offers setup documentation only after a successful empty response in %s', async (language) => {
+    renderApp('/projects', {
+      language,
+      fetchImpl: createFakeFetch({ '/api/v1/projects': EMPTY_PROJECTS }),
+    })
+    const labels = language === 'de' ? ['Agent verbinden', 'Demo einrichten'] : ['Connect agent', 'Set up demo']
+    for (const [index, anchor] of ['connect-an-agent', 'set-up-the-demo'].entries()) {
+      const link = await screen.findByRole('link', { name: labels[index]! })
+      expect(link).toHaveAttribute('href', `https://github.com/risqyy/visualise-ai/blob/develop/docs/getting-started.md#${anchor}`)
+      expect(link).not.toHaveAttribute('target')
+    }
+    expect(screen.queryByText(/\/api\/v1\/events/)).not.toBeInTheDocument()
   })
 
   it('translates the error state but not what the backend reported', async () => {
@@ -141,6 +156,7 @@ describe('project list — loading, empty and error states', () => {
 
     expect(await screen.findByText('Data could not be loaded')).toBeVisible()
     expect(screen.getByRole('button', { name: 'Try again' })).toBeVisible()
+    expect(screen.queryByRole('link', { name: 'Connect agent' })).not.toBeInTheDocument()
     // The backend's own words are reported data and stay as they came.
     await waitFor(() => {
       expect(

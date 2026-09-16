@@ -56,7 +56,7 @@
     "withoutChangeId": "Ohne <field/> gemeldet — der Agent hat diesen Diff keiner angekündigten Änderung zugeordnet."
   },
   "empty": {
-    "description": "Wählen Sie eine Komponente auf der Architekturfläche aus. Die Auswahl steht als ?component= in der Adresse und ist damit direkt verlinkbar.",
+    "description": "Wählen Sie eine Komponente in der Architektur aus, um hier ihre gemeldete Arbeit, ihr Feedback und ihre Codeänderungen zu sehen.",
     "title": "Keine Komponente ausgewählt"
   },
   "eventType": {
