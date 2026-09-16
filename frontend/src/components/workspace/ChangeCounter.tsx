@@ -48,11 +48,7 @@ export function ChangeCounter({ counts, className }: ChangeCounterProps) {
         return (
           <span
             key={state.id}
-            className={cn(
-              'flex items-center gap-1 text-[11px] whitespace-nowrap',
-              'transition-opacity duration-150',
-              count === 0 ? 'text-muted-foreground/45' : 'text-muted-foreground',
-            )}
+            className="text-muted-foreground flex items-center gap-1 text-[11px] whitespace-nowrap"
             data-testid={`change-counter-${state.id}`}
             data-count={count}
             title={t(state.descriptionKey)}

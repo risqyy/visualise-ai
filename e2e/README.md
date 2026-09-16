@@ -243,3 +243,15 @@ Leave `E2E_SKIP_COMPOSE` unset for final acceptance. This deletes only the selec
 acceptance project's volume, builds the current source and starts fresh. Never
 select a user's existing deployment project. See
 [the acceptance evidence and limits](../docs/epic-75-acceptance.md).
+
+## Text contrast acceptance (#112)
+
+`tests/20-text-contrast.spec.ts` checks the rendered text colors with axe-core in
+Chromium. Transparent diff cells that axe cannot resolve are checked using the
+browser's computed colors and background composition; unsupported paint or
+occlusion fails the check. It seeds its own finished run and newer run, then measures zero-state
+counters, historical context and diff captions, metadata, code and line numbers
+in German and English. Each sampled diff row is scrolled into view; both ends of
+each line kind are covered. Missing or indeterminate measurements fail the test.
+The report includes measured color pairs and screenshots. These checks target
+the reported text contrast issues; they are not a complete accessibility audit.

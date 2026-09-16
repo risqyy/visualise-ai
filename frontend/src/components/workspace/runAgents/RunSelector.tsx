@@ -75,7 +75,7 @@ export function RunSelector({
             <History className="size-3.5 shrink-0" aria-hidden="true" />
             {t('runs.historicalTitle')}
           </p>
-          <p className="text-muted-foreground text-xs">
+          <p className="text-foreground text-xs">
             {/*
               The run id has to sit inside the clause and carries markup, which
               is the one case `<Trans>` exists for. The value itself comes from
