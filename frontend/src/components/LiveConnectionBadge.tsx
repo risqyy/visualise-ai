@@ -64,36 +64,50 @@ export function LiveConnectionBadge({ className }: { className?: string }) {
   const label = t(presentation.labelKey)
 
   return (
-    <Tooltip>
-      <TooltipTrigger asChild>
-        <Badge
-          variant="outline"
-          className={cn('gap-1.5 font-normal', className)}
-          data-testid="live-connection-state"
-          data-state={state}
-          aria-label={t('live.label', { state: label })}
-        >
-          <Icon
-            aria-hidden="true"
-            className={cn(
-              'size-3',
-              presentation.className,
-              state === 'reconnecting' || state === 'connecting' ? 'animate-spin' : '',
-            )}
-          />
-          {t('live.label', { state: label })}
-        </Badge>
-      </TooltipTrigger>
-      <TooltipContent className="max-w-xs">
-        <p>{t(presentation.hintKey)}</p>
-        {lastEventPosition !== null && (
-          <p className="mt-1 opacity-80">
-            {/* The position is the server's own event number — reported data. */}
-            {t('live.lastPositionLabel')}{' '}
-            <ReportedText value={String(lastEventPosition)} />
-          </p>
-        )}
-      </TooltipContent>
-    </Tooltip>
+    <>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <Badge
+            variant="outline"
+            className={cn('focus-visible:outline-ring gap-1.5 font-normal focus-visible:outline-2 focus-visible:outline-offset-2', className)}
+            tabIndex={0}
+            data-testid="live-connection-state"
+            data-state={state}
+            aria-label={t('live.label', { state: label })}
+          >
+            <Icon
+              aria-hidden="true"
+              className={cn(
+                'size-3',
+                presentation.className,
+                state === 'reconnecting' || state === 'connecting' ? 'animate-spin' : '',
+              )}
+            />
+            {t('live.label', { state: label })}
+          </Badge>
+        </TooltipTrigger>
+        <TooltipContent className="max-w-xs">
+          <p>{t(presentation.hintKey)}</p>
+          {lastEventPosition !== null && (
+            <p className="mt-1 opacity-80">
+              {/* The position is the server's own event number — reported data. */}
+              {t('live.lastPositionLabel')}{' '}
+              <ReportedText value={String(lastEventPosition)} />
+            </p>
+          )}
+        </TooltipContent>
+      </Tooltip>
+      {/* Reception positions belong in the tooltip, not the announcement.
+          Only connection state changes alter this complete sentence. */}
+      <span
+        role="status"
+        aria-live="polite"
+        aria-atomic="false"
+        className="sr-only"
+        data-testid="live-connection-announcement"
+      >
+        {t(presentation.hintKey)}
+      </span>
+    </>
   )
 }

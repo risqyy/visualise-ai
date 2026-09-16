@@ -419,7 +419,9 @@ describe('accessible architecture graph — selection by keyboard alone', () => 
       node.focus()
       await user.keyboard('{ArrowRight}{ArrowDown}{ArrowLeft}{ArrowUp}')
 
-      const live = [...document.querySelectorAll('[aria-live]')]
+      // The connection status has its own legitimate announcement. This
+      // assertion concerns only fictitious movement messages from the graph.
+      const live = [...screen.getByTestId('architecture-canvas').querySelectorAll('[aria-live]')]
       expect(live.length).toBeGreaterThan(0)
       for (const region of live) expect(region.textContent).toBe('')
     },

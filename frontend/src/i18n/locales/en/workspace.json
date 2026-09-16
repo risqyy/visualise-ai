@@ -11,7 +11,7 @@
     "connectingLabel": "connecting",
     "label": "Connection: {{state}}",
     "lastPositionLabel": "Last processed position:",
-    "liveHint": "Events arrive in real time.",
+    "liveHint": "The live connection is established. Events arrive in real time.",
     "liveLabel": "live",
     "offlineHint": "No live connection. What is shown is the last state loaded — it is no longer being updated.",
     "offlineLabel": "offline",
