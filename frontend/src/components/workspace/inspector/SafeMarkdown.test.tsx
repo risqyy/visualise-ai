@@ -244,6 +244,21 @@ describe('SafeMarkdown — sanitisation of untrusted agent markdown', () => {
     expect(container.textContent).not.toContain('Discarded embedded title')
     expect(container.textContent).not.toContain('__xssMarkers')
   })
+
+  it.each([
+    ['Markdown', '## First\n\n#### First child\n\n# Later parent\n\n### Later child'],
+    ['raw HTML', '<h2>First</h2>\n<h4>First child</h4>\n<h1>Later parent</h1>\n<h3>Later child</h3>'],
+  ])('starts out-of-order %s headings below the report title without a skipped level', (_, body) => {
+    const container = renderMarkdown(body)
+    expect(screen.getAllByRole('heading').map((heading) => [heading.tagName, heading.textContent])).toEqual([
+      ['H5', 'First'],
+      ['H6', 'First child'],
+      ['H5', 'Later parent'],
+      ['H6', 'Later child'],
+    ])
+    expect(container.querySelector('h1, h2, h3, h4')).toBeNull()
+    expect(markers()).toEqual([])
+  })
 })
 
 describe('the sanitisation schema itself', () => {

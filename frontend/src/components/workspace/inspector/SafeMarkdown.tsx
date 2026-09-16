@@ -69,8 +69,13 @@ function rebaseReportHeadings() {
     }
     collect(tree)
     const levels = [...new Set(headings.map((node) => Number(node.tagName![1])))].sort((a, b) => a - b)
+    let previousLevel = 4
     for (const heading of headings) {
-      heading.tagName = `h${Math.min(6, 5 + levels.indexOf(Number(heading.tagName![1])))}`
+      // A deeper source heading may precede its parent level in a report.
+      // Never begin by skipping the h5 level below the report title.
+      const level = Math.min(6, 5 + levels.indexOf(Number(heading.tagName![1])), previousLevel + 1)
+      heading.tagName = `h${level}`
+      previousLevel = level
     }
   }
 }
