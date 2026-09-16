@@ -283,18 +283,16 @@
   }
 }
 
-/* Semantic detail changes are content changes, not motion. Respect the
-   platform preference when a node state or relationship highlight transitions
-   between them, and when React Flow animates a camera operation. */
+/* Reduced motion applies to the whole cockpit, including loading indicators
+   and overlays portalled outside the workspace. State remains visible through
+   text and static symbols; pseudo-elements must not keep decorative loops. */
 @media (prefers-reduced-motion: reduce) {
-  .react-flow,
-  .react-flow *,
-  .react-flow *::before,
-  .react-flow *::after {
-    animation-duration: 0.01ms !important;
-    animation-iteration-count: 1 !important;
+  *,
+  *::before,
+  *::after {
+    animation: none !important;
     scroll-behavior: auto !important;
-    transition-duration: 0.01ms !important;
+    transition-duration: 0s !important;
   }
 }
 
