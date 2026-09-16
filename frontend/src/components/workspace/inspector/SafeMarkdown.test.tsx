@@ -259,6 +259,18 @@ describe('SafeMarkdown — sanitisation of untrusted agent markdown', () => {
     expect(container.querySelector('h1, h2, h3, h4')).toBeNull()
     expect(markers()).toEqual([])
   })
+
+  it.each([
+    ['Markdown', '## First sibling\n\n## Second sibling\n\n# Later parent'],
+    ['raw HTML', '<h2>First sibling</h2>\n<h2>Second sibling</h2>\n<h1>Later parent</h1>'],
+  ])('keeps equal %s source levels as siblings when a shallower heading arrives later', (_, body) => {
+    renderMarkdown(body)
+    expect(screen.getAllByRole('heading').map((heading) => [heading.tagName, heading.textContent])).toEqual([
+      ['H5', 'First sibling'],
+      ['H5', 'Second sibling'],
+      ['H5', 'Later parent'],
+    ])
+  })
 })
 
 describe('the sanitisation schema itself', () => {

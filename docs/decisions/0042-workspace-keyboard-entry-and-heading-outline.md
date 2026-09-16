@@ -20,10 +20,11 @@ to mount and uses `preventScroll`, avoiding fragment navigation that would scrol
 the fixed workspace. Graph keyboard navigation remains owned by the canvas.
 
 Reported markdown headings are rebased below their `h4` report title. Distinct
-source levels start at `h5` and deeper levels are capped at `h6`. Emitted levels
-never skip a level from the preceding heading, starting with the report's `h4`
-title, even when source levels arrive out of order. A report beginning with `##`
-therefore does not create a skipped heading level. This normalization
+source levels are ranked relative to the first heading and clamped to `h5`–`h6`.
+The first heading starts at `h5`, and repeated source levels always remain peers,
+even when a shallower heading appears later. Such later parent levels cannot
+move above the report title and are flattened at `h5`. A report beginning with
+`##` therefore does not create a skipped heading level. This normalization
 runs on the parsed tree, including harmless raw HTML, before the final sanitizer.
 Subtrees that the sanitizer strips cannot influence the visible outline. Reported
 wording is unchanged. HTML's six heading levels limit how much deep report nesting

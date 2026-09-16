@@ -68,14 +68,14 @@ function rebaseReportHeadings() {
       node.children?.forEach(collect)
     }
     collect(tree)
+    if (headings.length === 0) return
     const levels = [...new Set(headings.map((node) => Number(node.tagName![1])))].sort((a, b) => a - b)
-    let previousLevel = 4
+    const firstRank = levels.indexOf(Number(headings[0]!.tagName![1]))
     for (const heading of headings) {
-      // A deeper source heading may precede its parent level in a report.
-      // Never begin by skipping the h5 level below the report title.
-      const level = Math.min(6, 5 + levels.indexOf(Number(heading.tagName![1])), previousLevel + 1)
+      // Anchor the first heading at h5. A fixed mapping keeps source peers
+      // equal, even when a shallower source heading appears later in the report.
+      const level = Math.min(6, Math.max(5, 5 + levels.indexOf(Number(heading.tagName![1])) - firstRank))
       heading.tagName = `h${level}`
-      previousLevel = level
     }
   }
 }
