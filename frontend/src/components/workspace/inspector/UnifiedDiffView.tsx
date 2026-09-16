@@ -29,7 +29,7 @@ const LINE_CLASSES: Record<DiffLineKind, string> = {
   removal: 'bg-state-removed/12 text-foreground',
   context: 'text-muted-foreground',
   hunk: 'bg-muted/60 text-muted-foreground',
-  meta: 'text-muted-foreground/70',
+  meta: 'text-muted-foreground',
 }
 
 /** Screen-reader prefix, so a diff is not read as one run-on paragraph. */
@@ -95,10 +95,10 @@ export function UnifiedDiffView({
                 className={cn('align-top', LINE_CLASSES[line.kind])}
                 data-line-kind={line.kind}
               >
-                <td className="text-muted-foreground/60 w-10 border-r border-r-border/60 px-1 text-right tabular-nums select-none">
+                <td className="text-foreground w-10 border-r border-r-border/60 px-1 text-right tabular-nums select-none">
                   {line.oldNumber ?? ''}
                 </td>
-                <td className="text-muted-foreground/60 w-10 border-r border-r-border/60 px-1 text-right tabular-nums select-none">
+                <td className="text-foreground w-10 border-r border-r-border/60 px-1 text-right tabular-nums select-none">
                   {line.newNumber ?? ''}
                 </td>
                 <td className="px-2 whitespace-pre">
