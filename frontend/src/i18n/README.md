@@ -220,8 +220,6 @@ is ours and is translated.
 | term | where |
 | ---- | ----- |
 | `changeId` | "Ohne `changeId` gemeldet …" ("Reported without `changeId` …") in the diff group header. A `<Trans>` slot, listed in `TECHNICAL_TERMS` in `scripts/check-ui-strings.mjs`. |
-| `?component=` | the empty state of the inspector, which names the search parameter a selection is shareable through |
-| `/api/v1/events` | the empty state of the project list |
 | `architecture.snapshot_published`, `agent.started`, `plan.published`, `diff.reported`, `risk.reported`, `problem.reported`, `feedback.published` | event names inside empty states — they are what an agent has to send, so a translated one would be wrong advice |
 
 ### Protocol names and abbreviations

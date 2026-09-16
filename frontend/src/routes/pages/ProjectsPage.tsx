@@ -6,6 +6,7 @@ import { useProjects } from '@/api/queries'
 import { AsyncState } from '@/components/AsyncState'
 import { LanguageSwitcher } from '@/components/LanguageSwitcher'
 import { Badge } from '@/components/ui/badge'
+import { Button } from '@/components/ui/button'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { ReportedText, ReportedTime } from '@/i18n'
 
@@ -49,6 +50,20 @@ export function ProjectsPage() {
               isEmpty={list.length === 0}
               emptyTitle={t('empty.title')}
               emptyDescription={t('empty.description')}
+              emptyActions={
+                <div className="mt-4 flex flex-wrap gap-2">
+                  <Button asChild variant="outline" size="sm">
+                    <a href="https://github.com/risqyy/visualise-ai/blob/develop/docs/getting-started.md#connect-an-agent">
+                      {t('empty.connectAgent')}
+                    </a>
+                  </Button>
+                  <Button asChild variant="outline" size="sm">
+                    <a href="https://github.com/risqyy/visualise-ai/blob/develop/docs/getting-started.md#set-up-the-demo">
+                      {t('empty.setUpDemo')}
+                    </a>
+                  </Button>
+                </div>
+              }
               onRetry={() => void projects.refetch()}
               skeletonRows={4}
             >

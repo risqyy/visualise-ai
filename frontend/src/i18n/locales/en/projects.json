@@ -6,7 +6,9 @@
     "noRunTitle": "No run reported yet"
   },
   "empty": {
-    "description": "A project appears as soon as an agent sends its first event to /api/v1/events.",
+    "description": "This cockpit observes work reported by agents. No agent has reported a project yet. Connect an agent or set up the demo to see your first project.",
+    "connectAgent": "Connect agent",
+    "setUpDemo": "Set up demo",
     "title": "No projects reported yet"
   },
   "item": {

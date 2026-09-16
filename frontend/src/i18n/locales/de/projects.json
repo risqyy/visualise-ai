@@ -6,7 +6,9 @@
     "noRunTitle": "Noch kein Run gemeldet"
   },
   "empty": {
-    "description": "Ein Projekt entsteht, sobald ein Agent das erste Ereignis an /api/v1/events sendet.",
+    "description": "Dieses Cockpit beobachtet die von Agenten gemeldete Arbeit. Noch hat kein Agent ein Projekt gemeldet. Verbinden Sie einen Agenten oder richten Sie die Demo ein, um Ihr erstes Projekt zu sehen.",
+    "connectAgent": "Agent verbinden",
+    "setUpDemo": "Demo einrichten",
     "title": "Noch keine Projekte gemeldet"
   },
   "item": {

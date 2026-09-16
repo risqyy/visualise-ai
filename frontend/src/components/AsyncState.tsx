@@ -19,6 +19,7 @@ export interface AsyncStateProps {
   isEmpty?: boolean
   emptyTitle: string
   emptyDescription?: string
+  emptyActions?: ReactNode
   onRetry?: () => void
   /** Number of skeleton rows rendered while pending. */
   skeletonRows?: number
@@ -40,6 +41,7 @@ export function AsyncState({
   isEmpty = false,
   emptyTitle,
   emptyDescription,
+  emptyActions,
   onRetry,
   skeletonRows = 3,
   className,
@@ -108,7 +110,9 @@ export function AsyncState({
         title={emptyTitle}
         description={emptyDescription}
         className={className}
-      />
+      >
+        {emptyActions}
+      </EmptyState>
     )
   }
 

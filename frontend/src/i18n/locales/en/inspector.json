@@ -56,7 +56,7 @@
     "withoutChangeId": "Reported without <field/> — the agent did not assign this diff to any announced change."
   },
   "empty": {
-    "description": "Select a component on the architecture surface. The selection is carried as ?component= in the address and is therefore directly linkable.",
+    "description": "Select a component in the architecture to see its reported work, feedback and code changes here.",
     "title": "No component selected"
   },
   "eventType": {
