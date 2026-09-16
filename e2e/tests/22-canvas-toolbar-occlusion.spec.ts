@@ -105,9 +105,33 @@ async function inspectToolDock(page: Page) {
   const before = await page.locator('.react-flow').boundingBox()
   expect(before).not.toBeNull()
   expect(before!.height, 'closed tools leave a useful drawing surface at 1280 × 720').toBeGreaterThan(300)
+  const canvas = page.getByTestId('architecture-canvas')
+  const cameraBefore = await page.locator('.react-flow__viewport').getAttribute('style')
+  const fitCountBefore = await canvas.getAttribute('data-fit-view-count')
+  expect(cameraBefore).not.toBeNull()
+  expect(fitCountBefore).not.toBeNull()
+  async function assertCameraAfterResize(open: boolean) {
+    // Observe both the painted dimensions and React Flow's reported resize
+    // before checking camera state. An assertion against the previous size
+    // would pass before the resize-triggered fit had a chance to run.
+    await expect.poll(() => page.evaluate(({ initialHeight, isOpen }) => {
+      const surface = document.querySelector('.react-flow')!.getBoundingClientRect()
+      const canvasElement = document.querySelector('[data-testid="architecture-canvas"]')!
+      const reportedWidth = Number(canvasElement.getAttribute('data-surface-width'))
+      const reportedHeight = Number(canvasElement.getAttribute('data-surface-height'))
+      const resized = isOpen ? surface.height < initialHeight - 1 : Math.abs(surface.height - initialHeight) < 1
+      return resized && Math.abs(reportedWidth - surface.width) < 1 && Math.abs(reportedHeight - surface.height) < 1
+    }, { initialHeight: before!.height, isOpen: open }), {
+      message: `${open ? 'opening' : 'closing'} tools must finish the actual drawing-surface resize`,
+    }).toBe(true)
+    await settled(page)
+    await expect(page.locator('.react-flow__viewport')).toHaveAttribute('style', cameraBefore!)
+    await expect(canvas).toHaveAttribute('data-fit-view-count', fitCountBefore!)
+  }
   await assertPrimaryControls(page)
   await toggle.click()
   await expect(toggle).toHaveAttribute('aria-expanded', 'true')
+  await assertCameraAfterResize(true)
   const reports = await probeControls(page, [
     { name: 'top-down orientation', selector: '[data-testid="canvas-layout-top-down"]' },
     { name: 'left-right orientation', selector: '[data-testid="canvas-layout-left-right"]' },
@@ -134,7 +158,7 @@ async function inspectToolDock(page: Page) {
   await toggle.click()
   await expect(toggle).toHaveAttribute('aria-expanded', 'false')
   await expect(page.locator('.react-flow__minimap')).not.toBeVisible()
-  await settled(page)
+  await assertCameraAfterResize(false)
 }
 
 async function enterGraph(page: Page) {
