@@ -1,4 +1,6 @@
+import { Square, SquareCheck } from 'lucide-react'
 import type { ComponentProps } from 'react'
+import { useTranslation } from 'react-i18next'
 import ReactMarkdown, { type Components } from 'react-markdown'
 import rehypeRaw from 'rehype-raw'
 import rehypeSanitize from 'rehype-sanitize'
@@ -88,6 +90,7 @@ function rebaseReportHeadings() {
  * scrolls inside its own box instead of widening the pane.
  */
 const MARKDOWN_COMPONENTS: Components = {
+  input: ReportedTaskState,
   h5: (props) => <h5 {...props} className="mt-4 mb-1.5 text-sm font-semibold first:mt-0" />,
   h6: (props) => <h6 {...props} className="mt-3 mb-1 text-xs font-semibold first:mt-0" />,
   p: (props) => <p {...props} className="my-1.5 leading-relaxed" />,
@@ -137,6 +140,17 @@ const MARKDOWN_COMPONENTS: Components = {
   ),
   td: (props) => <td {...props} className="border-border border px-2 py-1 align-top" />,
   img: (props) => <img {...props} className="my-2 max-w-full rounded-md" />,
+}
+
+/** A reported task is evidence, not an editable form control. */
+function ReportedTaskState({ checked }: ComponentProps<'input'>) {
+  const { t } = useTranslation('inspector')
+  const Icon = checked ? SquareCheck : Square
+  return (
+    <span role="img" aria-label={t(checked ? 'taskList.completed' : 'taskList.open')} data-testid="reported-task-state">
+      <Icon aria-hidden="true" className="inline size-3.5 align-text-bottom" />
+    </span>
+  )
 }
 
 export interface SafeMarkdownProps {
