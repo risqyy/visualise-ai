@@ -40,6 +40,10 @@ async function paneSnapshot(page: Page) {
 }
 
 async function assertOverlayGeometry(page: Page, label: string): Promise<void> {
+  const tools = page.getByTestId('canvas-toggle-tools')
+  await tools.click()
+  await expect(tools).toHaveAttribute('aria-expanded', 'true')
+  await expect(page.locator('.react-flow__minimap')).toBeVisible()
   const geometry = await page.evaluate(() => {
     const selectors = [
       '[data-testid="canvas-component-search"]',
@@ -117,6 +121,10 @@ async function assertOverlayGeometry(page: Page, label: string): Promise<void> {
     broken.length === 0,
     `${label}: focus/overlay controls are not operable:\n${formatControlReports(reports)}`,
   ).toBe(true)
+  // Probe disclosed tools, then restore the drawing surface before capturing
+  // the focus transition's fit counter and viewport baseline.
+  await tools.click()
+  await expect(tools).toHaveAttribute('aria-expanded', 'false')
 }
 
 for (const language of ['de', 'en'] as const) {
@@ -180,7 +188,7 @@ for (const language of ['de', 'en'] as const) {
         .toBe(fitBefore + 1)
 
       const focusedGeometry = await page.evaluate(() => {
-        const canvas = document.querySelector<HTMLElement>('[data-testid="architecture-canvas"]')
+        const canvas = document.querySelector<HTMLElement>('[data-testid="architecture-canvas"] .react-flow')
         if (canvas === null) return null
         const canvasRect = canvas.getBoundingClientRect()
         const nodes = Array.from(document.querySelectorAll<HTMLElement>('.react-flow__node'))
@@ -284,6 +292,10 @@ test('architecture focus overlays and graph controls stay keyboard-operable', as
     fitAfterEnter + 1,
   )
 
+  const tools = page.getByTestId('canvas-toggle-tools')
+  await tools.focus()
+  await page.keyboard.press('Enter')
+  await expect(tools).toHaveAttribute('aria-expanded', 'true')
   const minimapToggle = page.getByTestId('canvas-toggle-minimap')
   await minimapToggle.focus()
   await expect(minimapToggle).toBeFocused()

@@ -1,4 +1,5 @@
 import { act, render, screen, waitFor, within } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { describe, expect, it } from 'vitest'
 
 import type { ArchitectureResponse, Component, Relationship } from '@/api/types'
@@ -190,6 +191,8 @@ describe('live change overlays — every state appears after its own event', () 
         `${NESTED_COMPONENTS.length} Modellkomponenten`,
       )
       expect(screen.getByTestId('architecture-proposal-count')).toHaveTextContent('+ 1 Vorschlag')
+      await userEvent.click(screen.getByTestId('canvas-toggle-tools'))
+      expect(screen.getByTestId('canvas-toggle-tools')).toHaveAttribute('aria-expanded', 'true')
       expect(screen.getByTestId('canvas-visibility')).toHaveTextContent(
         `${NESTED_COMPONENTS.length + 1} von ${NESTED_COMPONENTS.length + 1} Elementen sichtbar`,
       )

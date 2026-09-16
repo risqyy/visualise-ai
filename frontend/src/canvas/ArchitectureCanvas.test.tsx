@@ -19,6 +19,7 @@ import { PROJECT_ID, RUN_ID, createFakeFetch, streamedEvent } from '@/test/fixtu
 import { renderApp } from '@/test/renderApp'
 
 import { RELATIONSHIP_KIND_STYLES } from './relationshipKinds'
+import { MIN_READABLE_ZOOM } from './detailLevel'
 
 const WORKSPACE_URL = `/projects/${PROJECT_ID}/runs/${RUN_ID}`
 const ARCHITECTURE_PATH = `/api/v1/projects/${PROJECT_ID}/architecture`
@@ -793,6 +794,8 @@ describe('architecture canvas — selection', () => {
       ).not.toBeNull()
       expect(canvas).toHaveAttribute('data-fit-view-count', '1')
 
+      await user.click(screen.getByTestId('canvas-toggle-tools'))
+      expect(screen.getByTestId('canvas-toggle-tools')).toHaveAttribute('aria-expanded', 'true')
       await user.click(screen.getByTestId('canvas-layout-top-down'))
       await waitFor(() =>
         expect(canvas).toHaveAttribute('data-layout-orientation', 'top-down'),
@@ -811,6 +814,40 @@ describe('architecture canvas — selection', () => {
 
 describe('architecture canvas — live updates never move the camera', () => {
   it(
+    'restores a saved whole-map camera below the usual zoom floor without clamping or refitting',
+    async () => {
+      const user = userEvent.setup()
+      renderCanvas()
+      await waitForCanvas()
+      // The default entry still prioritizes readable text. A later explicit
+      // overview can legitimately persist a much smaller camera for this view.
+      expect(useUiStore.getState().camera.zoom).toBeGreaterThanOrEqual(MIN_READABLE_ZOOM)
+      const saved = { x: 143, y: 87, zoom: 0.07 }
+      act(() => useUiStore.getState().setCamera(saved))
+      cleanup()
+
+      for (let remount = 0; remount < 2; remount += 1) {
+        renderCanvas()
+        const canvas = await screen.findByTestId('architecture-canvas')
+        await waitFor(() => expect(canvas).toHaveAttribute('data-layouting', 'false'))
+        await waitFor(() => expect(viewportTransform()).toContain('scale(0.07)'))
+        expect(useUiStore.getState().camera).toEqual(saved)
+        expect(canvas).toHaveAttribute('data-fit-view-count', '0')
+
+        // Exercise React Flow's native zoom limit, not only the persisted
+        // store or our data attributes: zooming out at the restored floor must
+        // keep the drawn viewport there instead of snapping back to 0.12.
+        await user.click(document.querySelector<HTMLButtonElement>('.react-flow__controls-zoomout')!)
+        await waitFor(() => expect(viewportTransform()).toContain('scale(0.07)'))
+        expect(useUiStore.getState().camera).toEqual(saved)
+        expect(canvas).toHaveAttribute('data-fit-view-count', '0')
+        cleanup()
+      }
+    },
+    CANVAS_TIMEOUT,
+  )
+
+  it(
     'drops pending search focus when orientation changes during the relayout',
     async () => {
       const user = userEvent.setup()
@@ -824,6 +861,8 @@ describe('architecture canvas — live updates never move the camera', () => {
         collapsed,
       )
       await waitForCanvas()
+      await user.click(screen.getByTestId('canvas-toggle-tools'))
+      expect(screen.getByTestId('canvas-toggle-tools')).toHaveAttribute('aria-expanded', 'true')
       await user.click(screen.getByTestId('canvas-layout-left-right'))
       await waitFor(() =>
         expect(screen.getByTestId('architecture-canvas')).toHaveAttribute(
@@ -844,6 +883,8 @@ describe('architecture canvas — live updates never move the camera', () => {
 
       const rendered = renderCanvas(WORKSPACE_URL, nestedArchitectureResponse, collapsed)
       await waitForCanvas()
+      await user.click(screen.getByTestId('canvas-toggle-tools'))
+      expect(screen.getByTestId('canvas-toggle-tools')).toHaveAttribute('aria-expanded', 'true')
       await user.click(screen.getByTestId('canvas-component-search'))
       const input = screen.getByTestId('canvas-component-search-input')
       input.focus()

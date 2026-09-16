@@ -1,7 +1,7 @@
 import { expect, test, type Locator, type Page } from '@playwright/test'
 
 import { BASE_URL, MAIN_PROJECT, MAIN_RUN } from '../src/config.js'
-import { showWholeModel } from '../src/canvas.js'
+import { panIntoCanvas, showWholeModel } from '../src/canvas.js'
 
 /**
  * Issue #59 — canvas actions keep a usable screen-space target while the
@@ -19,6 +19,7 @@ const BROWSER_GEOMETRY_TOLERANCE = 0.01
 const CANVAS_URL = `/projects/${MAIN_PROJECT}/runs/${MAIN_RUN}`
 
 const TOOLBAR_ACTIONS = [
+  '[data-testid="canvas-toggle-tools"]',
   '[data-testid="canvas-component-search"]',
   '[data-testid="canvas-fit-view"]',
   '[data-testid="canvas-layout-top-down"]',
@@ -32,6 +33,8 @@ async function openCanvas(page: Page): Promise<void> {
     'data-layouting',
     'false',
   )
+  await page.getByTestId('canvas-toggle-tools').click()
+  await expect(page.getByTestId('canvas-toggle-tools')).toHaveAttribute('aria-expanded', 'true')
   await showWholeModel(page)
 }
 
@@ -68,7 +71,7 @@ async function assertTarget(
 }
 
 /**
- * Returns the first target whose complete browser box is inside the canvas.
+ * Reveals a target through a real pointer pan, then checks its complete box.
  * React Flow can keep an off-screen node in the DOM after zooming; a normal
  * user click cannot activate that control, so the interaction check must use
  * the same visible geometry rather than relying on DOM order alone.
@@ -79,8 +82,8 @@ async function firstCanvasViewportTarget(
   label: string,
 ): Promise<Locator> {
   const targets = page.locator(selector)
-  const index = await targets.evaluateAll((elements) => {
-    const canvas = document.querySelector('[data-testid="architecture-canvas"]')
+  let index = await targets.evaluateAll((elements) => {
+    const canvas = document.querySelector('[data-testid="architecture-canvas"] .react-flow')
     if (!canvas) return -1
     const canvasBox = canvas.getBoundingClientRect()
     return elements.findIndex((element) => {
@@ -95,9 +98,31 @@ async function firstCanvasViewportTarget(
       )
     })
   })
+  if (index < 0) {
+    // Full zoom can place every container header outside the smaller drawing
+    // surface. Reveal the closest one before recording the gesture baseline.
+    index = await targets.evaluateAll((elements) => {
+      const bounds = document.querySelector('.react-flow__pane')?.getBoundingClientRect()
+      if (!bounds) return -1
+      const center = { x: bounds.x + bounds.width / 2, y: bounds.y + bounds.height / 2 }
+      const candidates = elements.map((element, candidate) => {
+        const box = element.getBoundingClientRect()
+        return { candidate, box, distance: Math.hypot(box.x + box.width / 2 - center.x, box.y + box.height / 2 - center.y) }
+      }).filter(({ box }) => box.width > 0 && box.height > 0)
+      candidates.sort((a, b) => a.distance - b.distance)
+      return candidates[0]?.candidate ?? -1
+    })
+    expect(index, `${label}: no rendered target to reveal`).toBeGreaterThanOrEqual(0)
+    await panIntoCanvas(page, targets.nth(index))
+  }
   expect(index, `${label}: no target fully inside the canvas viewport`).toBeGreaterThanOrEqual(0)
   const target = targets.nth(index)
   await expect(target, `${label}: target is not visible`).toBeVisible()
+  expect(await target.evaluate((element) => {
+    const bounds = document.querySelector('.react-flow__pane')!.getBoundingClientRect()
+    const box = element.getBoundingClientRect()
+    return box.left >= bounds.left && box.right <= bounds.right && box.top >= bounds.top && box.bottom <= bounds.bottom
+  }), `${label}: complete target must be inside the drawing surface`).toBe(true)
   return target
 }
 
@@ -279,9 +304,13 @@ test('11 · canvas hit areas stay measurable at several zoom levels for fine and
         '[data-testid^="edge-bundle-"], [data-testid^="edge-label-"], [data-testid^="edge-collapse-"]',
         `${pointer.name} relationship interaction`,
       )
+      // Any navigation needed to reveal this relationship is complete. Only
+      // its activation is forbidden from moving the camera.
+      const beforeRelationshipTransform = await viewportTransform(page)
+      await expect(canvas).toHaveAttribute('data-fit-view-count', beforeFitCount ?? '')
       await relationship.click()
       await expect(canvas).toHaveAttribute('data-fit-view-count', beforeFitCount ?? '')
-      expect(await viewportTransform(page)).toBe(beforeTransform)
+      expect(await viewportTransform(page)).toBe(beforeRelationshipTransform)
     } finally {
       await context.close()
     }

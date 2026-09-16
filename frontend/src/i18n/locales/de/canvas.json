@@ -158,6 +158,7 @@
     }
   },
   "tool": {
+    "moreTools": "Werkzeuge",
     "backToOverview": "Lesbare Systemübersicht",
     "backToOverviewHint": "Zur lesbaren Systemübersicht: tiefere Komponenten werden wieder eingeklappt und die Ansicht wird mit mindestens 12 px Primärtext eingepasst.",
     "collapse": "Einklappen",

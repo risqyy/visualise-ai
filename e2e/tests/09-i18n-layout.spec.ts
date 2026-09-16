@@ -119,6 +119,8 @@ async function openWorkspace(page: Page): Promise<void> {
     'data-layouting',
     'false',
   )
+  await page.getByTestId('canvas-toggle-tools').click()
+  await expect(page.getByTestId('canvas-toggle-tools')).toHaveAttribute('aria-expanded', 'true')
 }
 
 /**

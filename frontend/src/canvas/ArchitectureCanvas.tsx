@@ -23,6 +23,7 @@ import {
   Maximize2,
   RotateCcw,
   Search,
+  Settings2,
   TriangleAlert,
 } from 'lucide-react'
 import type { TFunction } from 'i18next'
@@ -130,7 +131,7 @@ import { useCanvasVoice } from './useCanvasVoice'
  * constant width inside the CSS transform (see `--vai-canvas-zoom`).
  */
 
-const MIN_ZOOM = 0.12
+const DEFAULT_MIN_ZOOM = 0.12
 const MAX_ZOOM = 2.5
 
 const NODE_TYPES = ARCHITECTURE_NODE_TYPES
@@ -239,6 +240,7 @@ function ArchitectureCanvasInner({
     [model.components, model.overlay?.extraComponents],
   )
   const [searchOpen, setSearchOpen] = useState(false)
+  const [toolsOpen, setToolsOpen] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
   const [activeSearchIndex, setActiveSearchIndex] = useState(0)
   // The graph is a composite widget: one visible node owns the Tab entry and
@@ -352,6 +354,9 @@ function ArchitectureCanvasInner({
   // The very first viewport React Flow renders with. Read once so a later
   // camera change never re-mounts the flow.
   const [initialViewport] = useState<Viewport>(() => useUiStore.getState().camera)
+  const [minimumZoom, setMinimumZoom] = useState(() =>
+    Math.min(DEFAULT_MIN_ZOOM, initialViewport.zoom),
+  )
 
   const positionedNodes = useMemo(
     () => {
@@ -447,7 +452,7 @@ function ArchitectureCanvasInner({
    */
   const fitView = useCallback(
     (mode: FitMode, focusComponentId: ComponentId | null = null) => {
-      const { width, height, nodeLookup } = storeApi.getState()
+      const { width, height, nodeLookup, minZoom, setMinZoom } = storeApi.getState()
       if (nodeLookup.size === 0) return false
 
       const bounds = getNodesBounds([...nodeLookup.values()], { nodeLookup })
@@ -474,8 +479,16 @@ function ArchitectureCanvasInner({
         { width, height },
         mode === 'initial'
           ? { minZoom: MIN_READABLE_ZOOM, overflow: 'start', focus }
-          : { minZoom: MIN_ZOOM },
+          : { minZoom: 0 },
       )
+      // An explicit whole-map fit must accommodate the complete model even
+      // on a short drawing surface. Lower the native limit before applying
+      // that camera, and retain it so zooming in/out can return to this view.
+      // Live updates never change this limit or request a new fit.
+      if (viewport.zoom < minZoom) {
+        setMinZoom(viewport.zoom)
+        setMinimumZoom(viewport.zoom)
+      }
       void flow.setViewport(viewport)
       setCamera(viewport)
       setDetailLevel(detailLevelForZoom(viewport.zoom))
@@ -550,7 +563,7 @@ function ArchitectureCanvasInner({
       const sizeChanged = width !== pending.before.width || height !== pending.before.height
       const measuredByReactFlow =
         width >= MIN_FIT_VIEWPORT && height >= MIN_FIT_VIEWPORT
-      const domRect = surfaceRef.current?.getBoundingClientRect()
+      const domRect = surfaceRef.current?.querySelector('.react-flow')?.getBoundingClientRect()
       const hasBrowserLayout = Boolean(domRect && domRect.width > 0 && domRect.height > 0)
       const canWaitForBrowserResize =
         typeof window.requestAnimationFrame === 'function' && hasBrowserLayout
@@ -1423,7 +1436,7 @@ function ArchitectureCanvasInner({
   return (
     <div
       ref={surfaceRef}
-      className="relative h-full w-full min-w-0"
+      className="relative flex h-full w-full min-h-0 min-w-0 flex-col"
       onFocusCapture={onSurfaceFocusCapture}
       onBlurCapture={onSurfaceBlurCapture}
       onKeyDownCapture={onSurfaceKeyDownCapture}
@@ -1454,215 +1467,178 @@ function ArchitectureCanvasInner({
         {t('graph.instructions')}
       </p>
       <CanvasNodeActionsContext value={nodeActions}>
-        <ReactFlow
-          nodes={nodes}
-          edges={edges}
-          nodeTypes={NODE_TYPES}
-          edgeTypes={EDGE_TYPES}
-          defaultViewport={initialViewport}
-          minZoom={MIN_ZOOM}
-          maxZoom={MAX_ZOOM}
-          onNodeClick={onNodeClick}
-          onEdgeClick={onEdgeClick}
-          onNodeDragStop={onNodeDragStop}
-          onMoveStart={onMoveStart}
-          onMove={onMove}
-          onMoveEnd={onMoveEnd}
-          nodesDraggable
-          nodesConnectable={false}
-          edgesFocusable
-          edgesReconnectable={false}
-          elementsSelectable
-          // Selection is owned by the URL, so React Flow must not manage its own.
-          selectNodesOnDrag={false}
-          multiSelectionKeyCode={null}
-          deleteKeyCode={null}
-          proOptions={{ hideAttribution: false }}
-          attributionPosition="bottom-left"
-          className="bg-canvas"
-          // Keyboard focus may bring a node that sits outside the viewport into
-          // view. That is a deliberate exception and the only one: it is
-          // requested by the user's own Tab press, it keeps the zoom, and it is
-          // not a `fitView` — `data-fit-view-count` does not move (ADR 0018).
-          autoPanOnNodeFocus
-          ariaLabelConfig={ariaLabelConfig}
-          aria-label={t('graph.label')}
-          aria-describedby={instructionsId}
-        >
-          <Background
-            variant={BackgroundVariant.Dots}
-            gap={28}
-            size={1}
-            color="var(--canvas-grid)"
-          />
-          <Controls
-            showInteractive={false}
-            // The built-in fit control is replaced by "Einpassen" in the toolbar,
-            // which goes through the camera policy instead of around it.
-            showFitView={false}
-            position="bottom-right"
-            className="!border-border !bg-card/90 !shadow-none [&>button]:!border-border [&>button]:!bg-card [&>button]:!fill-current [&>button]:!text-foreground"
-          />
-          {minimapVisible && (
-            <MiniMap
-              position="top-right"
-              pannable
-              zoomable
-              ariaLabel={t('graph.minimapLabel')}
-              className="!border-border !bg-card/80 !m-2 !rounded-md !border"
-              style={{ width: 168, height: 112 }}
-              maskColor="color-mix(in oklab, var(--background) 72%, transparent)"
-              nodeColor={(node) =>
-                node.type === COMPOUND_NODE_TYPE
-                  ? 'var(--graphite-700)'
-                  : 'var(--graphite-400)'
-              }
-              nodeStrokeWidth={0}
-            />
-          )}
-
-          <Panel position="top-left" className="!m-2">
-            {/* Wraps rather than overflows: the centre pane can be resized down
-                to a few hundred pixels, and a toolbar that runs past its edge
-                takes its own controls out of reach. */}
-            <div
-              className={`canvas-toolbar architecture-toolbar ${minimapVisible ? '' : 'architecture-toolbar-full'} border-border bg-card/90 nopan nodrag flex min-w-0 flex-wrap items-center gap-1 rounded-md border px-1 py-1 backdrop-blur-sm`}
+        {/* Real layout space keeps every camera path, including React Flow's
+            keyboard auto-pan, inside the unobstructed drawing surface. */}
+        <div className="canvas-toolbar architecture-toolbar border-border bg-card flex min-w-0 shrink-0 items-center gap-1 border-b p-1">
+          <div
+            className="flex min-w-0 flex-1 items-center gap-1"
+            role="group"
+            aria-label={t('tool.primaryActions')}
+            data-testid="canvas-primary-actions"
+          >
+            <Button
+              ref={searchTriggerRef}
+              variant="ghost"
+              size="sm"
+              className="canvas-toolbar-action h-7 min-w-0 shrink gap-1.5 px-2 text-xs"
+              aria-haspopup="dialog"
+              aria-expanded={searchOpen}
+              aria-keyshortcuts="/ Control+K Meta+K"
+              title={t('search.trigger')}
+              onClick={openSearch}
+              data-testid="canvas-component-search"
             >
-              <div
-                className="flex min-w-0 flex-wrap items-center gap-1"
-                role="group"
-                aria-label={t('tool.primaryActions')}
-                data-testid="canvas-primary-actions"
-              >
-              <Button
-                ref={searchTriggerRef}
-                variant="ghost"
-                size="sm"
-                className="canvas-toolbar-action h-7 gap-1.5 px-2 text-xs"
-                aria-haspopup="dialog"
-                aria-expanded={searchOpen}
-                aria-keyshortcuts="/ Control+K Meta+K"
-                onClick={openSearch}
-                data-testid="canvas-component-search"
-              >
-                <Search aria-hidden="true" />
-                {t('search.trigger')}
-              </Button>
+              <Search aria-hidden="true" />
+              <span className="truncate">{t('search.trigger')}</span>
+            </Button>
 
-              {selectionNeedsJump && selectedComponentId && (
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="canvas-toolbar-action h-7 gap-1.5 px-2 text-xs"
-                      onClick={onJumpToSelection}
-                      data-testid="canvas-jump-to-selection"
-                    >
-                      <MapPinOff aria-hidden="true" />
-                      {t('search.jumpToSelection')}
-                    </Button>
-                  </TooltipTrigger>
-                  <TooltipContent className="max-w-80">
-                    {t('search.jumpToSelectionHint')}
-                  </TooltipContent>
-                </Tooltip>
-              )}
+            {selectionNeedsJump && selectedComponentId && (
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="canvas-toolbar-action h-7 gap-1.5 px-2 text-xs"
+                    onClick={onJumpToSelection}
+                    data-testid="canvas-jump-to-selection"
+                  >
+                    <MapPinOff aria-hidden="true" />
+                    <span className="sr-only">{t('search.jumpToSelection')}</span>
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent className="max-w-80">
+                  {t('search.jumpToSelectionHint')}
+                </TooltipContent>
+              </Tooltip>
+            )}
 
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="canvas-toolbar-action h-7 gap-1.5 px-2 text-xs"
+                  onClick={onShowWholeModel}
+                  data-testid="canvas-fit-view"
+                >
+                  <Maximize2 aria-hidden="true" />
+                  <span className="sr-only">{t(DISCLOSURE_LABEL_KEYS.fitWholeModel)}</span>
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent className="max-w-80">
+                {t(DISCLOSURE_LABEL_KEYS.fitWholeModelHint)}
+              </TooltipContent>
+            </Tooltip>
+
+            {graph.initialCollapsedIds.length > 0 && (
               <Tooltip>
                 <TooltipTrigger asChild>
                   <Button
                     variant="ghost"
                     size="sm"
                     className="canvas-toolbar-action h-7 gap-1.5 px-2 text-xs"
-                    onClick={onShowWholeModel}
-                    data-testid="canvas-fit-view"
+                    onClick={onBackToOverview}
+                    data-testid="canvas-back-to-overview"
                   >
-                    <Maximize2 aria-hidden="true" />
-                    {t(DISCLOSURE_LABEL_KEYS.fitWholeModel)}
+                    <Layers2 aria-hidden="true" />
+                    <span className="sr-only">{t(DISCLOSURE_LABEL_KEYS.backToOverview)}</span>
                   </Button>
                 </TooltipTrigger>
                 <TooltipContent className="max-w-80">
-                  {t(DISCLOSURE_LABEL_KEYS.fitWholeModelHint)}
+                  {t(DISCLOSURE_LABEL_KEYS.backToOverviewHint)}
                 </TooltipContent>
               </Tooltip>
+            )}
 
-              {graph.initialCollapsedIds.length > 0 && (
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="canvas-toolbar-action h-7 gap-1.5 px-2 text-xs"
-                      onClick={onBackToOverview}
-                      data-testid="canvas-back-to-overview"
-                    >
-                      <Layers2 aria-hidden="true" />
-                      {t(DISCLOSURE_LABEL_KEYS.backToOverview)}
-                    </Button>
-                  </TooltipTrigger>
-                  <TooltipContent className="max-w-80">
-                    {t(DISCLOSURE_LABEL_KEYS.backToOverviewHint)}
-                  </TooltipContent>
-                </Tooltip>
-              )}
-
-              {hasTemporaryPositions && (
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="canvas-toolbar-action h-7 gap-1.5 px-2 text-xs"
-                      onClick={clearNodePositions}
-                      data-testid="canvas-reset-positions"
-                    >
-                      <RotateCcw aria-hidden="true" />
-                      {t('tool.resetPositions')}
-                    </Button>
-                  </TooltipTrigger>
-                  <TooltipContent>{t('tool.resetPositionsHint')}</TooltipContent>
-                </Tooltip>
-              )}
-
+            {hasTemporaryPositions && (
               <Tooltip>
                 <TooltipTrigger asChild>
                   <Button
-                    variant={architectureFocus ? 'secondary' : 'ghost'}
+                    variant="ghost"
                     size="sm"
-                    className="h-7 gap-1.5 px-2 text-xs"
-                    onClick={toggleArchitectureFocus}
-                    aria-pressed={architectureFocus}
-                    data-testid="canvas-toggle-architecture-focus"
+                    className="canvas-toolbar-action h-7 gap-1.5 px-2 text-xs"
+                    onClick={clearNodePositions}
+                    data-testid="canvas-reset-positions"
                   >
-                    <Focus aria-hidden="true" />
-                    {t(architectureFocus ? 'tool.exitArchitectureFocus' : 'tool.focusArchitecture')}
+                    <RotateCcw aria-hidden="true" />
+                    <span className="sr-only">{t('tool.resetPositions')}</span>
                   </Button>
                 </TooltipTrigger>
-                <TooltipContent className="max-w-80">
-                  {t(
-                    architectureFocus
-                      ? 'tool.exitArchitectureFocusHint'
-                      : 'tool.focusArchitectureHint',
-                  )}
-                </TooltipContent>
+                <TooltipContent>{t('tool.resetPositionsHint')}</TooltipContent>
               </Tooltip>
-              </div>
+            )}
+
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant={architectureFocus ? 'secondary' : 'ghost'}
+                  size="sm"
+                  className="canvas-toolbar-action h-7 gap-1.5 px-2 text-xs"
+                  onClick={toggleArchitectureFocus}
+                  aria-pressed={architectureFocus}
+                  data-testid="canvas-toggle-architecture-focus"
+                >
+                  <Focus aria-hidden="true" />
+                  <span className="sr-only">{t(architectureFocus ? 'tool.exitArchitectureFocus' : 'tool.focusArchitecture')}</span>
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent className="max-w-80">
+                {t(
+                  architectureFocus
+                    ? 'tool.exitArchitectureFocusHint'
+                    : 'tool.focusArchitectureHint',
+                )}
+              </TooltipContent>
+            </Tooltip>
+            <Button
+              variant={toolsOpen ? 'secondary' : 'ghost'}
+              size="sm"
+              className="canvas-toolbar-action h-7 gap-1.5 px-2 text-xs"
+              aria-expanded={toolsOpen}
+              aria-controls="canvas-tools-dock"
+              title={t('tool.moreTools')}
+              onClick={() => {
+                // This deliberate resize must not be mistaken for the
+                // initial surface settling and silently refit the graph.
+                userMovedCameraRef.current = true
+                setToolsOpen((open) => !open)
+              }}
+              data-testid="canvas-toggle-tools"
+            >
+              <Settings2 aria-hidden="true" />
+              <span className="sr-only">{t('tool.moreTools')}</span>
+            </Button>
+          </div>
+          <Controls
+            showInteractive={false}
+            // The built-in fit control is replaced by "Einpassen" in the toolbar,
+            // which goes through the camera policy instead of around it.
+            showFitView={false}
+            orientation="horizontal"
+            style={{ position: 'static', margin: 0 }}
+            className="!border-border !bg-card/90 !shadow-none [&>button]:!border-border [&>button]:!bg-card [&>button]:!fill-current [&>button]:!text-foreground"
+          />
+        </div>
+        {toolsOpen && (
+          <div
+            id="canvas-tools-dock"
+            data-testid="canvas-tools-dock"
+            className="border-border bg-card flex h-32 min-h-0 shrink items-start gap-2 overflow-auto border-b p-1"
+          >
+            <div
+              className="flex max-h-full min-w-0 flex-1 flex-wrap items-center gap-1 overflow-auto"
+              role="group"
+              aria-label={t('tool.secondaryInfo')}
+              data-testid="canvas-secondary-info"
+            >
+              <span className="bg-border mx-0.5 h-4 w-px" aria-hidden="true" />
 
               <div
-                className="flex min-w-0 flex-wrap items-center gap-1"
+                className="border-border/70 flex min-w-0 flex-wrap items-center rounded-sm border"
                 role="group"
-                aria-label={t('tool.secondaryInfo')}
-                data-testid="canvas-secondary-info"
+                aria-label={t('tool.layoutOrientation')}
+                data-testid="canvas-layout-orientation"
               >
-                <span className="bg-border mx-0.5 h-4 w-px" aria-hidden="true" />
-
-                <div
-                  className="border-border/70 flex min-w-0 flex-wrap items-center rounded-sm border"
-                  role="group"
-                  aria-label={t('tool.layoutOrientation')}
-                  data-testid="canvas-layout-orientation"
-                >
                 <Button
                   variant="ghost"
                   size="sm"
@@ -1685,7 +1661,7 @@ function ArchitectureCanvasInner({
                   <span aria-hidden="true">→ </span>
                   {t('tool.layoutLeftRight')}
                 </Button>
-                </div>
+              </div>
 
               <Tooltip>
                 <TooltipTrigger asChild>
@@ -1766,142 +1742,206 @@ function ArchitectureCanvasInner({
                   </TooltipContent>
                 </Tooltip>
               )}
-              </div>
             </div>
-            {/* The canvas clips its contents. Keep search in the viewport even
-                when the toolbar wraps or a side pane enters Deep Focus. */}
-            {searchOpen && createPortal(
-              <div
-                className="border-border bg-card text-card-foreground nokey nopan fixed top-16 left-1/2 z-50 flex max-h-[calc(100dvh-5rem)] w-[min(34rem,calc(100vw-2rem))] -translate-x-1/2 flex-col overflow-hidden rounded-md border shadow-lg"
-                role="dialog"
-                aria-label={t('search.trigger')}
-                data-testid="canvas-component-search-dialog"
-                onKeyDown={(event) => {
-                  if (event.key === 'Escape') {
-                    event.stopPropagation()
-                    closeSearch()
-                  }
+            {minimapVisible && (
+              <MiniMap
+                position="top-right"
+                pannable
+                zoomable
+                ariaLabel={t('graph.minimapLabel')}
+                className="!border-border !bg-card shrink-0 !rounded-md !border"
+                style={{
+                  position: 'relative', top: 'auto', right: 'auto', bottom: 'auto',
+                  left: 'auto', margin: 0, width: 168, height: 112,
                 }}
-              >
-                <div className="border-border flex shrink-0 items-center gap-2 border-b p-2">
-                  <Search className="text-muted-foreground size-4 shrink-0" aria-hidden="true" />
-                  <label htmlFor="canvas-component-search-input" className="sr-only">
-                    {t('search.hint')}
-                  </label>
-                  <input
-                    ref={searchInputRef}
-                    id="canvas-component-search-input"
-                    type="search"
-                    role="combobox"
-                    value={searchQuery}
-                    onChange={(event) => {
-                      setSearchQuery(event.target.value)
-                      setActiveSearchIndex(0)
-                    }}
-                    onKeyDown={(event) => {
-                      // React Flow owns the surrounding keyboard surface; keep
-                      // ordinary text entry from reaching its pane handler.
-                      event.stopPropagation()
-                      onSearchKeyDown(event)
-                    }}
-                    onPointerDown={(event) => event.stopPropagation()}
-                    placeholder={t('search.hint')}
-                    aria-describedby="canvas-component-search-status"
-                    aria-controls="canvas-component-search-results"
-                    aria-expanded={searchQuery.trim() !== '' && searchResults.length > 0}
-                    aria-autocomplete="list"
-                    aria-activedescendant={
-                      searchQuery.trim() !== '' && searchResults.length > 0
-                        ? `canvas-component-search-result-${effectiveActiveSearchIndex}`
-                        : undefined
-                    }
-                    className="focus-visible:ring-ring min-w-0 flex-1 rounded-sm bg-transparent text-sm outline-none placeholder:text-muted-foreground focus-visible:ring-2"
-                    data-testid="canvas-component-search-input"
-                  />
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="icon-xs"
-                    aria-label={t('search.close')}
-                    onClick={closeSearch}
-                    data-testid="canvas-component-search-close"
-                  >
-                    <span aria-hidden="true">×</span>
-                  </Button>
-                </div>
-
-                <p
-                  id="canvas-component-search-status"
-                  data-testid="canvas-component-search-status"
-                  className="text-muted-foreground shrink-0 px-3 py-2 text-xs"
-                  role="status"
-                  aria-live="polite"
-                >
-                  {searchQuery.trim() === ''
-                    ? t('search.empty')
-                    : searchResults.length === 0
-                      ? t('search.noResults')
-                      : t('search.resultCount', { count: searchResults.length })}
-                </p>
-
-                {searchQuery.trim() !== '' && searchResults.length > 0 && (
-                  <div
-                    className="border-border min-h-0 max-h-72 overflow-y-auto border-t p-1"
-                    id="canvas-component-search-results"
-                    role="listbox"
-                    aria-label={t('search.trigger')}
-                    data-testid="canvas-component-search-results"
-                  >
-                    {searchResults.map((entry, index) => (
-                      <button
-                        key={entry.component.componentId}
-                        ref={index === effectiveActiveSearchIndex ? activeSearchResultRef : null}
-                        type="button"
-                        id={`canvas-component-search-result-${index}`}
-                        role="option"
-                        aria-selected={index === effectiveActiveSearchIndex}
-                        className={`hover:bg-accent focus-visible:bg-accent flex w-full min-w-0 flex-col items-start gap-0.5 rounded-sm px-2 py-1.5 text-left text-sm outline-none ${index === effectiveActiveSearchIndex ? 'bg-accent' : ''}`}
-                        onMouseEnter={() => setActiveSearchIndex(index)}
-                        onClick={() => selectSearchResult(entry.component.componentId)}
-                        data-testid="canvas-component-search-result"
-                        data-component-id={entry.component.componentId}
-                      >
-                        <span className="flex w-full min-w-0 items-center gap-2">
-                          <span className="min-w-0 flex-1 truncate font-medium">
-                            <ReportedText value={entry.component.name} />
-                          </span>
-                          <span className="text-muted-foreground shrink-0 text-xs">
-                            {componentKindLabel(entry.component.kind, t)}
-                          </span>
-                        </span>
-                        <span className="text-muted-foreground w-full truncate text-xs">
-                          {entry.containerPath.length > 0 ? (
-                            <ReportedText value={entry.containerPath.join(' / ')} />
-                          ) : (
-                            t('search.root')
-                          )}
-                        </span>
-                      </button>
-                    ))}
-                  </div>
-                )}
-              </div>,
-              document.body,
+                maskColor="color-mix(in oklab, var(--background) 72%, transparent)"
+                nodeColor={(node) =>
+                  node.type === COMPOUND_NODE_TYPE
+                    ? 'var(--graphite-700)'
+                    : 'var(--graphite-400)'
+                }
+                nodeStrokeWidth={0}
+              />
             )}
-          </Panel>
-
-          {graph.isRelayouting && (
-            <Panel position="top-center" className="!m-2">
-              <span
-                className="border-border bg-card/90 text-muted-foreground rounded-md border px-2 py-1 text-[11px]"
-                role="status"
-                data-testid="canvas-layouting"
+          </div>
+        )}
+        {/* The canvas clips its contents. Keep search in the viewport even
+                when the toolbar wraps or a side pane enters Deep Focus. */}
+        {searchOpen && createPortal(
+          <div
+            className="border-border bg-card text-card-foreground nokey nopan fixed top-16 left-1/2 z-50 flex max-h-[calc(100dvh-5rem)] w-[min(34rem,calc(100vw-2rem))] -translate-x-1/2 flex-col overflow-hidden rounded-md border shadow-lg"
+            role="dialog"
+            aria-label={t('search.trigger')}
+            data-testid="canvas-component-search-dialog"
+            onKeyDown={(event) => {
+              if (event.key === 'Escape') {
+                event.stopPropagation()
+                closeSearch()
+              }
+            }}
+          >
+            <div className="border-border flex shrink-0 items-center gap-2 border-b p-2">
+              <Search className="text-muted-foreground size-4 shrink-0" aria-hidden="true" />
+              <label htmlFor="canvas-component-search-input" className="sr-only">
+                {t('search.hint')}
+              </label>
+              <input
+                ref={searchInputRef}
+                id="canvas-component-search-input"
+                type="search"
+                role="combobox"
+                value={searchQuery}
+                onChange={(event) => {
+                  setSearchQuery(event.target.value)
+                  setActiveSearchIndex(0)
+                }}
+                onKeyDown={(event) => {
+                  // React Flow owns the surrounding keyboard surface; keep
+                  // ordinary text entry from reaching its pane handler.
+                  event.stopPropagation()
+                  onSearchKeyDown(event)
+                }}
+                onPointerDown={(event) => event.stopPropagation()}
+                placeholder={t('search.hint')}
+                aria-describedby="canvas-component-search-status"
+                aria-controls="canvas-component-search-results"
+                aria-expanded={searchQuery.trim() !== '' && searchResults.length > 0}
+                aria-autocomplete="list"
+                aria-activedescendant={
+                  searchQuery.trim() !== '' && searchResults.length > 0
+                    ? `canvas-component-search-result-${effectiveActiveSearchIndex}`
+                    : undefined
+                }
+                className="focus-visible:ring-ring min-w-0 flex-1 rounded-sm bg-transparent text-sm outline-none placeholder:text-muted-foreground focus-visible:ring-2"
+                data-testid="canvas-component-search-input"
+              />
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon-xs"
+                aria-label={t('search.close')}
+                onClick={closeSearch}
+                data-testid="canvas-component-search-close"
               >
-                {t('graph.layouting')}
-              </span>
-            </Panel>
-          )}
-        </ReactFlow>
+                <span aria-hidden="true">×</span>
+              </Button>
+            </div>
+
+            <p
+              id="canvas-component-search-status"
+              data-testid="canvas-component-search-status"
+              className="text-muted-foreground shrink-0 px-3 py-2 text-xs"
+              role="status"
+              aria-live="polite"
+            >
+              {searchQuery.trim() === ''
+                ? t('search.empty')
+                : searchResults.length === 0
+                  ? t('search.noResults')
+                  : t('search.resultCount', { count: searchResults.length })}
+            </p>
+
+            {searchQuery.trim() !== '' && searchResults.length > 0 && (
+              <div
+                className="border-border min-h-0 max-h-72 overflow-y-auto border-t p-1"
+                id="canvas-component-search-results"
+                role="listbox"
+                aria-label={t('search.trigger')}
+                data-testid="canvas-component-search-results"
+              >
+                {searchResults.map((entry, index) => (
+                  <button
+                    key={entry.component.componentId}
+                    ref={index === effectiveActiveSearchIndex ? activeSearchResultRef : null}
+                    type="button"
+                    id={`canvas-component-search-result-${index}`}
+                    role="option"
+                    aria-selected={index === effectiveActiveSearchIndex}
+                    className={`hover:bg-accent focus-visible:bg-accent flex w-full min-w-0 flex-col items-start gap-0.5 rounded-sm px-2 py-1.5 text-left text-sm outline-none ${index === effectiveActiveSearchIndex ? 'bg-accent' : ''}`}
+                    onMouseEnter={() => setActiveSearchIndex(index)}
+                    onClick={() => selectSearchResult(entry.component.componentId)}
+                    data-testid="canvas-component-search-result"
+                    data-component-id={entry.component.componentId}
+                  >
+                    <span className="flex w-full min-w-0 items-center gap-2">
+                      <span className="min-w-0 flex-1 truncate font-medium">
+                        <ReportedText value={entry.component.name} />
+                      </span>
+                      <span className="text-muted-foreground shrink-0 text-xs">
+                        {componentKindLabel(entry.component.kind, t)}
+                      </span>
+                    </span>
+                    <span className="text-muted-foreground w-full truncate text-xs">
+                      {entry.containerPath.length > 0 ? (
+                        <ReportedText value={entry.containerPath.join(' / ')} />
+                      ) : (
+                        t('search.root')
+                      )}
+                    </span>
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>,
+          document.body,
+        )}
+        <div className="relative min-h-[15rem] flex-1" data-testid="canvas-drawing-surface">
+          <ReactFlow
+            nodes={nodes}
+            edges={edges}
+            nodeTypes={NODE_TYPES}
+            edgeTypes={EDGE_TYPES}
+            defaultViewport={initialViewport}
+            minZoom={minimumZoom}
+            maxZoom={MAX_ZOOM}
+            onNodeClick={onNodeClick}
+            onEdgeClick={onEdgeClick}
+            onNodeDragStop={onNodeDragStop}
+            onMoveStart={onMoveStart}
+            onMove={onMove}
+            onMoveEnd={onMoveEnd}
+            nodesDraggable
+            nodesConnectable={false}
+            edgesFocusable
+            edgesReconnectable={false}
+            elementsSelectable
+            // Selection is owned by the URL, so React Flow must not manage its own.
+            selectNodesOnDrag={false}
+            multiSelectionKeyCode={null}
+            deleteKeyCode={null}
+            proOptions={{ hideAttribution: false }}
+            attributionPosition="bottom-left"
+            className="bg-canvas"
+            // Keyboard focus may bring a node that sits outside the viewport into
+            // view. That is a deliberate exception and the only one: it is
+            // requested by the user's own Tab press, it keeps the zoom, and it is
+            // not a `fitView` — `data-fit-view-count` does not move (ADR 0018).
+            autoPanOnNodeFocus
+            ariaLabelConfig={ariaLabelConfig}
+            aria-label={t('graph.label')}
+            aria-describedby={instructionsId}
+          >
+            <Background
+              variant={BackgroundVariant.Dots}
+              gap={28}
+              size={1}
+              color="var(--canvas-grid)"
+            />
+
+
+            {graph.isRelayouting && (
+              <Panel position="top-center" className="!m-2">
+                <span
+                  className="border-border bg-card/90 text-muted-foreground rounded-md border px-2 py-1 text-[11px]"
+                  role="status"
+                  data-testid="canvas-layouting"
+                >
+                  {t('graph.layouting')}
+                </span>
+              </Panel>
+            )}
+          </ReactFlow>
+        </div>
       </CanvasNodeActionsContext>
     </div>
   )

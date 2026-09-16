@@ -158,6 +158,7 @@
     }
   },
   "tool": {
+    "moreTools": "Tools",
     "backToOverview": "Readable system overview",
     "backToOverviewHint": "Back to a readable system overview: deeper components are collapsed again and the view is fitted with at least 12 px effective primary text.",
     "collapse": "Collapse",
