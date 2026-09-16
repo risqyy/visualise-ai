@@ -44,7 +44,7 @@ function invalidatedNames(
 }
 
 describe('affectedQueryKeys', () => {
-  it.each([null, 'parent-orchestrator'])('refreshes current-run data only for a root start (parent: %s)', (parentAgentId) => {
+  it.each([null, undefined, 'parent-orchestrator'])('refreshes current-run data only for a root start (parent: %s)', (parentAgentId) => {
     const client = new QueryClient()
     const currentKey = queryKeys.currentRun(PROJECT_ID)
     const projectKey = queryKeys.projectDetail(PROJECT_ID)
@@ -52,11 +52,14 @@ describe('affectedQueryKeys', () => {
     client.setQueryData(currentKey, { runId: 'previous-run' })
     client.setQueryData(projectKey, { currentRunId: 'previous-run' })
     client.setQueryData(modelKey, { components: [], relationships: [] })
-    applyLiveEvent(client, streamedEvent('agent.started', {
+    const event = streamedEvent('agent.started', {
       role: 'orchestrator', displayName: 'Run author', assignedTask: 'Describe work',
-    }, { parentAgentId }))
-    expect(client.getQueryState(currentKey)?.isInvalidated).toBe(parentAgentId === null)
-    expect(client.getQueryState(projectKey)?.isInvalidated).toBe(parentAgentId === null)
+    }, { parentAgentId: parentAgentId ?? null })
+    // Go's live/replay envelope omits nil parents rather than serializing null.
+    if (parentAgentId === undefined) delete event.parentAgentId
+    applyLiveEvent(client, event)
+    expect(client.getQueryState(currentKey)?.isInvalidated).toBe(parentAgentId == null)
+    expect(client.getQueryState(projectKey)?.isInvalidated).toBe(parentAgentId == null)
     expect(client.getQueryState(modelKey)?.isInvalidated).toBe(false)
     expect(client.getQueryData(currentKey)).toEqual({ runId: 'previous-run' })
     client.clear()
