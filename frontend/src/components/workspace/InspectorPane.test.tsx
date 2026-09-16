@@ -204,6 +204,13 @@ function diffReported(diff: ReportedDiff, position: number) {
 async function renderInspector(url = SELECTED_URL, server = inspectorServer()) {
   const app = renderApp(url, { fetchImpl: server.fetchImpl })
   await screen.findByTestId('inspector-context')
+  // jsdom puts every separator at (0, 0), the default pointer position of
+  // user-event. The resizing library captures pointerdown globally, so that
+  // artificial overlap would swallow a tab press before Radix receives it.
+  // Keep only the unrelated resize handles outside the tested pointer area.
+  for (const separator of document.querySelectorAll('[data-slot="resizable-handle"]')) {
+    vi.spyOn(separator, 'getBoundingClientRect').mockReturnValue(new DOMRect(-100, -100, 1, 1))
+  }
   return { ...app, ...server }
 }
 
@@ -508,6 +515,121 @@ describe('inspector — diff pagination', () => {
 })
 
 describe('inspector — current run and history never mix', () => {
+  it('automatically activates with arrow keys, wraps in both directions and preserves URL and request scope', async () => {
+    const user = userEvent.setup()
+    const server = inspectorServer()
+    const fetchImpl = vi.fn(server.fetchImpl)
+    const { router } = await renderInspector(
+      `${SELECTED_URL}&layout=left-right&focus=diffs`,
+      { ...server, fetchImpl },
+    )
+    const tabs = screen.getByRole('tablist', { name: 'Belegquelle' })
+    const run = within(tabs).getByRole('tab', { name: 'Ausgewählter Run' })
+    const history = within(tabs).getByRole('tab', { name: 'Historie' })
+    const requests = () => fetchImpl.mock.calls.map(([input]) => new URL(String(input), 'http://localhost'))
+    expect(requests().filter((url) => url.pathname === HISTORY_PATH)).toHaveLength(0)
+    await user.click(run)
+
+    // Left from the first tab and right from the last both wrap. Activation
+    // follows focus without requiring a separate Enter or Space press.
+    for (const [key, target, historyMode] of [
+      ['{ArrowLeft}', history, true],
+      ['{ArrowRight}', run, false],
+      ['{ArrowRight}', history, true],
+      ['{ArrowLeft}', run, false],
+    ] as const) {
+      await user.keyboard(key)
+      await waitFor(() => {
+        expect(target).toHaveFocus()
+        expect(target).toHaveAttribute('aria-selected', 'true')
+        expect(router.state.location.search).toEqual({
+          component: COMPONENT_ID,
+          layout: 'left-right',
+          focus: 'diffs',
+          ...(historyMode ? { history: true } : {}),
+        })
+      })
+      expect(target === run ? history : run).toHaveAttribute('aria-selected', 'false')
+      expect(router.state.location.pathname).toBe(WORKSPACE_URL)
+      expect(screen.getByTestId('inspector-context')).toHaveAttribute('data-component-id', COMPONENT_ID)
+      expect(screen.getByTestId('inspector-context')).toHaveAttribute('data-run-id', RUN_ID)
+      if (historyMode) {
+        expect(await screen.findAllByTestId('history-entry')).toHaveLength(4)
+        expect(screen.queryByTestId('inspector-current-run')).not.toBeInTheDocument()
+        expect(screen.queryByTestId('unified-diff')).not.toBeInTheDocument()
+      } else {
+        expect(screen.getByTestId('inspector-current-run')).toBeInTheDocument()
+        expect(screen.getAllByTestId('unified-diff')).toHaveLength(ALL_DIFFS.length)
+        expect(screen.queryByTestId('history-entry')).not.toBeInTheDocument()
+      }
+    }
+
+    const runRequests = requests().filter((url) => url.pathname === INSPECTOR_PATH)
+    const historyRequests = requests().filter((url) => url.pathname === HISTORY_PATH)
+    expect(runRequests.length).toBeGreaterThan(0)
+    expect(historyRequests.length).toBeGreaterThan(0)
+    expect(runRequests.every((url) => url.searchParams.get('runId') === RUN_ID)).toBe(true)
+    expect(historyRequests.every((url) => !url.searchParams.has('runId'))).toBe(true)
+  })
+
+  it('gives both tabs persistent labelled panel targets and exposes only the active evidence', async () => {
+    const user = userEvent.setup()
+    await renderInspector()
+    const tabs = screen.getByRole('tablist', { name: 'Belegquelle' })
+    const run = within(tabs).getByRole('tab', { name: 'Ausgewählter Run' })
+    const history = within(tabs).getByRole('tab', { name: 'Historie' })
+    const panelIds = [run, history].map((tab) => tab.getAttribute('aria-controls'))
+    expect(panelIds.every(Boolean)).toBe(true)
+    expect(new Set(panelIds).size).toBe(2)
+    expect(run.id).not.toBe('')
+    expect(history.id).not.toBe('')
+    expect(run.id).not.toBe(history.id)
+
+    for (const selected of [run, history, run]) {
+      await user.click(selected)
+      await waitFor(() => expect(selected).toHaveAttribute('aria-selected', 'true'))
+      expect(screen.getAllByRole('tabpanel', { hidden: true })).toHaveLength(2)
+      for (const [index, tab] of [run, history].entries()) {
+        expect(tab).toHaveAttribute('aria-controls', panelIds[index]!)
+        const panel = document.getElementById(panelIds[index]!)
+        expect(panel).toHaveAttribute('role', 'tabpanel')
+        expect(panel).toHaveAttribute('aria-labelledby', tab.id)
+        if (tab === selected) {
+          expect(panel).toBeVisible()
+          expect(panel).toBe(screen.getByTestId('inspector-scroll'))
+          expect(panel).toHaveAccessibleName(tab.textContent!)
+          expect(screen.getAllByRole('tabpanel')).toEqual([panel])
+        } else {
+          expect(panel).toHaveAttribute('hidden')
+          expect(panel).not.toBeVisible()
+        }
+      }
+    }
+  })
+
+  it.each([false, true])('leaves the source tabs with Tab and re-enters the active tab (history URL: %s)', async (historyMode) => {
+    const user = userEvent.setup()
+    await renderInspector(`${SELECTED_URL}${historyMode ? '&history=true' : ''}`)
+    const tabs = screen.getByRole('tablist', { name: 'Belegquelle' })
+    const selected = within(tabs).getByRole('tab', { name: historyMode ? 'Historie' : 'Ausgewählter Run' })
+    const inactive = within(tabs).getByRole('tab', { name: historyMode ? 'Ausgewählter Run' : 'Historie' })
+    if (historyMode) await screen.findAllByTestId('history-entry')
+    await user.click(selected)
+    expect(selected).toHaveFocus()
+    expect(selected).toHaveAttribute('tabindex', '0')
+    expect(inactive).toHaveAttribute('tabindex', '-1')
+
+    await user.tab()
+    expect(tabs).not.toContainElement(document.activeElement as HTMLElement)
+    expect(document.activeElement).not.toBe(document.body)
+    expect(inactive).not.toHaveFocus()
+    await user.tab({ shift: true })
+    await waitFor(() => expect(selected).toHaveFocus())
+    expect(selected).toHaveAttribute('aria-selected', 'true')
+    expect(inactive).toHaveAttribute('aria-selected', 'false')
+    expect(within(tabs).getAllByRole('tab').filter((tab) => tab.tabIndex === 0)).toEqual([selected])
+  })
+
   it('defaults to the current run and keeps the history behind its own tab', async () => {
     const user = userEvent.setup()
     const { router } = await renderInspector()
