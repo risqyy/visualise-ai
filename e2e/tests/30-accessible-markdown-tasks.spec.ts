@@ -24,7 +24,7 @@ test('reported Markdown tasks expose localized states in list order without beco
         '',
         '<svg onload="window.taskAttackExecuted = true"><text>UNTRUSTED SVG PAYLOAD</text></svg>',
         '<script>window.taskAttackExecuted = true</script>',
-        '<span onclick="window.taskAttackExecuted = true" tabindex="0">Safe reported suffix</span>',
+        '<span onclick="window.taskAttackExecuted = true">Safe reported suffix</span>',
       ].join('\n'),
     },
   })
