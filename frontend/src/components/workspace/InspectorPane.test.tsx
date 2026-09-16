@@ -1,6 +1,6 @@
 import { act, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 
 import type {
   ArchitectureResponse,
@@ -10,6 +10,7 @@ import type {
   Relationship,
 } from '@/api/types'
 import { applyLiveEvent } from '@/api/useLiveStream'
+import { queryKeys } from '@/api/queryKeys'
 import {
   PROJECT_ID,
   RUN_ID,
@@ -60,6 +61,7 @@ function inspectorServer(options: {
   const state = {
     pages: options.pages ?? [inspectorPage()],
     history: options.history ?? [historyPage()],
+    unavailable: false,
   }
 
   const base = createFakeFetch({
@@ -75,6 +77,10 @@ function inspectorServer(options: {
     const url = new URL(String(input), 'http://localhost')
 
     if (url.pathname === INSPECTOR_PATH) {
+      if (state.unavailable) return new Response(JSON.stringify({
+        type: 'about:blank', title: 'Inspector temporarily unavailable', status: 503,
+        detail: 'Inspector temporarily unavailable',
+      }), { status: 503, headers: { 'Content-Type': 'application/problem+json' } })
       const cursor = url.searchParams.get('diffCursor')
       const index = cursor === null ? 0 : Number(cursor.replace('diff-page-', ''))
       const page = state.pages[index]
@@ -105,6 +111,9 @@ function inspectorServer(options: {
     /** Replaces what the server answers from now on, as a live change would. */
     publish(pages: ComponentInspectorResponse[]) {
       state.pages = pages
+    },
+    setUnavailable(unavailable: boolean) {
+      state.unavailable = unavailable
     },
   }
 }
@@ -309,6 +318,7 @@ describe('inspector — relationship selection', () => {
     expect(bundle).toHaveTextContent('HTTP · GET')
     expect(bundle).toHaveTextContent('NATS · orders.cancelled')
     expect(bundle.querySelector('[data-selected="true"]')).toHaveTextContent('HTTP · GET')
+    expect(screen.queryAllByTestId(/^inspector-jump-/)).toHaveLength(0)
   })
 
   it('keeps applied and proposed edges separate when their endpoints match', async () => {
@@ -324,6 +334,82 @@ describe('inspector — relationship selection', () => {
       expect(context).toHaveTextContent(`NATS · ${PROPOSED_RELATIONSHIP.channel}`)
     })
     expect(screen.queryByTestId('inspector-relationship-bundle')).not.toBeInTheDocument()
+  })
+})
+
+describe('inspector — evidence section navigation', () => {
+  it('hides section jumps when a background refetch fails despite retained data and restores them after retry', async () => {
+    const user = userEvent.setup()
+    const server = inspectorServer()
+    const { queryClient } = await renderInspector(SELECTED_URL, server)
+    const key = queryKeys.componentInspector(PROJECT_ID, COMPONENT_ID, RUN_ID)
+    const cached = queryClient.getQueryData(key)
+    expect(cached).toBeDefined()
+    expect(screen.getAllByTestId(/^inspector-jump-/)).toHaveLength(4)
+    server.setUnavailable(true)
+    await act(async () => {
+      await queryClient.invalidateQueries({ queryKey: key })
+    })
+    await waitFor(() => expect(queryClient.getQueryState(key)?.status).toBe('error'))
+    expect(queryClient.getQueryData(key)).toEqual(cached)
+    expect(screen.queryAllByTestId(/^inspector-jump-/)).toHaveLength(0)
+    for (const target of ['feedback', 'diffs', 'risks', 'problems']) {
+      expect(document.getElementById(`inspector-${target}-section`)).not.toBeInTheDocument()
+    }
+    server.setUnavailable(false)
+    await user.click(within(screen.getByTestId('pane-inspector')).getByRole('button', { name: 'Erneut versuchen' }))
+    await waitFor(() => expect(screen.getAllByTestId(/^inspector-jump-/)).toHaveLength(4))
+    expect(screen.getByTestId('inspector-feedback')).toBeInTheDocument()
+    expect(screen.getAllByTestId('unified-diff')).toHaveLength(ALL_DIFFS.length)
+  })
+
+  it.each(['pointer', 'keyboard'] as const)('uses the counts to reach complete evidence by %s without changing context', async (method) => {
+    const user = userEvent.setup()
+    const { router } = await renderInspector()
+    const scroll = vi.spyOn(HTMLElement.prototype, 'scrollIntoView')
+    const scrollRegion = screen.getByTestId('inspector-scroll')
+    const outer = screen.getByTestId('pane-inspector')
+    const outerScrollBefore = outer.scrollTop
+    // jsdom has no layout. Give each heading a distinct content position and
+    // derive its viewport rectangle from the actual scrollTop being exercised.
+    vi.spyOn(scrollRegion, 'getBoundingClientRect').mockReturnValue(new DOMRect(0, 100, 300, 500))
+    const targets = [
+      ['feedback', '1 Feedback', 140],
+      ['diffs', `${ALL_DIFFS.length} Diffs`, 600],
+      ['risks', '1 Risiko', 1100],
+      ['problems', '1 Problem', 1600],
+    ] as const
+    for (const [target, , contentTop] of targets) {
+      const heading = document.getElementById(`inspector-${target}-heading`)!
+      vi.spyOn(heading, 'getBoundingClientRect').mockImplementation(() =>
+        new DOMRect(0, 100 + contentTop - scrollRegion.scrollTop, 300, 24),
+      )
+    }
+    const context = screen.getByTestId('inspector-context')
+    const reportedBefore = Array.from(scrollRegion.querySelectorAll('[data-reported]')).map((element) => element.textContent)
+    for (const [target, label, contentTop] of targets) {
+      const jump = screen.getByTestId(`inspector-jump-${target}`)
+      expect(jump).toHaveAccessibleName(label)
+      expect(scrollRegion).not.toContainElement(jump)
+      expect(jump).toHaveAttribute('aria-controls', `inspector-${target}-section`)
+      if (method === 'pointer') await user.click(jump)
+      else {
+        act(() => jump.focus())
+        await user.keyboard('{Enter}')
+      }
+      const heading = document.getElementById(`inspector-${target}-heading`)
+      await waitFor(() => expect(heading).toHaveFocus())
+      expect(document.getElementById(`inspector-${target}-section`)).toContainElement(heading)
+      expect(scrollRegion.scrollTop).toBe(contentTop)
+      expect(outer.scrollTop).toBe(outerScrollBefore)
+      expect(scroll).not.toHaveBeenCalled()
+      expect(router.state.location.search).toEqual({ component: COMPONENT_ID })
+      expect(context).toHaveAttribute('data-component-id', COMPONENT_ID)
+      expect(context).toHaveAttribute('data-run-id', RUN_ID)
+    }
+    expect(Array.from(scrollRegion.querySelectorAll('[data-reported]')).map((element) => element.textContent)).toEqual(reportedBefore)
+    expect(screen.getAllByTestId('unified-diff')).toHaveLength(ALL_DIFFS.length)
+    expect(screen.getAllByTestId('feedback-entry')).toHaveLength(1)
   })
 })
 
@@ -433,6 +519,7 @@ describe('inspector — current run and history never mix', () => {
     )
     expect(screen.getByTestId('inspector-current-run')).toBeInTheDocument()
     expect(screen.queryByTestId('inspector-history')).not.toBeInTheDocument()
+    expect(screen.getAllByTestId(/^inspector-jump-/)).toHaveLength(4)
 
     await user.click(within(tabs).getByRole('tab', { name: 'Historie' }))
 
@@ -442,6 +529,7 @@ describe('inspector — current run and history never mix', () => {
     expect(screen.queryByTestId('inspector-current-run')).not.toBeInTheDocument()
     expect(screen.queryByTestId('unified-diff')).not.toBeInTheDocument()
     expect(screen.queryByTestId('feedback-entry')).not.toBeInTheDocument()
+    expect(screen.queryAllByTestId(/^inspector-jump-/)).toHaveLength(0)
     expect(router.state.location.search).toEqual({
       component: COMPONENT_ID,
       history: true,
@@ -453,6 +541,7 @@ describe('inspector — current run and history never mix', () => {
       expect(screen.getByTestId('inspector-current-run')).toBeInTheDocument(),
     )
     expect(screen.queryByTestId('history-entry')).not.toBeInTheDocument()
+    expect(screen.getAllByTestId(/^inspector-jump-/)).toHaveLength(4)
   })
 
   it('keeps corrections and retractions as their own entries and overwrites nothing', async () => {
@@ -512,6 +601,7 @@ describe('inspector — deep focus', () => {
     )
 
     await screen.findByTestId('deep-focus-banner')
+    expect(screen.queryAllByTestId(/^inspector-jump-/)).toHaveLength(0)
 
     // The diffs get the whole pane: everything else in the run view steps aside.
     expect(screen.getByTestId('inspector-diffs')).toBeInTheDocument()
@@ -527,6 +617,7 @@ describe('inspector — deep focus', () => {
     await waitFor(() =>
       expect(screen.getByTestId('inspector-feedback')).toBeInTheDocument(),
     )
+    expect(screen.getAllByTestId(/^inspector-jump-/)).toHaveLength(4)
   })
 })
 

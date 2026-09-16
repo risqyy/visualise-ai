@@ -1,5 +1,5 @@
 import { Maximize2, Minimize2 } from 'lucide-react'
-import { useMemo, type ReactNode } from 'react'
+import { useCallback, useMemo, useRef, type ReactNode, type Ref } from 'react'
 import { useTranslation } from 'react-i18next'
 
 import { useArchitecture, useComponentHistory, useComponentInspector } from '@/api/queries'
@@ -20,7 +20,6 @@ import {
   RiskList,
 } from '@/components/workspace/inspector/FindingsList'
 import { useStableScroll } from '@/components/workspace/inspector/scrollStability'
-import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Separator } from '@/components/ui/separator'
 import { ReportedText } from '@/i18n'
@@ -151,6 +150,16 @@ export function InspectorPane({
     historyEntries.map((entry) => entry.serverEventId).join(','),
   ].join('|')
   const scrollProps = useStableScroll(contentSignature)
+  const scrollViewport = useRef<HTMLDivElement>(null)
+  const rememberScrollViewport = scrollProps.ref
+  const setScrollViewport = useCallback((element: HTMLDivElement | null) => {
+    scrollViewport.current = element
+    rememberScrollViewport(element)
+  }, [rememberScrollViewport])
+  const feedbackHeading = useRef<HTMLHeadingElement>(null)
+  const diffsHeading = useRef<HTMLHeadingElement>(null)
+  const risksHeading = useRef<HTMLHeadingElement>(null)
+  const problemsHeading = useRef<HTMLHeadingElement>(null)
 
   const showFeedback = focus === undefined || focus === 'feedback'
   const showDiffs = focus === undefined || focus === 'diffs'
@@ -228,8 +237,58 @@ export function InspectorPane({
         </div>
       )}
 
+      {componentId && !relationshipId && !historyMode && showSecondary && inspector.isSuccess && head && (
+        <nav
+          aria-label={t('navigation.label')}
+          data-testid="inspector-section-navigation"
+          className="border-border flex shrink-0 flex-wrap gap-1 border-b px-3 py-1.5"
+        >
+          {[
+            {
+              target: 'feedback', heading: feedbackHeading,
+              label: tCommon('count.feedback', { count: head.feedback.length }),
+            },
+            {
+              target: 'diffs', heading: diffsHeading,
+              label: tCommon('count.diff', { count: diffs.length }),
+            },
+            {
+              target: 'risks', heading: risksHeading,
+              label: tCommon('count.risk', { count: head.risks.length }),
+            },
+            {
+              target: 'problems', heading: problemsHeading,
+              label: tCommon('count.problem', { count: head.problems.length }),
+            },
+          ].map(({ target, heading, label }) => (
+            <Button
+              key={target}
+              variant="outline"
+              size="xs"
+              className="font-normal"
+              data-testid={`inspector-jump-${target}`}
+              aria-controls={`inspector-${target}-section`}
+              onClick={() => {
+                const viewport = scrollViewport.current
+                const targetHeading = heading.current
+                if (!viewport || !targetHeading) return
+                // scrollIntoView also moves overflow-hidden outer ancestors.
+                // Only this pane should move when navigating its evidence.
+                viewport.scrollTop += targetHeading.getBoundingClientRect().top -
+                  viewport.getBoundingClientRect().top
+                targetHeading.focus({ preventScroll: true })
+                scrollProps.onScroll()
+              }}
+            >
+              {label}
+            </Button>
+          ))}
+        </nav>
+      )}
+
       <div
         {...scrollProps}
+        ref={setScrollViewport}
         className="min-h-0 flex-1 overflow-x-hidden overflow-y-auto"
         data-testid="inspector-scroll"
       >
@@ -315,27 +374,11 @@ export function InspectorPane({
                 </section>
               ) : (
                 <div className="space-y-4" data-testid="inspector-current-run">
-                  {showSecondary && head && (
-                    <div className="flex flex-wrap gap-1">
-                      <Badge variant="outline" className="text-2xs font-normal">
-                        {tCommon('count.feedback', { count: head.feedback.length })}
-                      </Badge>
-                      <Badge variant="outline" className="text-2xs font-normal">
-                        {tCommon('count.diff', { count: diffs.length })}
-                      </Badge>
-                      <Badge variant="outline" className="text-2xs font-normal">
-                        {tCommon('count.risk', { count: head.risks.length })}
-                      </Badge>
-                      <Badge variant="outline" className="text-2xs font-normal">
-                        {tCommon('count.problem', { count: head.problems.length })}
-                      </Badge>
-                    </div>
-                  )}
-
                   {showFeedback && (
                     <InspectorSection
                       label={t('feedback.label')}
                       target="feedback"
+                      headingRef={feedbackHeading}
                       focus={focus}
                       onSetFocus={onSetFocus}
                     >
@@ -349,6 +392,7 @@ export function InspectorPane({
                     <InspectorSection
                       label={t('diff.label')}
                       target="diffs"
+                      headingRef={diffsHeading}
                       focus={focus}
                       onSetFocus={onSetFocus}
                     >
@@ -364,18 +408,37 @@ export function InspectorPane({
                   {showSecondary && (
                     <>
                       <Separator />
-                      <section aria-label={t('risk.label')} data-testid="inspector-risks">
-                        <span className="pane-heading">{t('risk.label')}</span>
+                      <section
+                        id="inspector-risks-section"
+                        aria-label={t('risk.label')}
+                        data-testid="inspector-risks"
+                      >
+                        <h3
+                          id="inspector-risks-heading"
+                          ref={risksHeading}
+                          tabIndex={-1}
+                          className="pane-heading focus-visible:outline-ring focus-visible:outline-2"
+                        >
+                          {t('risk.label')}
+                        </h3>
                         <div className="pt-2">
                           <RiskList risks={head?.risks ?? []} />
                         </div>
                       </section>
 
                       <section
+                        id="inspector-problems-section"
                         aria-label={t('problem.label')}
                         data-testid="inspector-problems"
                       >
-                        <span className="pane-heading">{t('problem.label')}</span>
+                        <h3
+                          id="inspector-problems-heading"
+                          ref={problemsHeading}
+                          tabIndex={-1}
+                          className="pane-heading focus-visible:outline-ring focus-visible:outline-2"
+                        >
+                          {t('problem.label')}
+                        </h3>
                         <div className="pt-2">
                           <ProblemList problems={head?.problems ?? []} />
                         </div>
@@ -432,12 +495,14 @@ function ViewTab({
 function InspectorSection({
   label,
   target,
+  headingRef,
   focus,
   onSetFocus,
   children,
 }: {
   label: string
   target: DeepFocusTarget
+  headingRef: Ref<HTMLHeadingElement>
   focus: DeepFocusTarget | undefined
   onSetFocus: (target: DeepFocusTarget | undefined) => void
   children: ReactNode
@@ -446,9 +511,20 @@ function InspectorSection({
   const isFocused = focus === target
 
   return (
-    <section aria-label={label} data-testid={`inspector-${target}`}>
+    <section
+      id={`inspector-${target}-section`}
+      aria-label={label}
+      data-testid={`inspector-${target}`}
+    >
       <div className="flex items-center justify-between gap-2">
-        <span className="pane-heading">{label}</span>
+        <h3
+          id={`inspector-${target}-heading`}
+          ref={headingRef}
+          tabIndex={-1}
+          className="pane-heading focus-visible:outline-ring focus-visible:outline-2"
+        >
+          {label}
+        </h3>
         <Button
           variant="ghost"
           size="sm"

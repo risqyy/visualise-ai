@@ -1,4 +1,7 @@
 {
+  "navigation": {
+    "label": "Inspector contents"
+  },
   "change": {
     "emptyDescription": "For this component no change is announced and still unapplied in this run.",
     "emptyTitle": "No open proposals",
