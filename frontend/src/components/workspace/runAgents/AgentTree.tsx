@@ -80,6 +80,14 @@ export function AgentTree({ agents, selectedAgentId, onSelectAgent }: AgentTreeP
     [agents],
   )
 
+  const selectAgent = useCallback(
+    (agentId: AgentId) => {
+      setDetailOverrides((current) => ({ ...current, [agentId]: true }))
+      onSelectAgent(agentId)
+    },
+    [onSelectAgent],
+  )
+
   return (
     <div data-testid="agent-tree" className="space-y-2">
       <div className="flex items-center gap-1">
@@ -164,7 +172,7 @@ export function AgentTree({ agents, selectedAgentId, onSelectAgent }: AgentTreeP
               }
               onToggleCollapsed={toggleAgentCollapsed}
               onToggleDetail={toggleDetail}
-              onSelect={onSelectAgent}
+              onSelect={selectAgent}
             />
           ))}
         </ul>

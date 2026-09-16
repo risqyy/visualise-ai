@@ -570,6 +570,34 @@ describe('default density of an agent row', () => {
 })
 
 describe('opening and closing a row', () => {
+  it.each(['pointer', 'keyboard'] as const)('opens compact agent details from the name with %s activation and keeps repeated activation open', async (method) => {
+    const user = userEvent.setup()
+    await renderPane()
+    const row = screen.getByTestId('agent-row-subagent-architect')
+    const name = within(row).getByRole('button', { name: 'Architecture Mapper', pressed: false })
+    const arrow = screen.getByTestId('agent-detail-toggle-subagent-architect')
+    expect(row).toHaveAttribute('data-density', 'compact')
+    expect(name).toHaveAttribute('aria-expanded', 'false')
+    expect(name.getAttribute('aria-controls')).toBe(arrow.getAttribute('aria-controls'))
+    name.focus()
+    for (let activation = 0; activation < 2; activation += 1) {
+      if (method === 'pointer') await user.click(name)
+      else await user.keyboard('{Enter}')
+      expect(row).toHaveAttribute('data-density', 'detailed')
+      expect(row).toHaveAttribute('data-selected', 'true')
+      expect(name).toHaveAttribute('aria-pressed', 'true')
+      expect(name).toHaveAttribute('aria-expanded', 'true')
+      if (method === 'keyboard') expect(name).toHaveFocus()
+      expect(screen.getByTestId('agent-progress-subagent-architect')).toBeVisible()
+      expect(document.getElementById(name.getAttribute('aria-controls')!)).toBeVisible()
+    }
+    await user.click(arrow)
+    expect(row).toHaveAttribute('data-density', 'compact')
+    expect(name).toHaveAttribute('aria-expanded', 'false')
+    expect(name).toHaveAttribute('aria-pressed', 'true')
+    expect(screen.queryByTestId('agent-progress-subagent-architect')).not.toBeInTheDocument()
+  })
+
   it('is operable with the keyboard alone and keeps the focus on the control', async () => {
     const user = userEvent.setup()
     await renderPane()
@@ -597,11 +625,13 @@ describe('opening and closing a row', () => {
     expect(toggle).toHaveFocus()
   })
 
-  it('keeps a row the user opened open when the next report arrives', async () => {
+  it('keeps name-selected details open when a live refetch reports an idle status', async () => {
     const user = userEvent.setup()
     const { queryClient, setAgents } = await renderPane()
 
-    await user.click(await detailToggle('subagent-architect'))
+    const row = screen.getByTestId('agent-row-subagent-architect')
+    const name = within(row).getByRole('button', { name: 'Architecture Mapper', pressed: false })
+    await user.click(name)
     expect(screen.getByTestId('agent-row-subagent-architect')).toHaveAttribute(
       'data-density',
       'detailed',
@@ -611,7 +641,7 @@ describe('opening and closing a row', () => {
       ...treeAgentsResponse,
       agents: treeAgentsResponse.agents.map((entry) =>
         entry.agentId === 'subagent-architect'
-          ? { ...entry, progress: { percent: 100, scope: 'own_task', basis: 'completed_steps' } }
+          ? { ...entry, status: 'idle', progress: { percent: 100, scope: 'own_task', basis: 'completed_steps' } }
           : entry,
       ),
     })
@@ -619,8 +649,8 @@ describe('opening and closing a row', () => {
       applyLiveEvent(
         queryClient as QueryClient,
         streamedEvent(
-          'agent.progress_reported',
-          { percent: 100, scope: 'own_task', basis: 'completed_steps', note: '' },
+          'agent.status_reported',
+          { status: 'idle', note: '' },
           { agentId: 'subagent-architect', position: 64 },
         ),
       )
@@ -635,6 +665,9 @@ describe('opening and closing a row', () => {
       'data-density',
       'detailed',
     )
+    expect(row).toHaveAttribute('data-selected', 'true')
+    expect(name).toHaveAttribute('aria-pressed', 'true')
+    expect(name).toHaveAttribute('aria-expanded', 'true')
   })
 })
 
