@@ -1,5 +1,6 @@
 import { getRouteApi } from '@tanstack/react-router'
-import { useCallback, useEffect, useLayoutEffect } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 
 import { useProject } from '@/api/queries'
 import { useLiveStream } from '@/api/useLiveStream'
@@ -8,6 +9,7 @@ import { InspectorPane } from '@/components/workspace/InspectorPane'
 import { RunAgentPane } from '@/components/workspace/RunAgentPane'
 import { WorkspaceHeader } from '@/components/workspace/WorkspaceHeader'
 import { WorkspaceLayout } from '@/components/workspace/WorkspaceLayout'
+import { ReportedText } from '@/i18n'
 import { canvasViewKey, useUiStore } from '@/state/uiStore'
 import type { DeepFocusTarget } from '@/routes/searchParams'
 import {
@@ -15,6 +17,8 @@ import {
 } from '@/canvas/graphOrientation'
 
 const route = getRouteApi('/projects/$projectId/runs/$runId')
+const WORKSPACE_TARGETS = ['run-agents', 'architecture', 'inspector'] as const
+type WorkspaceTarget = (typeof WORKSPACE_TARGETS)[number]
 
 /**
  * `/projects/$projectId/runs/$runId` — the cockpit workspace.
@@ -26,9 +30,36 @@ const route = getRouteApi('/projects/$projectId/runs/$runId')
  * into the URL except an explicit user action.
  */
 export function WorkspacePage() {
+  const { t } = useTranslation('workspace')
   const { projectId, runId } = route.useParams()
   const search = route.useSearch()
   const navigate = route.useNavigate()
+  const mainRef = useRef<HTMLElement>(null)
+  const [navigationRequest, setNavigationRequest] = useState<{ target: WorkspaceTarget } | null>(null)
+  const pageTitle = t('navigation.pageTitle', { projectId, runId })
+
+  useEffect(() => {
+    const previousTitle = document.title
+    document.title = pageTitle
+    return () => { document.title = previousTitle }
+  }, [pageTitle])
+
+  // The request renders after a collapsed pane has mounted its heading. Keep
+  // focus local; browser fragment scrolling could move overflow-hidden ancestors.
+  useLayoutEffect(() => {
+    if (!navigationRequest) return
+    mainRef.current?.querySelector<HTMLElement>(
+      `#workspace-${navigationRequest.target}-heading`,
+    )?.focus({ preventScroll: true })
+  }, [navigationRequest])
+
+  const jumpToPane = (target: WorkspaceTarget) => {
+    const ui = useUiStore.getState()
+    if (target !== 'architecture') ui.exitArchitectureFocus()
+    if (target === 'run-agents') ui.setLeftCollapsed(false)
+    if (target === 'inspector') ui.setRightCollapsed(false)
+    setNavigationRequest({ target })
+  }
 
   // Keeps the project detail subscribed so live events invalidate and refetch
   // it. The header renders the slug — the contract has no project display name.
@@ -148,36 +179,56 @@ export function WorkspacePage() {
 
   return (
     <>
+      <nav aria-label={t('navigation.label')}>
+        {WORKSPACE_TARGETS.map((target) => (
+          <a
+            key={target}
+            href={`#workspace-${target}-heading`}
+            className="sr-only focus:not-sr-only focus:fixed focus:top-2 focus:left-2 focus:z-50 focus:rounded-md focus:bg-background focus:px-4 focus:py-2 focus:text-sm focus:text-foreground focus:outline-2 focus:outline-ring"
+            onClick={(event) => {
+              event.preventDefault()
+              jumpToPane(target)
+            }}
+          >
+            {t(`navigation.${target}`)}
+          </a>
+        ))}
+      </nav>
       <WorkspaceHeader projectId={projectId} runId={runId} />
-      <WorkspaceLayout
-        left={<RunAgentPane projectId={projectId} runId={runId} />}
-        center={
-          <ArchitecturePane
-            projectId={projectId}
-            runId={runId}
-            viewId={search.view}
-            onSelectView={setView}
-            selectedComponentId={search.component}
-            selectedRelationshipId={search.relationship}
-            onSelectComponent={setSelectedComponent}
-            orientation={search.layout}
-            onOrientationChange={setGraphOrientation}
-            onSelectRelationship={setSelectedRelationship}
-          />
-        }
-        right={
-          <InspectorPane
-            projectId={projectId}
-            runId={runId}
-            componentId={search.component}
-            relationshipId={search.relationship}
-            focus={search.focus}
-            historyMode={search.history === true}
-            onSetFocus={setFocus}
-            onSetHistoryMode={setHistoryMode}
-          />
-        }
-      />
+      <main ref={mainRef} aria-labelledby="workspace-title" className="flex min-h-0 flex-1 flex-col">
+        <h1 id="workspace-title" className="sr-only">
+          {t('navigation.headingLabel')} <ReportedText value={projectId} /> · <ReportedText value={runId} />
+        </h1>
+        <WorkspaceLayout
+          left={<RunAgentPane projectId={projectId} runId={runId} />}
+          center={
+            <ArchitecturePane
+              projectId={projectId}
+              runId={runId}
+              viewId={search.view}
+              onSelectView={setView}
+              selectedComponentId={search.component}
+              selectedRelationshipId={search.relationship}
+              onSelectComponent={setSelectedComponent}
+              orientation={search.layout}
+              onOrientationChange={setGraphOrientation}
+              onSelectRelationship={setSelectedRelationship}
+            />
+          }
+          right={
+            <InspectorPane
+              projectId={projectId}
+              runId={runId}
+              componentId={search.component}
+              relationshipId={search.relationship}
+              focus={search.focus}
+              historyMode={search.history === true}
+              onSetFocus={setFocus}
+              onSetHistoryMode={setHistoryMode}
+            />
+          }
+        />
+      </main>
     </>
   )
 }

@@ -6,7 +6,7 @@ import remarkGfm from 'remark-gfm'
 
 import { cn } from '@/lib/utils'
 
-import { feedbackSanitizeSchema } from './sanitizeSchema'
+import { feedbackSanitizeSchema, STRIPPED_TAG_NAMES } from './sanitizeSchema'
 
 /**
  * Renders agent published markdown safely.
@@ -22,7 +22,8 @@ import { feedbackSanitizeSchema } from './sanitizeSchema'
  * 3. `rehype-raw` — parses those `raw` nodes into real elements. This is the
  *    step that makes an attack possible at all, and it exists so that harmless
  *    inline HTML an agent writes (`<b>`, `<br>`, `<details>`) is not silently
- *    dropped.
+ *    dropped. Report heading levels are normalized on this parsed tree before
+ *    it reaches the sanitizer; normalization never changes reported text.
  * 4. `rehype-sanitize` — the allow list of `sanitizeSchema.ts`, applied to the
  *    **HTML tree**, after everything that could produce an element has run. A
  *    plugin added before it would be sanitised; a plugin added after it would
@@ -45,9 +46,34 @@ const REMARK_PLUGINS: MarkdownPlugins = [remarkGfm]
 
 const REHYPE_PLUGINS: MarkdownPlugins = [
   rehypeRaw,
+  rebaseReportHeadings,
   // Must stay last: it is the boundary between untrusted and rendered.
   [rehypeSanitize, feedbackSanitizeSchema],
 ]
+
+interface HeadingTree {
+  type: string
+  tagName?: string
+  children?: HeadingTree[]
+}
+
+/** Normalize reported outlines below their h4 title, including raw HTML. */
+function rebaseReportHeadings() {
+  return (tree: HeadingTree) => {
+    const headings: HeadingTree[] = []
+    const collect = (node: HeadingTree) => {
+      // Content that the final sanitizer drops must not affect the visible outline.
+      if ((STRIPPED_TAG_NAMES as readonly string[]).includes(node.tagName ?? '')) return
+      if (node.type === 'element' && /^h[1-6]$/.test(node.tagName ?? '')) headings.push(node)
+      node.children?.forEach(collect)
+    }
+    collect(tree)
+    const levels = [...new Set(headings.map((node) => Number(node.tagName![1])))].sort((a, b) => a - b)
+    for (const heading of headings) {
+      heading.tagName = `h${Math.min(6, 5 + levels.indexOf(Number(heading.tagName![1])))}`
+    }
+  }
+}
 
 /**
  * Tailwind mapping for the rendered elements.
@@ -57,10 +83,8 @@ const REHYPE_PLUGINS: MarkdownPlugins = [
  * scrolls inside its own box instead of widening the pane.
  */
 const MARKDOWN_COMPONENTS: Components = {
-  h1: (props) => <h3 {...props} className="mt-4 mb-1.5 text-sm font-semibold first:mt-0" />,
-  h2: (props) => <h4 {...props} className="mt-4 mb-1.5 text-sm font-semibold first:mt-0" />,
-  h3: (props) => <h5 {...props} className="mt-3 mb-1 text-xs font-semibold first:mt-0" />,
-  h4: (props) => <h6 {...props} className="mt-3 mb-1 text-xs font-semibold first:mt-0" />,
+  h5: (props) => <h5 {...props} className="mt-4 mb-1.5 text-sm font-semibold first:mt-0" />,
+  h6: (props) => <h6 {...props} className="mt-3 mb-1 text-xs font-semibold first:mt-0" />,
   p: (props) => <p {...props} className="my-1.5 leading-relaxed" />,
   ul: (props) => <ul {...props} className="my-1.5 list-disc space-y-0.5 pl-5" />,
   ol: (props) => <ol {...props} className="my-1.5 list-decimal space-y-0.5 pl-5" />,

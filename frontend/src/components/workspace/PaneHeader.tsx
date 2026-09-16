@@ -4,6 +4,7 @@ import { cn } from '@/lib/utils'
 
 export interface PaneHeaderProps {
   title: string
+  headingId?: string
   /** Short, neutral subtitle — usually the id the pane is bound to. */
   subtitle?: ReactNode
   actions?: ReactNode
@@ -14,6 +15,7 @@ export interface PaneHeaderProps {
 /** Shared header row of the three panes. Keeps the panes visually identical. */
 export function PaneHeader({
   title,
+  headingId,
   subtitle,
   actions,
   actionsClassName,
@@ -27,7 +29,11 @@ export function PaneHeader({
       )}
     >
       <div className="flex min-w-0 flex-col">
-        <h2 className="pane-heading truncate">{title}</h2>
+        <h2
+          id={headingId}
+          tabIndex={headingId ? -1 : undefined}
+          className="pane-heading focus-visible:outline-ring truncate focus-visible:outline-2"
+        >{title}</h2>
         {subtitle !== undefined && (
           <span className="text-muted-foreground truncate text-xs">{subtitle}</span>
         )}

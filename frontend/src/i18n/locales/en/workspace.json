@@ -25,5 +25,13 @@
     "leftWidthLabel": "Width of the runs and agents pane",
     "rightLabel": "Inspector",
     "rightWidthLabel": "Width of the inspector pane"
+  },
+  "navigation": {
+    "headingLabel": "Workspace",
+    "run-agents": "Skip to runs and agents",
+    "architecture": "Skip to architecture",
+    "label": "Workspace navigation",
+    "inspector": "Skip to inspector",
+    "pageTitle": "Workspace {{projectId}} · Run {{runId}} — Visualise AI"
   }
 }
