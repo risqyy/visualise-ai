@@ -1,4 +1,9 @@
 {
+  "navigation": {
+    "agents": "Agents",
+    "currentPlans": "Aktuelle Pläne",
+    "label": "Navigation im Run"
+  },
   "outcome": {
     "cancelled": "abgebrochen",
     "completed": "abgeschlossen",
@@ -62,6 +67,7 @@
     "textExpand": "{{subject}} von {{agent}} vollständig anzeigen"
   },
   "runState": {
+    "details": "Rundetails",
     "emptyTitle": "Run nicht verfügbar",
     "endLabel": "Ende",
     "noEnd": "kein Ende gemeldet",

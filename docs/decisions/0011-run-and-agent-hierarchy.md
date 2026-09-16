@@ -130,7 +130,10 @@ fold something the user had opened.
 
 ### Plan revisions are shown in full, never replaced
 
-Every revision of every plan is rendered, ascending, with all of its steps.
+Every revision of every plan is rendered with all of its steps. **Updated by
+#117:** the explicitly current revision comes first; earlier revisions retain
+their ascending order. This replaces the original all-ascending presentation
+so the current plan is reached directly without hiding its history.
 Revisions are append-only by contract — a `plan.step_updated` only reaches the
 revision that was current when it was reported — so an earlier revision keeps
 exactly the states it was last seen with. Showing only `currentRevision` would

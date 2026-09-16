@@ -33,6 +33,20 @@ density problem they would solve:
 
 ## Decision
 
+### Run navigation prioritizes reported work and current plans
+
+**Updated by #117:** persistent pane navigation jumps to the agent overview or
+the plans, opens the plan section if needed, and focuses its target heading.
+The current revision of each plan is first; earlier revisions stay fully
+expanded in ascending order. This advances ADR 0011's original all-ascending
+order, using only the explicit current marker, with no inferred quality ranking.
+
+The selected run appears once in the run selector. Its state and reported counts
+stay visible in the summary; timestamps and root identity remain available in
+a native details disclosure. Other run options retain their identifying metadata
+so choosing a historical run remains informed. This reduces duplicated metadata
+without removing reports or changing the historical-run warning.
+
 ### Density follows the agent's own reported status, and no clock is read
 
 A row paints its detail block by default exactly when the agent's last reported

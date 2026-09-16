@@ -427,7 +427,7 @@ describe('reported progress', () => {
 // ---------------------------------------------------------------------------
 
 describe('plan revisions', () => {
-  it('shows every revision in order and keeps revision 1 after revision 2 exists', async () => {
+  it('shows the current revision first and retains every earlier report and step', async () => {
     await renderPane()
 
     const plan = screen.getByTestId('plan-plan-2026-08-04-0001')
@@ -436,7 +436,7 @@ describe('plan revisions', () => {
     const revisionOrder = Array.from(plan.querySelectorAll('[data-revision]')).map((element) =>
       element.getAttribute('data-revision'),
     )
-    expect(revisionOrder).toEqual(['1', '2'])
+    expect(revisionOrder).toEqual(['2', '1'])
 
     // Revision 1 is still there, complete, with the states it was last seen with.
     const first = screen.getByTestId('plan-revision-plan-2026-08-04-0001-1')
@@ -457,6 +457,57 @@ describe('plan revisions', () => {
     expect(
       screen.getByTestId('plan-step-plan-2026-08-04-0001-2-step-rates'),
     ).toBeInTheDocument()
+  })
+})
+
+describe('work and plan navigation', () => {
+  it('jumps by keyboard to agents and reopens collapsed plans without changing the run', async () => {
+    const user = userEvent.setup()
+    const { router } = await renderPane()
+    const scroll = vi.spyOn(HTMLElement.prototype, 'scrollIntoView')
+    const agentsJump = screen.getByTestId('run-jump-agents')
+    act(() => agentsJump.focus())
+    await user.keyboard('{Enter}')
+    await waitFor(() => expect(document.getElementById('run-agents-heading')).toHaveFocus())
+    expect(scroll.mock.instances).toContain(document.getElementById('run-agents-heading'))
+
+    const plansToggle = within(screen.getByTestId('pane-run-agents')).getByRole('button', { name: /^Pläne/, expanded: true })
+    await user.click(plansToggle)
+    expect(plansToggle).toHaveAttribute('aria-expanded', 'false')
+    expect(screen.queryByTestId('plan-revisions')).not.toBeInTheDocument()
+    const plansJump = screen.getByTestId('run-jump-plans')
+    act(() => plansJump.focus())
+    await user.keyboard('{Enter}')
+    await waitFor(() => expect(plansToggle).toHaveAttribute('aria-expanded', 'true'))
+    await waitFor(() => expect(document.getElementById('run-plans-heading')).toHaveFocus())
+    expect(scroll.mock.instances).toContain(document.getElementById('run-plans-heading'))
+    expect(screen.getByTestId('plan-revision-plan-2026-08-04-0001-2')).toBeVisible()
+    expect(screen.getByTestId('plan-revision-plan-2026-08-04-0001-1')).toBeVisible()
+    expect(router.state.location.pathname).toBe(WORKSPACE_URL)
+  })
+
+  it('keeps exact historical metadata behind a local read-only disclosure', async () => {
+    const user = userEvent.setup()
+    const { router } = await renderPane(HISTORICAL_URL)
+    const state = screen.getByTestId('run-state')
+    const summary = within(state).getByText('Rundetails', { selector: 'summary' })
+    const details = summary.closest('details')!
+    const run = historicalRunResponse.run
+    expect(details).not.toHaveAttribute('open')
+    expect(screen.getByTestId('run-openness')).toBeVisible()
+    // Collapsing changes paint only; both exact instants and the root remain.
+    expect(details.querySelector(`time[datetime="${run.startedAt}"]`)).toBeInTheDocument()
+    expect(details.querySelector(`time[datetime="${run.finishedAt}"]`)).toBeInTheDocument()
+    expect(details).toHaveTextContent(run.rootAgentId!)
+    await user.click(summary)
+    expect(details).toHaveAttribute('open')
+    expect(details.querySelector(`time[datetime="${run.startedAt}"]`)).toBeVisible()
+    expect(details.querySelector(`time[datetime="${run.finishedAt}"]`)).toBeVisible()
+    expect(details.querySelectorAll('input, textarea, select')).toHaveLength(0)
+    await user.click(summary)
+    expect(details).not.toHaveAttribute('open')
+    expect(router.state.location.pathname).toBe(HISTORICAL_URL)
+    expect(details).toHaveTextContent(run.rootAgentId!)
   })
 })
 

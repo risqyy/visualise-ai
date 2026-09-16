@@ -186,28 +186,29 @@ function RunLink({
           </Badge>
         )}
       </span>
-      <span className="text-muted-foreground block text-xs">
-        {run.isOpen
-          ? t('runs.openState')
-          : t('runs.finishedState', {
-              outcome: run.outcome ? t(OUTCOME_LABEL_KEY[run.outcome]) : t('runs.noOutcome'),
-            })}
-      </span>
-      <span className="pane-meta text-muted-foreground block">
-        {t('runs.since')} <ReportedTime value={run.startedAt} className="pane-meta" />
-      </span>
-      <span className="text-muted-foreground block text-xs">
-        {/*
-          `RunSummary` carries no agent count — only `RunDetail.counts` does, on
-          a different endpoint. The root agent is what the summary reports.
-        */}
-        {t('runs.rootLabel')}{' '}
-        {run.rootAgentId ? (
-          <ReportedText value={run.rootAgentId} />
-        ) : (
-          t('runs.noRootAgent')
-        )}
-      </span>
+      {!shown && (
+        <>
+          <span className="text-muted-foreground block text-xs">
+            {run.isOpen
+              ? t('runs.openState')
+              : t('runs.finishedState', {
+                  outcome: run.outcome ? t(OUTCOME_LABEL_KEY[run.outcome]) : t('runs.noOutcome'),
+                })}
+          </span>
+          <span className="pane-meta text-muted-foreground block">
+            {t('runs.since')} <ReportedTime value={run.startedAt} className="pane-meta" />
+          </span>
+          <span className="text-muted-foreground block text-xs">
+            {/* RunSummary reports root identity, not the detailed run counts. */}
+            {t('runs.rootLabel')}{' '}
+            {run.rootAgentId ? (
+              <ReportedText value={run.rootAgentId} />
+            ) : (
+              t('runs.noRootAgent')
+            )}
+          </span>
+        </>
+      )}
     </Link>
   )
 }
