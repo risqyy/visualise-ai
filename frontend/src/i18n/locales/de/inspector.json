@@ -1,4 +1,7 @@
 {
+  "navigation": {
+    "label": "Inspector-Inhalte"
+  },
   "change": {
     "emptyDescription": "Für diese Komponente ist in diesem Run keine Änderung angekündigt und noch nicht angewandt.",
     "emptyTitle": "Keine offenen Vorschläge",

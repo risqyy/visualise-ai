@@ -33,6 +33,18 @@ appears *above* what is being read.
 
 ## Decision
 
+### Reported content counts provide direct section navigation
+
+**Updated by #118:** in the selected-run overview, feedback, diff, risk and
+problem counts are navigation buttons beside the component context. They remain
+available outside the scrolling body. Each action scrolls to and focuses the
+section heading, including empty sections, without changing the component, run
+or URL. Counts describe reported entries, not a quality assessment.
+
+All feedback, diffs and findings remain fully readable. History and deep focus
+retain their separate content scopes; the overview navigation is absent while
+its target sections are hidden. Existing deep-focus controls remain available.
+
 ### Agent feedback is untrusted input, and it is sanitised after rendering
 
 Feedback is rendered through a fixed pipeline in
