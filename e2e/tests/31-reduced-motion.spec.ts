@@ -36,10 +36,16 @@ test('reduced motion stops the connection spinner and real tooltip portal while 
   for (const language of ['de', 'en'] as const) {
     await page.emulateMedia({ reducedMotion: 'no-preference' })
     let rejectedStreams = 0
+    let releaseRetries: () => void = () => undefined
+    const retryGate = new Promise<void>((resolve) => { releaseRetries = resolve })
     // Only the actual EventSource transport receives the deliberate 503. No
     // REST response or application connection state is replaced by a fixture.
     await page.route(streamMatcher, async (route) => {
       rejectedStreams += 1
+      // One real 503 starts reconnection. Hold later failure responses while
+      // checking its spinner, so a slow CI host cannot race the retry policy's
+      // legitimate offline state (which uses a different, static icon).
+      if (rejectedStreams > 1) await retryGate
       await route.fulfill({ status: 503, contentType: 'text/plain', body: 'Temporary SSE failure for reduced-motion acceptance' })
     })
     try {
@@ -90,7 +96,8 @@ test('reduced motion stops the connection spinner and real tooltip portal while 
       await expect(page.getByTestId('inspector-context')).toHaveAttribute('data-component-id', TAX)
       await expect(page.getByTestId('unified-diff')).toHaveCount(3)
     } finally {
-      await page.unroute(streamMatcher)
+      releaseRetries()
+      await page.unrouteAll({ behavior: 'wait' })
     }
     await expect(page.getByTestId('live-connection-state')).toHaveAttribute('data-state', 'live')
     await expect(page.getByTestId('live-connection-state').locator('svg')).toBeVisible()
