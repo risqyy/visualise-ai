@@ -38,6 +38,7 @@ import {
   type KeyboardEvent as ReactKeyboardEvent,
 } from 'react'
 import { useTranslation } from 'react-i18next'
+import { createPortal } from 'react-dom'
 
 import '@xyflow/react/dist/style.css'
 
@@ -246,6 +247,7 @@ function ArchitectureCanvasInner({
   const graphHasNodeFocusRef = useRef(false)
   const searchInputRef = useRef<HTMLInputElement | null>(null)
   const searchTriggerRef = useRef<HTMLButtonElement | null>(null)
+  const activeSearchResultRef = useRef<HTMLButtonElement | null>(null)
   const wasSearchOpenRef = useRef(false)
   const pendingFocusRef = useRef<ComponentId | null>(null)
   const invalidatePendingSearchFocus = useCallback(() => {
@@ -265,6 +267,11 @@ function ArchitectureCanvasInner({
     }
     wasSearchOpenRef.current = searchOpen
   }, [searchOpen])
+  // aria-activedescendant keeps focus in the input; scroll its active option
+  // explicitly so Enter always chooses a result the user can see.
+  useEffect(() => {
+    if (searchOpen) activeSearchResultRef.current?.scrollIntoView({ block: 'nearest', inline: 'nearest' })
+  }, [searchOpen, effectiveActiveSearchIndex, searchResults])
   const flow = useReactFlow()
   const storeApi = useStoreApi()
 
@@ -1761,14 +1768,22 @@ function ArchitectureCanvasInner({
               )}
               </div>
             </div>
-            {searchOpen && (
+            {/* The canvas clips its contents. Keep search in the viewport even
+                when the toolbar wraps or a side pane enters Deep Focus. */}
+            {searchOpen && createPortal(
               <div
-                className="border-border bg-card text-card-foreground nokey nopan absolute top-full left-0 z-50 mt-1 w-[min(34rem,calc(100vw-2rem))] overflow-hidden rounded-md border shadow-lg"
+                className="border-border bg-card text-card-foreground nokey nopan fixed top-16 left-1/2 z-50 flex max-h-[calc(100dvh-5rem)] w-[min(34rem,calc(100vw-2rem))] -translate-x-1/2 flex-col overflow-hidden rounded-md border shadow-lg"
                 role="dialog"
                 aria-label={t('search.trigger')}
                 data-testid="canvas-component-search-dialog"
+                onKeyDown={(event) => {
+                  if (event.key === 'Escape') {
+                    event.stopPropagation()
+                    closeSearch()
+                  }
+                }}
               >
-                <div className="border-border flex items-center gap-2 border-b p-2">
+                <div className="border-border flex shrink-0 items-center gap-2 border-b p-2">
                   <Search className="text-muted-foreground size-4 shrink-0" aria-hidden="true" />
                   <label htmlFor="canvas-component-search-input" className="sr-only">
                     {t('search.hint')}
@@ -1800,7 +1815,7 @@ function ArchitectureCanvasInner({
                         ? `canvas-component-search-result-${effectiveActiveSearchIndex}`
                         : undefined
                     }
-                    className="min-w-0 flex-1 bg-transparent text-sm outline-none placeholder:text-muted-foreground"
+                    className="focus-visible:ring-ring min-w-0 flex-1 rounded-sm bg-transparent text-sm outline-none placeholder:text-muted-foreground focus-visible:ring-2"
                     data-testid="canvas-component-search-input"
                   />
                   <Button
@@ -1818,7 +1833,7 @@ function ArchitectureCanvasInner({
                 <p
                   id="canvas-component-search-status"
                   data-testid="canvas-component-search-status"
-                  className="text-muted-foreground px-3 py-2 text-xs"
+                  className="text-muted-foreground shrink-0 px-3 py-2 text-xs"
                   role="status"
                   aria-live="polite"
                 >
@@ -1831,7 +1846,7 @@ function ArchitectureCanvasInner({
 
                 {searchQuery.trim() !== '' && searchResults.length > 0 && (
                   <div
-                    className="border-border max-h-72 overflow-y-auto border-t p-1"
+                    className="border-border min-h-0 max-h-72 overflow-y-auto border-t p-1"
                     id="canvas-component-search-results"
                     role="listbox"
                     aria-label={t('search.trigger')}
@@ -1840,6 +1855,7 @@ function ArchitectureCanvasInner({
                     {searchResults.map((entry, index) => (
                       <button
                         key={entry.component.componentId}
+                        ref={index === effectiveActiveSearchIndex ? activeSearchResultRef : null}
                         type="button"
                         id={`canvas-component-search-result-${index}`}
                         role="option"
@@ -1869,7 +1885,8 @@ function ArchitectureCanvasInner({
                     ))}
                   </div>
                 )}
-              </div>
+              </div>,
+              document.body,
             )}
           </Panel>
 
