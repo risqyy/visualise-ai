@@ -287,6 +287,13 @@ test('4 · the pane stays legible and keyboard-operable while it is dense (#39)'
       declaredLength: Number(element.getAttribute('data-full-length')),
       text: element.textContent ?? '',
       lineClamp: getComputedStyle(element).webkitLineClamp,
+      lineHeight: Number.parseFloat(getComputedStyle(element).lineHeight),
+      height: element.getBoundingClientRect().height,
+      overflowing: element.scrollHeight > element.clientHeight + 1 ||
+        element.scrollWidth > element.clientWidth + 1,
+      hasDisclosure: document.querySelector(
+        `[data-testid="${element.getAttribute('data-testid')}-toggle"]`,
+      ) !== null,
     })),
   )
   expect(painted.length).toBe(5)
@@ -297,9 +304,11 @@ test('4 · the pane stays legible and keyboard-operable while it is dense (#39)'
     // shortened, re-worded or replaced by an ellipsis.
     expect(entry.text, `the task of ${entry.agentId} must be quoted verbatim`).toBe(reported)
     expect(entry.declaredLength).toBe(reported?.length)
-    // Clipping is decided by the character budget alone, and paints two lines.
-    const shouldClip = (reported?.length ?? 0) > 90
-    expect(entry.clipped).toBe(shouldClip ? 'true' : 'false')
-    expect(entry.lineClamp).toBe(shouldClip ? '2' : 'none')
+    // Every collapsed task has two lines available; only real overflow needs
+    // disclosure. This also covers short reports in narrow rows (#115).
+    expect(entry.clipped).toBe(entry.overflowing ? 'true' : 'false')
+    expect(entry.hasDisclosure).toBe(entry.overflowing)
+    expect(entry.lineClamp).toBe('2')
+    expect(entry.height).toBeLessThanOrEqual(entry.lineHeight * 2 + 1)
   }
 })
