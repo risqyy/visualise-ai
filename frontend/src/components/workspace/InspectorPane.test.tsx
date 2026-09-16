@@ -427,7 +427,7 @@ describe('inspector — current run and history never mix', () => {
     const { router } = await renderInspector()
 
     const tabs = screen.getByRole('tablist', { name: 'Belegquelle' })
-    expect(within(tabs).getByRole('tab', { name: 'Aktueller Run' })).toHaveAttribute(
+    expect(within(tabs).getByRole('tab', { name: 'Ausgewählter Run' })).toHaveAttribute(
       'aria-selected',
       'true',
     )
@@ -448,7 +448,7 @@ describe('inspector — current run and history never mix', () => {
     })
 
     // …and nothing of the history leaks back.
-    await user.click(within(tabs).getByRole('tab', { name: 'Aktueller Run' }))
+    await user.click(within(tabs).getByRole('tab', { name: 'Ausgewählter Run' }))
     await waitFor(() =>
       expect(screen.getByTestId('inspector-current-run')).toBeInTheDocument(),
     )
@@ -575,7 +575,7 @@ describe('inspector — live updates never disturb the reader', () => {
     // Run context: unchanged, and still the current run rather than history.
     expect(screen.getByTestId('inspector-context')).toHaveAttribute('data-run-id', RUN_ID)
     expect(screen.getByTestId('inspector-current-run')).toBeInTheDocument()
-    expect(screen.getByRole('tab', { name: 'Aktueller Run' })).toHaveAttribute(
+    expect(screen.getByRole('tab', { name: 'Ausgewählter Run' })).toHaveAttribute(
       'aria-selected',
       'true',
     )

@@ -81,7 +81,7 @@ export function LiveConnectionBadge({ className }: { className?: string }) {
               state === 'reconnecting' || state === 'connecting' ? 'animate-spin' : '',
             )}
           />
-          {label}
+          {t('live.label', { state: label })}
         </Badge>
       </TooltipTrigger>
       <TooltipContent className="max-w-xs">

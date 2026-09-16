@@ -1,12 +1,15 @@
 {
   "header": {
     "contextLabel": "Kontext",
-    "projectsLink": "Projekte"
+    "projectsLink": "Projekte",
+    "historicalRun": "Historischer Run",
+    "backToCurrentRun": "Zum aktuellen Run",
+    "temporalScope": "Architektur: letzter geladener Projektstand. Inspector: Belege des ausgewählten Runs."
   },
   "live": {
     "connectingHint": "Die Live-Verbindung wird aufgebaut.",
     "connectingLabel": "verbindet",
-    "label": "Live-Verbindung: {{state}}",
+    "label": "Verbindung: {{state}}",
     "lastPositionLabel": "Zuletzt verarbeitete Position:",
     "liveHint": "Ereignisse treffen in Echtzeit ein.",
     "liveLabel": "live",
