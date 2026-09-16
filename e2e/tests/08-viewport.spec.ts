@@ -43,6 +43,8 @@ test('8 · the page has no horizontal scrollbar and every primary control is ope
   )
 
   // ---- the mandatory acceptance resolution --------------------------------
+  await page.getByTestId('canvas-toggle-tools').click()
+  await expect(page.getByTestId('canvas-toggle-tools')).toHaveAttribute('aria-expanded', 'true')
   const geometry = await page.evaluate(() => ({
     innerWidth: window.innerWidth,
     innerHeight: window.innerHeight,

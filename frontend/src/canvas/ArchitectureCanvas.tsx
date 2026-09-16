@@ -23,6 +23,7 @@ import {
   Maximize2,
   RotateCcw,
   Search,
+  Settings2,
   TriangleAlert,
 } from 'lucide-react'
 import type { TFunction } from 'i18next'
@@ -239,6 +240,7 @@ function ArchitectureCanvasInner({
     [model.components, model.overlay?.extraComponents],
   )
   const [searchOpen, setSearchOpen] = useState(false)
+  const [toolsOpen, setToolsOpen] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
   const [activeSearchIndex, setActiveSearchIndex] = useState(0)
   // The graph is a composite widget: one visible node owns the Tab entry and
@@ -550,7 +552,7 @@ function ArchitectureCanvasInner({
       const sizeChanged = width !== pending.before.width || height !== pending.before.height
       const measuredByReactFlow =
         width >= MIN_FIT_VIEWPORT && height >= MIN_FIT_VIEWPORT
-      const domRect = surfaceRef.current?.getBoundingClientRect()
+      const domRect = surfaceRef.current?.querySelector('.react-flow')?.getBoundingClientRect()
       const hasBrowserLayout = Boolean(domRect && domRect.width > 0 && domRect.height > 0)
       const canWaitForBrowserResize =
         typeof window.requestAnimationFrame === 'function' && hasBrowserLayout
@@ -1423,7 +1425,7 @@ function ArchitectureCanvasInner({
   return (
     <div
       ref={surfaceRef}
-      className="relative h-full w-full min-w-0"
+      className="relative flex h-full w-full min-h-0 min-w-0 flex-col"
       onFocusCapture={onSurfaceFocusCapture}
       onBlurCapture={onSurfaceBlurCapture}
       onKeyDownCapture={onSurfaceKeyDownCapture}
@@ -1454,99 +1456,29 @@ function ArchitectureCanvasInner({
         {t('graph.instructions')}
       </p>
       <CanvasNodeActionsContext value={nodeActions}>
-        <ReactFlow
-          nodes={nodes}
-          edges={edges}
-          nodeTypes={NODE_TYPES}
-          edgeTypes={EDGE_TYPES}
-          defaultViewport={initialViewport}
-          minZoom={MIN_ZOOM}
-          maxZoom={MAX_ZOOM}
-          onNodeClick={onNodeClick}
-          onEdgeClick={onEdgeClick}
-          onNodeDragStop={onNodeDragStop}
-          onMoveStart={onMoveStart}
-          onMove={onMove}
-          onMoveEnd={onMoveEnd}
-          nodesDraggable
-          nodesConnectable={false}
-          edgesFocusable
-          edgesReconnectable={false}
-          elementsSelectable
-          // Selection is owned by the URL, so React Flow must not manage its own.
-          selectNodesOnDrag={false}
-          multiSelectionKeyCode={null}
-          deleteKeyCode={null}
-          proOptions={{ hideAttribution: false }}
-          attributionPosition="bottom-left"
-          className="bg-canvas"
-          // Keyboard focus may bring a node that sits outside the viewport into
-          // view. That is a deliberate exception and the only one: it is
-          // requested by the user's own Tab press, it keeps the zoom, and it is
-          // not a `fitView` — `data-fit-view-count` does not move (ADR 0018).
-          autoPanOnNodeFocus
-          ariaLabelConfig={ariaLabelConfig}
-          aria-label={t('graph.label')}
-          aria-describedby={instructionsId}
-        >
-          <Background
-            variant={BackgroundVariant.Dots}
-            gap={28}
-            size={1}
-            color="var(--canvas-grid)"
-          />
-          <Controls
-            showInteractive={false}
-            // The built-in fit control is replaced by "Einpassen" in the toolbar,
-            // which goes through the camera policy instead of around it.
-            showFitView={false}
-            position="bottom-right"
-            className="!border-border !bg-card/90 !shadow-none [&>button]:!border-border [&>button]:!bg-card [&>button]:!fill-current [&>button]:!text-foreground"
-          />
-          {minimapVisible && (
-            <MiniMap
-              position="top-right"
-              pannable
-              zoomable
-              ariaLabel={t('graph.minimapLabel')}
-              className="!border-border !bg-card/80 !m-2 !rounded-md !border"
-              style={{ width: 168, height: 112 }}
-              maskColor="color-mix(in oklab, var(--background) 72%, transparent)"
-              nodeColor={(node) =>
-                node.type === COMPOUND_NODE_TYPE
-                  ? 'var(--graphite-700)'
-                  : 'var(--graphite-400)'
-              }
-              nodeStrokeWidth={0}
-            />
-          )}
-
-          <Panel position="top-left" className="!m-2">
-            {/* Wraps rather than overflows: the centre pane can be resized down
-                to a few hundred pixels, and a toolbar that runs past its edge
-                takes its own controls out of reach. */}
-            <div
-              className={`canvas-toolbar architecture-toolbar ${minimapVisible ? '' : 'architecture-toolbar-full'} border-border bg-card/90 nopan nodrag flex min-w-0 flex-wrap items-center gap-1 rounded-md border px-1 py-1 backdrop-blur-sm`}
-            >
-              <div
-                className="flex min-w-0 flex-wrap items-center gap-1"
-                role="group"
-                aria-label={t('tool.primaryActions')}
-                data-testid="canvas-primary-actions"
-              >
+        {/* Real layout space keeps every camera path, including React Flow's
+            keyboard auto-pan, inside the unobstructed drawing surface. */}
+        <div className="canvas-toolbar architecture-toolbar border-border bg-card flex min-w-0 shrink-0 items-center gap-1 border-b p-1">
+          <div
+            className="flex min-w-0 flex-1 items-center gap-1"
+            role="group"
+            aria-label={t('tool.primaryActions')}
+            data-testid="canvas-primary-actions"
+          >
               <Button
                 ref={searchTriggerRef}
                 variant="ghost"
                 size="sm"
-                className="canvas-toolbar-action h-7 gap-1.5 px-2 text-xs"
+                className="canvas-toolbar-action h-7 min-w-0 shrink gap-1.5 px-2 text-xs"
                 aria-haspopup="dialog"
                 aria-expanded={searchOpen}
                 aria-keyshortcuts="/ Control+K Meta+K"
+                title={t('search.trigger')}
                 onClick={openSearch}
                 data-testid="canvas-component-search"
               >
                 <Search aria-hidden="true" />
-                {t('search.trigger')}
+                <span className="truncate">{t('search.trigger')}</span>
               </Button>
 
               {selectionNeedsJump && selectedComponentId && (
@@ -1560,7 +1492,7 @@ function ArchitectureCanvasInner({
                       data-testid="canvas-jump-to-selection"
                     >
                       <MapPinOff aria-hidden="true" />
-                      {t('search.jumpToSelection')}
+                      <span className="sr-only">{t('search.jumpToSelection')}</span>
                     </Button>
                   </TooltipTrigger>
                   <TooltipContent className="max-w-80">
@@ -1579,7 +1511,7 @@ function ArchitectureCanvasInner({
                     data-testid="canvas-fit-view"
                   >
                     <Maximize2 aria-hidden="true" />
-                    {t(DISCLOSURE_LABEL_KEYS.fitWholeModel)}
+                    <span className="sr-only">{t(DISCLOSURE_LABEL_KEYS.fitWholeModel)}</span>
                   </Button>
                 </TooltipTrigger>
                 <TooltipContent className="max-w-80">
@@ -1598,7 +1530,7 @@ function ArchitectureCanvasInner({
                       data-testid="canvas-back-to-overview"
                     >
                       <Layers2 aria-hidden="true" />
-                      {t(DISCLOSURE_LABEL_KEYS.backToOverview)}
+                      <span className="sr-only">{t(DISCLOSURE_LABEL_KEYS.backToOverview)}</span>
                     </Button>
                   </TooltipTrigger>
                   <TooltipContent className="max-w-80">
@@ -1618,7 +1550,7 @@ function ArchitectureCanvasInner({
                       data-testid="canvas-reset-positions"
                     >
                       <RotateCcw aria-hidden="true" />
-                      {t('tool.resetPositions')}
+                      <span className="sr-only">{t('tool.resetPositions')}</span>
                     </Button>
                   </TooltipTrigger>
                   <TooltipContent>{t('tool.resetPositionsHint')}</TooltipContent>
@@ -1630,13 +1562,13 @@ function ArchitectureCanvasInner({
                   <Button
                     variant={architectureFocus ? 'secondary' : 'ghost'}
                     size="sm"
-                    className="h-7 gap-1.5 px-2 text-xs"
+                    className="canvas-toolbar-action h-7 gap-1.5 px-2 text-xs"
                     onClick={toggleArchitectureFocus}
                     aria-pressed={architectureFocus}
                     data-testid="canvas-toggle-architecture-focus"
                   >
                     <Focus aria-hidden="true" />
-                    {t(architectureFocus ? 'tool.exitArchitectureFocus' : 'tool.focusArchitecture')}
+                    <span className="sr-only">{t(architectureFocus ? 'tool.exitArchitectureFocus' : 'tool.focusArchitecture')}</span>
                   </Button>
                 </TooltipTrigger>
                 <TooltipContent className="max-w-80">
@@ -1647,10 +1579,38 @@ function ArchitectureCanvasInner({
                   )}
                 </TooltipContent>
               </Tooltip>
-              </div>
-
+              <Button
+                variant={toolsOpen ? 'secondary' : 'ghost'}
+                size="sm"
+                className="canvas-toolbar-action h-7 gap-1.5 px-2 text-xs"
+                aria-expanded={toolsOpen}
+                aria-controls="canvas-tools-dock"
+                title={t('tool.moreTools')}
+                onClick={() => setToolsOpen((open) => !open)}
+                data-testid="canvas-toggle-tools"
+              >
+                <Settings2 aria-hidden="true" />
+                <span className="sr-only">{t('tool.moreTools')}</span>
+              </Button>
+          </div>
+          <Controls
+            showInteractive={false}
+            // The built-in fit control is replaced by "Einpassen" in the toolbar,
+            // which goes through the camera policy instead of around it.
+            showFitView={false}
+            orientation="horizontal"
+            style={{ position: 'static', margin: 0 }}
+            className="!border-border !bg-card/90 !shadow-none [&>button]:!border-border [&>button]:!bg-card [&>button]:!fill-current [&>button]:!text-foreground"
+          />
+        </div>
+        {toolsOpen && (
+          <div
+            id="canvas-tools-dock"
+            data-testid="canvas-tools-dock"
+            className="border-border bg-card flex h-32 min-h-0 shrink items-start gap-2 overflow-auto border-b p-1"
+          >
               <div
-                className="flex min-w-0 flex-wrap items-center gap-1"
+                className="flex max-h-full min-w-0 flex-1 flex-wrap items-center gap-1 overflow-auto"
                 role="group"
                 aria-label={t('tool.secondaryInfo')}
                 data-testid="canvas-secondary-info"
@@ -1767,7 +1727,28 @@ function ArchitectureCanvasInner({
                 </Tooltip>
               )}
               </div>
-            </div>
+            {minimapVisible && (
+              <MiniMap
+              position="top-right"
+              pannable
+              zoomable
+              ariaLabel={t('graph.minimapLabel')}
+              className="!border-border !bg-card shrink-0 !rounded-md !border"
+              style={{
+                position: 'relative', top: 'auto', right: 'auto', bottom: 'auto',
+                left: 'auto', margin: 0, width: 168, height: 112,
+              }}
+              maskColor="color-mix(in oklab, var(--background) 72%, transparent)"
+              nodeColor={(node) =>
+                node.type === COMPOUND_NODE_TYPE
+                  ? 'var(--graphite-700)'
+                  : 'var(--graphite-400)'
+              }
+              nodeStrokeWidth={0}
+              />
+            )}
+          </div>
+        )}
             {/* The canvas clips its contents. Keep search in the viewport even
                 when the toolbar wraps or a side pane enters Deep Focus. */}
             {searchOpen && createPortal(
@@ -1888,7 +1869,49 @@ function ArchitectureCanvasInner({
               </div>,
               document.body,
             )}
-          </Panel>
+        <div className="relative min-h-[15rem] flex-1" data-testid="canvas-drawing-surface">
+        <ReactFlow
+          nodes={nodes}
+          edges={edges}
+          nodeTypes={NODE_TYPES}
+          edgeTypes={EDGE_TYPES}
+          defaultViewport={initialViewport}
+          minZoom={MIN_ZOOM}
+          maxZoom={MAX_ZOOM}
+          onNodeClick={onNodeClick}
+          onEdgeClick={onEdgeClick}
+          onNodeDragStop={onNodeDragStop}
+          onMoveStart={onMoveStart}
+          onMove={onMove}
+          onMoveEnd={onMoveEnd}
+          nodesDraggable
+          nodesConnectable={false}
+          edgesFocusable
+          edgesReconnectable={false}
+          elementsSelectable
+          // Selection is owned by the URL, so React Flow must not manage its own.
+          selectNodesOnDrag={false}
+          multiSelectionKeyCode={null}
+          deleteKeyCode={null}
+          proOptions={{ hideAttribution: false }}
+          attributionPosition="bottom-left"
+          className="bg-canvas"
+          // Keyboard focus may bring a node that sits outside the viewport into
+          // view. That is a deliberate exception and the only one: it is
+          // requested by the user's own Tab press, it keeps the zoom, and it is
+          // not a `fitView` — `data-fit-view-count` does not move (ADR 0018).
+          autoPanOnNodeFocus
+          ariaLabelConfig={ariaLabelConfig}
+          aria-label={t('graph.label')}
+          aria-describedby={instructionsId}
+        >
+          <Background
+            variant={BackgroundVariant.Dots}
+            gap={28}
+            size={1}
+            color="var(--canvas-grid)"
+          />
+
 
           {graph.isRelayouting && (
             <Panel position="top-center" className="!m-2">
@@ -1902,6 +1925,7 @@ function ArchitectureCanvasInner({
             </Panel>
           )}
         </ReactFlow>
+        </div>
       </CanvasNodeActionsContext>
     </div>
   )

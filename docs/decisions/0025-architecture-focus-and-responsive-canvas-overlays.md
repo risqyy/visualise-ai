@@ -5,6 +5,10 @@
 - **Context issue:** #58
 - **Builds on:** [0003 — Frontend state split and live updates](./0003-frontend-state-split-and-live-updates.md), [0015 — Desktop viewport and absolute pane minimums](./0015-desktop-viewport-and-absolute-pane-minimums.md), [0024 — Readable semantic zoom levels](./0024-readable-semantic-zoom-levels.md)
 
+The overlay placement below is superseded by
+[0041 — Unobstructed canvas viewport](./0041-unobstructed-canvas-viewport.md).
+The architecture-focus behavior and restoration policy remain in force.
+
 ## Decision
 
 The canvas toolbar exposes one explicit **Architecture focus** action. Entering

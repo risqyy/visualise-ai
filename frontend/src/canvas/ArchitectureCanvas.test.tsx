@@ -793,6 +793,8 @@ describe('architecture canvas — selection', () => {
       ).not.toBeNull()
       expect(canvas).toHaveAttribute('data-fit-view-count', '1')
 
+      await user.click(screen.getByTestId('canvas-toggle-tools'))
+      expect(screen.getByTestId('canvas-toggle-tools')).toHaveAttribute('aria-expanded', 'true')
       await user.click(screen.getByTestId('canvas-layout-top-down'))
       await waitFor(() =>
         expect(canvas).toHaveAttribute('data-layout-orientation', 'top-down'),
@@ -824,6 +826,8 @@ describe('architecture canvas — live updates never move the camera', () => {
         collapsed,
       )
       await waitForCanvas()
+      await user.click(screen.getByTestId('canvas-toggle-tools'))
+      expect(screen.getByTestId('canvas-toggle-tools')).toHaveAttribute('aria-expanded', 'true')
       await user.click(screen.getByTestId('canvas-layout-left-right'))
       await waitFor(() =>
         expect(screen.getByTestId('architecture-canvas')).toHaveAttribute(
@@ -844,6 +848,8 @@ describe('architecture canvas — live updates never move the camera', () => {
 
       const rendered = renderCanvas(WORKSPACE_URL, nestedArchitectureResponse, collapsed)
       await waitForCanvas()
+      await user.click(screen.getByTestId('canvas-toggle-tools'))
+      expect(screen.getByTestId('canvas-toggle-tools')).toHaveAttribute('aria-expanded', 'true')
       await user.click(screen.getByTestId('canvas-component-search'))
       const input = screen.getByTestId('canvas-component-search-input')
       input.focus()

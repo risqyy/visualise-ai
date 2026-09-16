@@ -114,6 +114,8 @@ test('2 · top-down is the default and both orientations are shareable at accept
       await expect(disclosure).toHaveAttribute('aria-expanded', 'true')
     }
 
+    await page.getByTestId('canvas-toggle-tools').click()
+    await expect(page.getByTestId('canvas-toggle-tools')).toHaveAttribute('aria-expanded', 'true')
     await page.getByTestId('canvas-layout-left-right').click()
     await expect(canvas).toHaveAttribute('data-layout-orientation', 'left-right')
     await expect(canvas).toHaveAttribute('data-layouting', 'false')

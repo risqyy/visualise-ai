@@ -223,13 +223,13 @@
 
 .canvas-flow-hit-area:not(:disabled):hover,
 .canvas-toolbar-action:not(:disabled):hover,
-.react-flow .react-flow__controls-button:not(:disabled):hover {
+[data-testid='architecture-canvas'] .react-flow__controls-button:not(:disabled):hover {
   box-shadow: inset 0 0 0 1px color-mix(in oklab, var(--foreground) 35%, transparent);
 }
 
 .canvas-flow-hit-area:not(:disabled):active,
 .canvas-toolbar-action:not(:disabled):active,
-.react-flow .react-flow__controls-button:not(:disabled):active {
+[data-testid='architecture-canvas'] .react-flow__controls-button:not(:disabled):active {
   background-color: color-mix(in oklab, var(--accent) 85%, var(--foreground));
   color: var(--accent-foreground);
   box-shadow: inset 0 0 0 2px color-mix(in oklab, var(--foreground) 45%, transparent);
@@ -237,7 +237,7 @@
 
 .canvas-flow-hit-area:disabled,
 .canvas-toolbar-action:disabled,
-.react-flow .react-flow__controls-button:disabled {
+[data-testid='architecture-canvas'] .react-flow__controls-button:disabled {
   cursor: not-allowed;
   opacity: 0.5;
 }
@@ -257,14 +257,14 @@
   color: var(--accent-foreground);
 }
 
-.react-flow .react-flow__controls {
+[data-testid='architecture-canvas'] .react-flow__controls {
   gap: 0.5rem;
   border: 0;
   background: transparent;
   box-shadow: none;
 }
 
-.react-flow .react-flow__controls-button {
+[data-testid='architecture-canvas'] .react-flow__controls-button {
   width: var(--vai-hit-area-size);
   height: var(--vai-hit-area-size);
   min-width: var(--vai-hit-area-size);
@@ -299,15 +299,10 @@
 }
 
 @layer components {
-  /* Keep the top-left action cluster out of the minimap's fixed top-right
-     footprint. The toolbar wraps inside this gutter at the supported desktop
-     widths, so every button remains reachable without covering the map. */
+  /* Canvas controls own layout space above the drawing viewport. */
   .architecture-toolbar {
-    max-width: calc(100% - 12rem);
-  }
-
-  .architecture-toolbar-full {
-    max-width: 100%;
+    width: 100%;
+    height: calc(var(--vai-hit-area-size) + 9px);
   }
 
   /* Shared surface for the three panes. */

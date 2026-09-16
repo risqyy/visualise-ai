@@ -19,6 +19,7 @@ const BROWSER_GEOMETRY_TOLERANCE = 0.01
 const CANVAS_URL = `/projects/${MAIN_PROJECT}/runs/${MAIN_RUN}`
 
 const TOOLBAR_ACTIONS = [
+  '[data-testid="canvas-toggle-tools"]',
   '[data-testid="canvas-component-search"]',
   '[data-testid="canvas-fit-view"]',
   '[data-testid="canvas-layout-top-down"]',
@@ -32,6 +33,8 @@ async function openCanvas(page: Page): Promise<void> {
     'data-layouting',
     'false',
   )
+  await page.getByTestId('canvas-toggle-tools').click()
+  await expect(page.getByTestId('canvas-toggle-tools')).toHaveAttribute('aria-expanded', 'true')
   await showWholeModel(page)
 }
 
@@ -80,7 +83,7 @@ async function firstCanvasViewportTarget(
 ): Promise<Locator> {
   const targets = page.locator(selector)
   const index = await targets.evaluateAll((elements) => {
-    const canvas = document.querySelector('[data-testid="architecture-canvas"]')
+    const canvas = document.querySelector('[data-testid="architecture-canvas"] .react-flow')
     if (!canvas) return -1
     const canvasBox = canvas.getBoundingClientRect()
     return elements.findIndex((element) => {

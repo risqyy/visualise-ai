@@ -42,6 +42,8 @@ describe('native saved views in the workspace', () => {
     const app = renderApp(`/projects/${PROJECT_ID}/runs/${RUN_ID}?view=all%2Fview`, { fetchImpl: fetch.fetchImpl })
     await settled('2')
     await waitFor(() => expect(useUiStore.getState().cameraInitialized).toBe(true))
+    await userEvent.click(screen.getByTestId('canvas-toggle-tools'))
+    expect(screen.getByTestId('canvas-toggle-tools')).toHaveAttribute('aria-expanded', 'true')
     await userEvent.click(screen.getByTestId('canvas-layout-left-right'))
     await settled('2')
     await waitFor(() => expect(screen.getByTestId('architecture-canvas')).toHaveAttribute('data-layout-orientation', 'left-right'))
