@@ -9,6 +9,8 @@ pane visibility. When the selected run differs from the server's current run,
 it shows a persistent historical-run notice and an explicit link back. A newer
 run arriving through the live stream updates this notice without navigating or
 changing the user's selection. The run list is not used to infer recency.
+Root `agent.started` events refresh the run list/current alias and project detail,
+matching `context.opened`; child starts retain their narrow agent-list refresh.
 
 Inspector evidence is labelled "Selected run", including its entries in the
 cross-run history. Connection status explicitly names the connection. The

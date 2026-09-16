@@ -90,7 +90,7 @@ for (const language of ['de', 'en'] as const) {
     await page.screenshot({ path: testInfo.outputPath(`historical-collapsed-${language}.png`) })
 
     await leftToggle.click()
-    await page.getByTestId('inspector-diffs').getByRole('button', { name: 'Deep Focus', exact: true }).click()
+    await page.getByTestId('inspector-diffs').getByRole('button', { name: language === 'de' ? 'Deep Focus' : 'Deep focus', exact: true }).click()
     await expect(page.getByTestId('deep-focus-banner')).toBeVisible()
     await expect(page.getByTestId('pane-rail-left')).toBeVisible()
     await expect(page.getByTestId('inspector-context')).toHaveAttribute('data-run-id', FIRST_RUN)
