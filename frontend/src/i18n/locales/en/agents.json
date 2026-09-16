@@ -1,4 +1,9 @@
 {
+  "navigation": {
+    "agents": "Agents",
+    "currentPlans": "Current plans",
+    "label": "Run navigation"
+  },
   "outcome": {
     "cancelled": "cancelled",
     "completed": "completed",
@@ -62,6 +67,7 @@
     "textExpand": "Show the {{subject}} of {{agent}} in full"
   },
   "runState": {
+    "details": "Run details",
     "emptyTitle": "Run not available",
     "endLabel": "End",
     "noEnd": "no end reported",

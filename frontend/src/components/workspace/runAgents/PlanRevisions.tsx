@@ -22,7 +22,8 @@ export interface PlanRevisionsProps {
  * Revisions are append-only by contract: a `plan.step_updated` only reaches the
  * revision that was current when it was reported, so an earlier revision keeps
  * exactly the step states it was last seen with. The pane renders that literally
- * — all revisions, ascending, each with all of its steps. Showing only the
+ * — the current revision first, then earlier revisions ascending, each with all
+ * of its steps (#117). Showing only the
  * current revision would make a re-plan invisible, and a re-plan is one of the
  * things a reviewer most needs to see.
  *
@@ -57,7 +58,10 @@ export function PlanRevisions({ plans }: PlanRevisionsProps) {
             className="divide-border divide-y"
           >
             {[...plan.revisions]
-              .sort((left, right) => left.revision - right.revision)
+              .sort((left, right) =>
+                Number(right.isCurrent) - Number(left.isCurrent) ||
+                left.revision - right.revision,
+              )
               .map((revision) => (
                 <PlanRevisionEntry
                   key={revision.revision}

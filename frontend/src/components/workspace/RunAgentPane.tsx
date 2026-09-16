@@ -1,5 +1,5 @@
 import { ChevronRight } from 'lucide-react'
-import { useState, type ReactNode } from 'react'
+import { useLayoutEffect, useRef, useState, type ReactNode, type Ref } from 'react'
 import { useTranslation } from 'react-i18next'
 
 import { useCurrentRun } from '@/api/currentRun'
@@ -65,6 +65,22 @@ export function RunAgentPane({ projectId, runId }: RunAgentPaneProps) {
   // at the run, not the run. Keeping it in component state is also what makes a
   // live refetch harmless — the query cache changes, this value does not.
   const [selectedAgentId, setSelectedAgentId] = useState<AgentId | null>(null)
+  const [plansOpen, setPlansOpen] = useState(true)
+  const [navigationRequest, setNavigationRequest] = useState<{
+    target: 'agents' | 'plans'
+  } | null>(null)
+  const agentsHeading = useRef<HTMLHeadingElement>(null)
+  const plansHeading = useRef<HTMLHeadingElement>(null)
+
+  // A fresh request also handles repeated jumps. Scroll after React has opened
+  // the plan disclosure, so its expanded height participates in the scroll range.
+  useLayoutEffect(() => {
+    if (navigationRequest === null) return
+    const heading =
+      navigationRequest.target === 'agents' ? agentsHeading.current : plansHeading.current
+    heading?.scrollIntoView({ block: 'start' })
+    heading?.focus({ preventScroll: true })
+  }, [navigationRequest])
 
   const runList: RunSummary[] = runs.data?.pages.flatMap((page) => page.runs) ?? []
   const agentList = agents.data?.agents ?? []
@@ -78,6 +94,31 @@ export function RunAgentPane({ projectId, runId }: RunAgentPaneProps) {
       data-run-id={runId}
     >
       <PaneHeader title={t('pane.title')} subtitle={<ReportedText value={projectId} />} />
+
+      <nav
+        aria-label={t('navigation.label')}
+        className="border-border flex shrink-0 gap-1 border-b px-3 py-1"
+      >
+        <Button
+          variant="ghost"
+          size="sm"
+          data-testid="run-jump-agents"
+          onClick={() => setNavigationRequest({ target: 'agents' })}
+        >
+          {t('navigation.agents')}
+        </Button>
+        <Button
+          variant="ghost"
+          size="sm"
+          data-testid="run-jump-plans"
+          onClick={() => {
+            setPlansOpen(true)
+            setNavigationRequest({ target: 'plans' })
+          }}
+        >
+          {t('navigation.currentPlans')}
+        </Button>
+      </nav>
 
       <ScrollArea className="min-h-0 flex-1">
         <div className="space-y-4 p-3">
@@ -117,9 +158,6 @@ export function RunAgentPane({ projectId, runId }: RunAgentPaneProps) {
               >
                 {run.data && (
                   <dl className="space-y-0.5 text-xs">
-                    <Row label={t('runState.runLabel')}>
-                      <ReportedText value={run.data.run.runId} className="pane-meta" />
-                    </Row>
                     <Row label={t('runState.stateLabel')}>
                       <span
                         data-testid="run-openness"
@@ -134,26 +172,39 @@ export function RunAgentPane({ projectId, runId }: RunAgentPaneProps) {
                             })}
                       </span>
                     </Row>
-                    <Row label={t('runState.startLabel')}>
-                      <ReportedTime value={run.data.run.startedAt} className="pane-meta" />
-                    </Row>
-                    <Row label={t('runState.endLabel')}>
-                      {/*
-                        A timestamp is metadata and may be 11 px; "nothing was
-                        reported" is a sentence and is not (#39).
-                      */}
-                      {run.data.run.finishedAt ? (
-                        <ReportedTime value={run.data.run.finishedAt} className="pane-meta" />
-                      ) : (
-                        <span className="text-muted-foreground">{t('runState.noEnd')}</span>
-                      )}
-                    </Row>
                     <Row label={t('runState.scopeLabel')}>
                       {tCommon('count.agent', { count: run.data.run.counts.agents })} ·{' '}
                       {tCommon('count.plan', { count: run.data.run.counts.plans })} ·{' '}
                       {tCommon('count.workStep', { count: run.data.run.counts.workSteps })}
                     </Row>
                   </dl>
+                )}
+                {run.data && (
+                  <details className="mt-1 text-xs" data-testid="run-metadata">
+                    <summary className="focus-visible:ring-ring cursor-pointer rounded-sm py-1 focus-visible:ring-2 focus-visible:outline-none">
+                      {t('runState.details')}
+                    </summary>
+                    <dl className="space-y-0.5 pt-1">
+                      <Row label={t('runState.startLabel')}>
+                        <ReportedTime value={run.data.run.startedAt} className="pane-meta" />
+                      </Row>
+                      <Row label={t('runState.endLabel')}>
+                        {/* A timestamp is metadata; an absence label is a sentence. */}
+                        {run.data.run.finishedAt ? (
+                          <ReportedTime value={run.data.run.finishedAt} className="pane-meta" />
+                        ) : (
+                          <span className="text-muted-foreground">{t('runState.noEnd')}</span>
+                        )}
+                      </Row>
+                      <Row label={t('runs.rootLabel')}>
+                        {run.data.run.rootAgentId ? (
+                          <ReportedText value={run.data.run.rootAgentId} className="pane-meta" />
+                        ) : (
+                          t('runs.noRootAgent')
+                        )}
+                      </Row>
+                    </dl>
+                  </details>
                 )}
               </AsyncState>
             </div>
@@ -163,7 +214,14 @@ export function RunAgentPane({ projectId, runId }: RunAgentPaneProps) {
 
           <section aria-label={t('tree.label')} data-testid="agent-tree-region">
             <div className="flex items-center justify-between gap-2">
-              <span className="pane-heading">{t('tree.label')}</span>
+              <h3
+                id="run-agents-heading"
+                ref={agentsHeading}
+                tabIndex={-1}
+                className="pane-heading focus-visible:outline-ring focus-visible:outline-2"
+              >
+                {t('tree.label')}
+              </h3>
               {agents.isSuccess && (
                 <Badge variant="outline" className="font-normal">
                   {t('tree.reportedCount', { count: agentList.length })}
@@ -199,6 +257,10 @@ export function RunAgentPane({ projectId, runId }: RunAgentPaneProps) {
           <Section
             title={t('plans.title')}
             count={planList.length > 0 ? `${planList.length}` : null}
+            id="run-plans-heading"
+            headingRef={plansHeading}
+            open={plansOpen}
+            onOpenChange={setPlansOpen}
           >
             <AsyncState
               isPending={plans.isPending}
@@ -224,24 +286,43 @@ function Section({
   title,
   count,
   children,
+  id,
+  headingRef,
+  open,
+  onOpenChange,
 }: {
   title: string
   count: string | null
   children: ReactNode
+  id?: string
+  headingRef?: Ref<HTMLHeadingElement>
+  open?: boolean
+  onOpenChange?: (open: boolean) => void
 }) {
   return (
-    <Collapsible defaultOpen>
+    <Collapsible
+      defaultOpen
+      {...(open === undefined ? {} : { open })}
+      {...(onOpenChange === undefined ? {} : { onOpenChange })}
+    >
       <div className="flex items-center justify-between gap-2">
-        <CollapsibleTrigger asChild>
-          <Button
-            variant="ghost"
-            size="sm"
-            className="h-7 gap-1 px-1.5 [&[data-state=open]>svg]:rotate-90"
-          >
-            <ChevronRight className="size-3.5 transition-transform" aria-hidden="true" />
-            <span className="pane-heading">{title}</span>
-          </Button>
-        </CollapsibleTrigger>
+        <h3
+          id={id}
+          ref={headingRef}
+          tabIndex={headingRef ? -1 : undefined}
+          className="focus-visible:outline-ring focus-visible:outline-2"
+        >
+          <CollapsibleTrigger asChild>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-7 gap-1 px-1.5 [&[data-state=open]>svg]:rotate-90"
+            >
+              <ChevronRight className="size-3.5 transition-transform" aria-hidden="true" />
+              <span className="pane-heading">{title}</span>
+            </Button>
+          </CollapsibleTrigger>
+        </h3>
         {count && <span className="text-muted-foreground text-xs">{count}</span>}
       </div>
       <CollapsibleContent className="pt-1">{children}</CollapsibleContent>
