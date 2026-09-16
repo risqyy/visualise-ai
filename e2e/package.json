@@ -13,6 +13,7 @@
     "@modelcontextprotocol/sdk": "1.30.0",
     "@playwright/test": "^1.62.1",
     "@types/node": "^24.10.0",
+    "axe-core": "^4.13.0",
     "typescript": "~5.9.0"
   }
 }
