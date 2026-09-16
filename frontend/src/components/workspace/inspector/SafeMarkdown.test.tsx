@@ -1,6 +1,9 @@
-import { fireEvent, render, screen } from '@testing-library/react'
+import { fireEvent, render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
+import { I18nextProvider } from 'react-i18next'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+
+import { createI18n } from '@/i18n'
 
 import { SafeMarkdown } from './SafeMarkdown'
 import { feedbackSanitizeSchema, STRIPPED_TAG_NAMES } from './sanitizeSchema'
@@ -270,6 +273,56 @@ describe('SafeMarkdown — sanitisation of untrusted agent markdown', () => {
       ['H5', 'Second sibling'],
       ['H5', 'Later parent'],
     ])
+  })
+})
+
+describe('reported task lists', () => {
+  it.each(['de', 'en'] as const)('exposes status beside each unchanged task in %s without editable controls', async (language) => {
+    const user = userEvent.setup()
+    const i18n = createI18n({ language })
+    render(
+      <I18nextProvider i18n={i18n}>
+        <button>Before report</button>
+        <SafeMarkdown>{'- [x] Document **rounding**\n- [ ] Decide `fallback`'}</SafeMarkdown>
+        <button>After report</button>
+      </I18nextProvider>,
+    )
+    const report = screen.getByTestId('safe-markdown')
+    const tasks = within(report).getAllByRole('listitem')
+    expect(tasks.map((task) => task.textContent?.trim())).toEqual(['Document rounding', 'Decide fallback'])
+    for (const [index, state] of (language === 'de' ? ['Erledigt', 'Offen'] : ['Completed', 'Open']).entries()) {
+      const icon = within(tasks[index]!).getByRole('img', { name: state })
+      expect(tasks[index]!.firstElementChild).toBe(icon)
+      expect(icon.querySelector('svg')).toHaveAttribute('aria-hidden', 'true')
+      await user.click(icon)
+      expect(icon).toHaveAccessibleName(state)
+    }
+    expect(report.querySelector('input, button, [role="checkbox"], [tabindex]')).toBeNull()
+    await user.tab()
+    expect(screen.getByRole('button', { name: 'Before report' })).toHaveFocus()
+    await user.tab()
+    expect(screen.getByRole('button', { name: 'After report' })).toHaveFocus()
+    expect(report.querySelector('strong')).toHaveTextContent('rounding')
+    expect(report.querySelector('code')).toHaveTextContent('fallback')
+  })
+
+  it('keeps nested and loose task statuses in reported reading order', () => {
+    renderMarkdown('- [x] Parent\n\n  More parent evidence.\n\n  - [ ] Child\n\n- [ ] Sibling')
+    const report = screen.getByTestId('safe-markdown')
+    expect(within(report).getAllByRole('img').map((icon) => icon.getAttribute('aria-label'))).toEqual(['Erledigt', 'Offen', 'Offen'])
+    expect(report.textContent?.replace(/\s+/g, ' ').trim()).toBe('Parent More parent evidence. Child Sibling')
+    expect(report.querySelectorAll('li')).toHaveLength(3)
+    expect(report.querySelector('input, [role="checkbox"]')).toBeNull()
+  })
+
+  it('strips hostile task attributes and raw SVG while rendering only trusted status icons', () => {
+    const container = renderMarkdown('- [x] Safe task\n\n<svg onload="globalThis.__xssMarkers.push(\'task\')"><text>Hostile SVG</text></svg>\n\n<input type="checkbox" checked onclick="globalThis.__xssMarkers.push(\'input\')" aria-label="Forged state" tabindex="0">')
+    expect(container.querySelectorAll('[data-testid="reported-task-state"] > svg')).toHaveLength(2)
+    expect(container.querySelectorAll('svg')).toHaveLength(2)
+    expect(container.textContent).not.toContain('Hostile SVG')
+    expect(container.querySelector('input, [onclick], [onload], [tabindex], [aria-label="Forged state"]')).toBeNull()
+    for (const icon of screen.getAllByRole('img', { name: 'Erledigt' })) fireEvent.click(icon)
+    expect(markers()).toEqual([])
   })
 })
 

@@ -1,4 +1,8 @@
 {
+  "taskList": {
+    "completed": "Completed",
+    "open": "Open"
+  },
   "navigation": {
     "label": "Inspector contents"
   },

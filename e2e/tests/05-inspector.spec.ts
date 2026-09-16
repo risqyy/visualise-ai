@@ -180,7 +180,10 @@ test('5 · the rendered feedback contains no active element', async ({ page }) =
       for (const element of Array.from(root.querySelectorAll('*'))) {
         elements += 1
         const tag = element.tagName.toLowerCase()
-        if (EXECUTABLE.includes(tag)) executable.push(describe(element))
+        // Task-state icons are trusted renderer output. Raw reported SVG is
+        // still stripped by the sanitizer; all attributes remain audited here.
+        const taskIcon = element.matches('[data-testid="reported-task-state"] > svg[aria-hidden="true"]')
+        if (EXECUTABLE.includes(tag) && !taskIcon) executable.push(describe(element))
 
         for (const attribute of Array.from(element.attributes)) {
           if (attribute.name.toLowerCase().startsWith('on')) handlers.push(describe(element))
