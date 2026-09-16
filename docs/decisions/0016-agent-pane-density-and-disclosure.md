@@ -73,6 +73,13 @@ open when the next report for that agent arrives; a row nobody touched follows
 the report. Nothing about it is persisted — it describes one snapshot of one
 run, not a layout preference (ADR 0003).
 
+**Updated by #116:** activating an agent's name selects the row and explicitly
+opens its details. Repeating that action keeps the details open; the adjacent
+disclosure still toggles them. The name exposes the same expanded state and
+detail association to assistive technology. This gives selection a visible
+reading context and keeps it stable across live reports, without changing the
+selected architecture component or the inspector.
+
 ### Long reports are clipped by CSS, never shortened in code
 
 `ClippedReportedText` renders the complete string and lets CSS `line-clamp` decide how

@@ -146,6 +146,8 @@ export function AgentTreeItem({
         <button
           type="button"
           aria-pressed={selected}
+          aria-expanded={detailOpen}
+          aria-controls={detailId}
           onClick={() => onSelect(agent.agentId)}
           className={cn('min-w-0 flex-1 py-0.5 text-left', CONTROL_FOCUS)}
         >
