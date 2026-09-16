@@ -1,4 +1,4 @@
-import { useId, useState } from 'react'
+import { useId, useLayoutEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
 import { cn } from '@/lib/utils'
@@ -22,20 +22,10 @@ import { cn } from '@/lib/utils'
  * * no substring is ever computed, so there is no code path on which a report
  *   could reach the user altered.
  *
- * The control appears only when the text is long enough to be clipped. That is
- * decided by a character budget rather than by measuring the rendered box: the
- * budget is deterministic, it does not depend on the current pane width, and it
- * is therefore the same in the browser and in a test.
+ * The collapsed text always has a line limit. Its actual overflow determines
+ * whether a disclosure is needed, including after pane or font changes. A
+ * short report in a narrow row can overflow just as a long report can.
  */
-
-/**
- * Characters above which a reported text gets a disclosure control.
- *
- * The left pane is ~346 px wide at the acceptance resolution, which carries
- * roughly 45 characters per line at 12 px. Two clamped lines are therefore
- * around 90 characters — the point from which a text starts being cut off.
- */
-export const CLAMP_CHARS = 90
 
 const CLAMP_CLASS = {
   1: 'line-clamp-1',
@@ -71,25 +61,46 @@ export function ClippedReportedText({
 }: ClippedReportedTextProps) {
   const { t } = useTranslation('agents')
   const [expanded, setExpanded] = useState(false)
+  const [overflowing, setOverflowing] = useState(false)
+  const textRef = useRef<HTMLSpanElement>(null)
   const textId = useId()
 
-  const clampable = text.length > CLAMP_CHARS
-  const clipped = clampable && !expanded
+  useLayoutEffect(() => {
+    const element = textRef.current
+    // Retain the collapse action while expanded. Measure again after the
+    // reader collapses, when the browser paints the line-limited box.
+    if (!element || expanded) return
+    const measure = () => setOverflowing(
+      element.scrollHeight > element.clientHeight + 1 ||
+      element.scrollWidth > element.clientWidth + 1,
+    )
+    measure()
+    const observer = new ResizeObserver(measure)
+    observer.observe(element)
+    document.fonts?.addEventListener('loadingdone', measure)
+    return () => {
+      observer.disconnect()
+      document.fonts?.removeEventListener('loadingdone', measure)
+    }
+  }, [expanded, lines, text])
+
+  const clipped = overflowing && !expanded
 
   return (
     <>
       <span
+        ref={textRef}
         id={textId}
         data-testid={testId}
         data-clipped={clipped ? 'true' : 'false'}
         data-full-length={text.length}
         translate="no"
         data-reported=""
-        className={cn('block', clipped && CLAMP_CLASS[lines])}
+        className={cn('block [overflow-wrap:anywhere]', !expanded && CLAMP_CLASS[lines])}
       >
         {text}
       </span>
-      {clampable && (
+      {(overflowing || expanded) && (
         <button
           type="button"
           aria-expanded={expanded}

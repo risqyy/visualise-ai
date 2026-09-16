@@ -137,6 +137,23 @@ test('8 · content below the fold is reachable inside its own pane, not by scrol
   await expect(page.getByTestId('agent-row-subagent-test-engineer')).toBeVisible()
   await expect(page.getByTestId('diff-groups')).toBeVisible()
 
+  // Build a deliberately overflowing reading state through the real detail
+  // controls. Compact status notes now let the last default row fit in some
+  // browser/font combinations; that is desirable, not a scrolling regression.
+  // Keep the target row compact so it can still fit completely when reached.
+  const runPane = page.getByTestId('pane-run-agents')
+  const detailToggles = runPane.locator('[data-testid^="agent-detail-toggle-"]')
+  expect(await detailToggles.count()).toBeGreaterThan(1)
+  for (const toggle of await detailToggles.all()) {
+    if (await toggle.getAttribute('data-testid') === 'agent-detail-toggle-subagent-test-engineer') continue
+    if (await toggle.getAttribute('aria-expanded') === 'false') await toggle.click()
+    await expect(toggle).toHaveAttribute('aria-expanded', 'true')
+  }
+  const runViewport = runPane.locator('[data-slot="scroll-area-viewport"]')
+  await runViewport.hover()
+  await page.mouse.wheel(0, -10_000)
+  await expect.poll(() => runViewport.evaluate((element) => element.scrollTop)).toBe(0)
+
   // Both side panes have more content than height — otherwise this test would
   // pass without there being anything below a fold.
   const regions = await page.evaluate(() => {
@@ -156,8 +173,8 @@ test('8 · content below the fold is reachable inside its own pane, not by scrol
 
   // The last agent row starts below the fold and is brought into view by
   // scrolling the pane — the page itself stays where it is. It is the last row
-  // rather than the deepest one because the rows are compact by default (#39):
-  // the reviewer now fits above the fold, the run pane still does not.
+  // rather than relying on the default row heights: the preceding detail
+  // controls deliberately created enough content to exercise pane scrolling.
   const before = await page.getByTestId('agent-row-subagent-test-engineer').boundingBox()
   expect(before).not.toBeNull()
   expect(

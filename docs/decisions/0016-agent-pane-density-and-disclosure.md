@@ -75,18 +75,22 @@ run, not a layout preference (ADR 0003).
 
 ### Long reports are clipped by CSS, never shortened in code
 
-`ReportedText` renders the complete string and lets CSS `line-clamp` decide how
+`ClippedReportedText` renders the complete string and lets CSS `line-clamp` decide how
 many lines are painted. No substring is ever computed, so there is no code path
 on which a rewritten report could reach the user. The complete text stays in the
 DOM and in the accessibility tree at all times: it is selectable, copyable,
 findable with the browser's own search and read out in full by a screen reader,
 whether the control was used or not. The control changes the paint.
 
-Whether a control appears at all is decided by a character budget (90) rather
-than by measuring the rendered box. The budget is deterministic, independent of
-the current pane width, and therefore identical in Chromium and in jsdom, which
-is what makes "the full text is still reachable" a testable statement rather
-than a screenshot.
+**Updated by #115:** the collapsed text always has its line limit. Actual
+rendered overflow determines whether a disclosure appears; the former
+90-character budget missed short reports in narrow rows. Resize and font-load
+notifications keep that decision in sync with the available space. Expanded
+reports retain their collapse action, and collapsing measures the text again.
+Status messages occupy the full row below role and status. Browser tests verify
+40-, 80- and 120-character reports at a 260 px pane width; unit tests provide
+explicit geometry because jsdom does not lay out text. Full wording and keyboard
+disclosure remain unchanged.
 
 ### The two progress forms are untouched
 
