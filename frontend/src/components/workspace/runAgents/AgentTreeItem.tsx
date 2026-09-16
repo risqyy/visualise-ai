@@ -187,8 +187,8 @@ export function AgentTreeItem({
       </div>
 
       <div className="space-y-1 pt-0.5 pl-7">
-        <div className="flex min-w-0 flex-wrap items-baseline gap-x-1.5 gap-y-0.5 text-xs">
-          <Badge variant="outline" className="shrink-0 font-normal">
+        <div className="grid min-w-0 grid-cols-[auto_minmax(0,1fr)] items-baseline gap-x-1.5 gap-y-0.5 text-xs">
+          <Badge variant="outline" className="justify-self-start font-normal">
             {t(AGENT_ROLE_LABEL_KEY[agent.role])}
           </Badge>
           {/*
@@ -201,12 +201,12 @@ export function AgentTreeItem({
             data-testid={`agent-status-${agent.agentId}`}
             data-status={agent.status}
             data-work-state={workState}
-            className="flex min-w-0 flex-1 flex-wrap items-baseline gap-x-1.5 gap-y-0.5"
+            className="contents"
           >
             <span className="sr-only">{t('row.statusLabel')}: </span>
             <span
               className={cn(
-                'shrink-0 rounded-sm px-1 py-px',
+                'justify-self-start rounded-sm px-1 py-px',
                 workState === 'ongoing'
                   ? 'bg-secondary text-foreground font-medium'
                   : 'text-muted-foreground',
@@ -218,7 +218,7 @@ export function AgentTreeItem({
               {t(AGENT_STATUS_LABEL_KEY[agent.status])}
             </span>
             {agent.statusNote && (
-              <span className="text-muted-foreground min-w-0 flex-1">
+              <span className="text-muted-foreground col-span-2 min-w-0">
                 <ClippedReportedText
                   text={agent.statusNote}
                   subject={t('row.subjectStatusNote')}

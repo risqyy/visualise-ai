@@ -1,7 +1,7 @@
 import type { QueryClient } from '@tanstack/react-query'
 import { act, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 
 import { applyLiveEvent } from '@/api/useLiveStream'
 import type { AgentListResponse } from '@/api/types'
@@ -466,6 +466,19 @@ describe('plan revisions', () => {
 
 /** Renders the pane against the long-text stress case of #39. */
 function renderLongTaskPane() {
+  // jsdom has no line layout. Supply the measured boxes of this stress fixture
+  // rather than reproducing the retired character-count disclosure rule.
+  const overflowingIds = new Set([
+    'agent-task-orchestrator-root',
+    'agent-task-subagent-backend-api',
+    'agent-status-note-orchestrator-root',
+  ])
+  vi.spyOn(HTMLElement.prototype, 'clientHeight', 'get').mockImplementation(function (this: HTMLElement) {
+    return this.className.includes('line-clamp') ? 32 : 96
+  })
+  vi.spyOn(HTMLElement.prototype, 'scrollHeight', 'get').mockImplementation(function (this: HTMLElement) {
+    return overflowingIds.has(this.dataset.testid ?? '') ? 96 : 20
+  })
   return renderPane(WORKSPACE_URL, { [runPaths.agents]: longTaskAgentsResponse })
 }
 
