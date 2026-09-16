@@ -25,5 +25,13 @@
     "leftWidthLabel": "Breite des Run- und Agent-Bereichs",
     "rightLabel": "Inspector",
     "rightWidthLabel": "Breite des Inspectors"
+  },
+  "navigation": {
+    "headingLabel": "Arbeitsbereich",
+    "run-agents": "Zu Runs und Agents springen",
+    "architecture": "Zur Architektur springen",
+    "label": "Arbeitsbereiche",
+    "inspector": "Zum Inspector springen",
+    "pageTitle": "Arbeitsbereich {{projectId}} · Run {{runId}} — Visualise AI"
   }
 }

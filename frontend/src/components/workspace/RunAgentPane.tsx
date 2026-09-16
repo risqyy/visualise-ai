@@ -93,7 +93,7 @@ export function RunAgentPane({ projectId, runId }: RunAgentPaneProps) {
       data-testid="pane-run-agents"
       data-run-id={runId}
     >
-      <PaneHeader title={t('pane.title')} subtitle={<ReportedText value={projectId} />} />
+      <PaneHeader headingId="workspace-run-agents-heading" title={t('pane.title')} subtitle={<ReportedText value={projectId} />} />
 
       <nav
         aria-label={t('navigation.label')}
@@ -146,7 +146,7 @@ export function RunAgentPane({ projectId, runId }: RunAgentPaneProps) {
           <Separator />
 
           <section aria-label={t('runState.sectionLabel')} data-testid="run-state">
-            <span className="pane-heading">{t('runState.title')}</span>
+            <h3 className="pane-heading">{t('runState.title')}</h3>
             <div className="pt-1">
               <AsyncState
                 isPending={run.isPending}

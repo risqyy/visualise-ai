@@ -125,6 +125,7 @@ export function ArchitecturePane({
       data-testid="pane-architecture"
     >
       <PaneHeader
+        headingId="workspace-architecture-heading"
         title={t('pane.title')}
         subtitle={<ReportedText value={projectId} />}
         // The architecture counters are intentionally allowed to wrap inside

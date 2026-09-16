@@ -196,6 +196,81 @@ describe('SafeMarkdown — sanitisation of untrusted agent markdown', () => {
     expect(container.querySelectorAll('ol > li')).toHaveLength(2)
     expect(container.querySelector('pre')?.textContent).toContain('func For(country string)')
   })
+
+  it('rebases a report starting at level two below its entry title and closes gaps without changing reported text', () => {
+    const container = renderMarkdown([
+      '## Root report heading',
+      '',
+      'Reported text remains complete.',
+      '',
+      '#### Nested heading with a skipped source level',
+      '',
+      '###### Deep report heading',
+      '',
+      '## Another root heading',
+    ].join('\n'))
+    expect(screen.getAllByRole('heading').map((heading) => [heading.tagName, heading.textContent])).toEqual([
+      ['H5', 'Root report heading'],
+      ['H6', 'Nested heading with a skipped source level'],
+      ['H6', 'Deep report heading'],
+      ['H5', 'Another root heading'],
+    ])
+    expect(container.textContent).toContain('Reported text remains complete.')
+    expect(container.querySelector('h1, h2, h3, h4')).toBeNull()
+    expect(screen.getByTestId('safe-markdown')).toHaveAttribute('translate', 'no')
+    expect(screen.getByTestId('safe-markdown')).toHaveAttribute('data-reported')
+  })
+
+  it('rebases raw HTML headings while keeping safe markup and removing executable attributes', () => {
+    const container = renderMarkdown([
+      '<object><h1>Discarded embedded title</h1></object>',
+      '',
+      '<h2 onclick="globalThis.__xssMarkers.push(\'heading\')">Raw <em>reported</em> heading</h2>',
+      '',
+      '<h5>Nested HTML heading</h5>',
+      '',
+      '<script>globalThis.__xssMarkers.push("script")</script>',
+      '',
+      '<p>Unchanged <b>evidence</b>.</p>',
+    ].join('\n'))
+    const root = screen.getByRole('heading', { level: 5, name: 'Raw reported heading' })
+    expect(root.querySelector('em')).toHaveTextContent('reported')
+    expect(screen.getByRole('heading', { level: 6 })).toHaveTextContent('Nested HTML heading')
+    expect(root).not.toHaveAttribute('onclick')
+    fireEvent.click(root)
+    expect(markers()).toEqual([])
+    expect(container.querySelector('script, h1, h2, h3, h4')).toBeNull()
+    expect(container.querySelector('b')).toHaveTextContent('evidence')
+    expect(container.textContent).not.toContain('Discarded embedded title')
+    expect(container.textContent).not.toContain('__xssMarkers')
+  })
+
+  it.each([
+    ['Markdown', '## First\n\n#### First child\n\n# Later parent\n\n### Later child'],
+    ['raw HTML', '<h2>First</h2>\n<h4>First child</h4>\n<h1>Later parent</h1>\n<h3>Later child</h3>'],
+  ])('starts out-of-order %s headings below the report title without a skipped level', (_, body) => {
+    const container = renderMarkdown(body)
+    expect(screen.getAllByRole('heading').map((heading) => [heading.tagName, heading.textContent])).toEqual([
+      ['H5', 'First'],
+      ['H6', 'First child'],
+      ['H5', 'Later parent'],
+      ['H6', 'Later child'],
+    ])
+    expect(container.querySelector('h1, h2, h3, h4')).toBeNull()
+    expect(markers()).toEqual([])
+  })
+
+  it.each([
+    ['Markdown', '## First sibling\n\n## Second sibling\n\n# Later parent'],
+    ['raw HTML', '<h2>First sibling</h2>\n<h2>Second sibling</h2>\n<h1>Later parent</h1>'],
+  ])('keeps equal %s source levels as siblings when a shallower heading arrives later', (_, body) => {
+    renderMarkdown(body)
+    expect(screen.getAllByRole('heading').map((heading) => [heading.tagName, heading.textContent])).toEqual([
+      ['H5', 'First sibling'],
+      ['H5', 'Second sibling'],
+      ['H5', 'Later parent'],
+    ])
+  })
 })
 
 describe('the sanitisation schema itself', () => {

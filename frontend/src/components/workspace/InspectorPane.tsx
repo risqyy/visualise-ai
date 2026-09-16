@@ -175,6 +175,7 @@ export function InspectorPane({
       data-testid="pane-inspector"
     >
       <PaneHeader
+        headingId="workspace-inspector-heading"
         title={tWorkspace('pane.rightLabel')}
         subtitle={
           // The component's reported name — or, failing that, its reported id.
@@ -359,7 +360,7 @@ export function InspectorPane({
                     data-testid="inspector-history"
                     className="space-y-2"
                   >
-                    <span className="pane-heading">{t('history.title')}</span>
+                    <h3 className="pane-heading">{t('history.title')}</h3>
                     <AsyncState
                       isPending={history.isPending}
                       isError={history.isError}
@@ -452,7 +453,7 @@ export function InspectorPane({
                           aria-label={t('change.label')}
                           data-testid="inspector-active-changes"
                         >
-                          <span className="pane-heading">{t('change.label')}</span>
+                          <h3 className="pane-heading">{t('change.label')}</h3>
                           <div className="pt-2">
                             <ActiveChangeList changes={head?.activeChanges ?? []} />
                           </div>
