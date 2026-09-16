@@ -1,6 +1,7 @@
 import { Maximize2, Minimize2 } from 'lucide-react'
 import { useCallback, useMemo, useRef, type ReactNode, type Ref } from 'react'
 import { useTranslation } from 'react-i18next'
+import { Tabs as TabsPrimitive } from 'radix-ui'
 
 import { useArchitecture, useComponentHistory, useComponentInspector } from '@/api/queries'
 import type { AppliedRelationship, ComponentId, Identifier, ProjectId, Relationship, RunId } from '@/api/types'
@@ -164,8 +165,10 @@ export function InspectorPane({
   const showFeedback = focus === undefined || focus === 'feedback'
   const showDiffs = focus === undefined || focus === 'diffs'
   const showSecondary = focus === undefined
+  const hasComponentTabs = Boolean(componentId) && !relationshipId
+  const tabValue = historyMode ? 'history' : 'run'
 
-  return (
+  const pane = (
     <section
       className="pane-surface"
       aria-label={tWorkspace('pane.rightLabel')}
@@ -211,21 +214,21 @@ export function InspectorPane({
         </div>
       )}
 
-      {componentId && !relationshipId && (
-        <div
-          role="tablist"
+      {hasComponentTabs && (
+        <TabsPrimitive.List
+          loop
           aria-label={t('source.label')}
           className="border-border flex shrink-0 items-center gap-1 border-b px-3 py-1.5"
         >
           <ViewTab
+            value="run"
             label={t('source.selectedRun')}
             selected={!historyMode}
-            onSelect={() => onSetHistoryMode(false)}
           />
           <ViewTab
+            value="history"
             label={t('source.history')}
             selected={historyMode}
-            onSelect={() => onSetHistoryMode(true)}
           />
           <span className="text-muted-foreground text-2xs ml-auto truncate font-mono">
             {historyMode ? (
@@ -234,7 +237,7 @@ export function InspectorPane({
               <ReportedText value={head?.runId ?? runId} />
             )}
           </span>
-        </div>
+        </TabsPrimitive.List>
       )}
 
       {componentId && !relationshipId && !historyMode && showSecondary && inspector.isSuccess && head && (
@@ -286,200 +289,231 @@ export function InspectorPane({
         </nav>
       )}
 
-      <div
-        {...scrollProps}
-        ref={setScrollViewport}
-        className="min-h-0 flex-1 overflow-x-hidden overflow-y-auto"
-        data-testid="inspector-scroll"
-      >
-        <div className="space-y-4 p-3">
-          {contributions.length > 0 && (
-            <section aria-label={t('contributions.label')} data-testid="element-contributions" className="border-border space-y-2 rounded-md border p-2">
-              <h3 className="pane-heading">{t('contributions.label')}</h3>
-              <p className="text-muted-foreground text-xs">{t('contributions.note')}</p>
-              <ul className="space-y-2 text-xs">
-                {contributions.map((entry, index) => (
-                  <li key={`${entry.runId}:${entry.agentId}:${entry.position}:${entry.source}:${index}`} data-agent-id={entry.agentId} data-source={entry.source}>
-                    <ReportedText value={entry.agentId} /> · <ReportedText value={entry.runId} />
-                    <p>{contributionDetail(entry, tCanvas)}</p>
-                  </li>
-                ))}
-              </ul>
-            </section>
-          )}
-          {relationshipId ? (
-            <RelationshipContextCard
-              relationshipId={relationshipId}
-              relationship={selectedRelationship}
-              sourceName={
-                selectedRelationship
-                  ? componentNames.get(selectedRelationship.sourceComponentId) ??
-                    selectedRelationship.sourceComponentId
-                  : ''
-              }
-              targetName={
-                selectedRelationship
-                  ? componentNames.get(selectedRelationship.targetComponentId) ??
-                    selectedRelationship.targetComponentId
-                  : ''
-              }
-              {...(selectedRelationshipOverlay
-                ? { overlay: selectedRelationshipOverlay }
-                : {})}
-              bundle={relationshipBundle}
-            />
-          ) : !componentId ? (
-            <EmptyState title={t('empty.title')} description={t('empty.description')} />
-          ) : (
-            <AsyncState
-              isPending={inspector.isPending}
-              isError={inspector.isError}
-              error={inspector.error}
-              emptyTitle={t('component.emptyTitle')}
-              onRetry={() => void inspector.refetch()}
-              skeletonRows={6}
-            >
-              {head && (
-                <ComponentContextCard
-                  componentId={componentId}
-                  component={head.component}
-                  responsibleAgent={head.responsibleAgent}
-                  currentWorkStep={head.currentWorkStep}
-                  runId={head.runId}
-                />
-              )}
+      <InspectorTabPanel enabled={hasComponentTabs} value={tabValue}>
+        <div
+          {...scrollProps}
+          ref={setScrollViewport}
+          className="min-h-0 flex-1 overflow-x-hidden overflow-y-auto"
+          data-testid="inspector-scroll"
+        >
+          <div className="space-y-4 p-3">
+            {contributions.length > 0 && (
+              <section aria-label={t('contributions.label')} data-testid="element-contributions" className="border-border space-y-2 rounded-md border p-2">
+                <h3 className="pane-heading">{t('contributions.label')}</h3>
+                <p className="text-muted-foreground text-xs">{t('contributions.note')}</p>
+                <ul className="space-y-2 text-xs">
+                  {contributions.map((entry, index) => (
+                    <li key={`${entry.runId}:${entry.agentId}:${entry.position}:${entry.source}:${index}`} data-agent-id={entry.agentId} data-source={entry.source}>
+                      <ReportedText value={entry.agentId} /> · <ReportedText value={entry.runId} />
+                      <p>{contributionDetail(entry, tCanvas)}</p>
+                    </li>
+                  ))}
+                </ul>
+              </section>
+            )}
+            {relationshipId ? (
+              <RelationshipContextCard
+                relationshipId={relationshipId}
+                relationship={selectedRelationship}
+                sourceName={
+                  selectedRelationship
+                    ? componentNames.get(selectedRelationship.sourceComponentId) ??
+                      selectedRelationship.sourceComponentId
+                    : ''
+                }
+                targetName={
+                  selectedRelationship
+                    ? componentNames.get(selectedRelationship.targetComponentId) ??
+                      selectedRelationship.targetComponentId
+                    : ''
+                }
+                {...(selectedRelationshipOverlay
+                  ? { overlay: selectedRelationshipOverlay }
+                  : {})}
+                bundle={relationshipBundle}
+              />
+            ) : !componentId ? (
+              <EmptyState title={t('empty.title')} description={t('empty.description')} />
+            ) : (
+              <AsyncState
+                isPending={inspector.isPending}
+                isError={inspector.isError}
+                error={inspector.error}
+                emptyTitle={t('component.emptyTitle')}
+                onRetry={() => void inspector.refetch()}
+                skeletonRows={6}
+              >
+                {head && (
+                  <ComponentContextCard
+                    componentId={componentId}
+                    component={head.component}
+                    responsibleAgent={head.responsibleAgent}
+                    currentWorkStep={head.currentWorkStep}
+                    runId={head.runId}
+                  />
+                )}
 
-              {historyMode ? (
-                <section
-                  aria-label={t('history.label')}
-                  data-testid="inspector-history"
-                  className="space-y-2"
-                >
-                  <span className="pane-heading">{t('history.title')}</span>
-                  <AsyncState
-                    isPending={history.isPending}
-                    isError={history.isError}
-                    error={history.error}
-                    emptyTitle={t('history.emptyTitle')}
-                    onRetry={() => void history.refetch()}
+                {historyMode ? (
+                  <section
+                    aria-label={t('history.label')}
+                    data-testid="inspector-history"
+                    className="space-y-2"
                   >
-                    <ComponentHistoryList
-                      entries={historyEntries}
-                      selectedRunId={head?.runId ?? null}
-                      hasNextPage={history.hasNextPage}
-                      isFetchingNextPage={history.isFetchingNextPage}
-                      onFetchNextPage={() => void history.fetchNextPage()}
-                    />
-                  </AsyncState>
-                </section>
-              ) : (
-                <div className="space-y-4" data-testid="inspector-current-run">
-                  {showFeedback && (
-                    <InspectorSection
-                      label={t('feedback.label')}
-                      target="feedback"
-                      headingRef={feedbackHeading}
-                      focus={focus}
-                      onSetFocus={onSetFocus}
+                    <span className="pane-heading">{t('history.title')}</span>
+                    <AsyncState
+                      isPending={history.isPending}
+                      isError={history.isError}
+                      error={history.error}
+                      emptyTitle={t('history.emptyTitle')}
+                      onRetry={() => void history.refetch()}
                     >
-                      <FeedbackList feedback={head?.feedback ?? []} />
-                    </InspectorSection>
-                  )}
-
-                  {showSecondary && <Separator />}
-
-                  {showDiffs && (
-                    <InspectorSection
-                      label={t('diff.label')}
-                      target="diffs"
-                      headingRef={diffsHeading}
-                      focus={focus}
-                      onSetFocus={onSetFocus}
-                    >
-                      <DiffGroupList
-                        diffs={diffs}
-                        hasNextPage={inspector.hasNextPage}
-                        isFetchingNextPage={inspector.isFetchingNextPage}
-                        onFetchNextPage={() => void inspector.fetchNextPage()}
+                      <ComponentHistoryList
+                        entries={historyEntries}
+                        selectedRunId={head?.runId ?? null}
+                        hasNextPage={history.hasNextPage}
+                        isFetchingNextPage={history.isFetchingNextPage}
+                        onFetchNextPage={() => void history.fetchNextPage()}
                       />
-                    </InspectorSection>
-                  )}
-
-                  {showSecondary && (
-                    <>
-                      <Separator />
-                      <section
-                        id="inspector-risks-section"
-                        aria-label={t('risk.label')}
-                        data-testid="inspector-risks"
+                    </AsyncState>
+                  </section>
+                ) : (
+                  <div className="space-y-4" data-testid="inspector-current-run">
+                    {showFeedback && (
+                      <InspectorSection
+                        label={t('feedback.label')}
+                        target="feedback"
+                        headingRef={feedbackHeading}
+                        focus={focus}
+                        onSetFocus={onSetFocus}
                       >
-                        <h3
-                          id="inspector-risks-heading"
-                          ref={risksHeading}
-                          tabIndex={-1}
-                          className="pane-heading focus-visible:outline-ring focus-visible:outline-2"
+                        <FeedbackList feedback={head?.feedback ?? []} />
+                      </InspectorSection>
+                    )}
+
+                    {showSecondary && <Separator />}
+
+                    {showDiffs && (
+                      <InspectorSection
+                        label={t('diff.label')}
+                        target="diffs"
+                        headingRef={diffsHeading}
+                        focus={focus}
+                        onSetFocus={onSetFocus}
+                      >
+                        <DiffGroupList
+                          diffs={diffs}
+                          hasNextPage={inspector.hasNextPage}
+                          isFetchingNextPage={inspector.isFetchingNextPage}
+                          onFetchNextPage={() => void inspector.fetchNextPage()}
+                        />
+                      </InspectorSection>
+                    )}
+
+                    {showSecondary && (
+                      <>
+                        <Separator />
+                        <section
+                          id="inspector-risks-section"
+                          aria-label={t('risk.label')}
+                          data-testid="inspector-risks"
                         >
-                          {t('risk.label')}
-                        </h3>
-                        <div className="pt-2">
-                          <RiskList risks={head?.risks ?? []} />
-                        </div>
-                      </section>
+                          <h3
+                            id="inspector-risks-heading"
+                            ref={risksHeading}
+                            tabIndex={-1}
+                            className="pane-heading focus-visible:outline-ring focus-visible:outline-2"
+                          >
+                            {t('risk.label')}
+                          </h3>
+                          <div className="pt-2">
+                            <RiskList risks={head?.risks ?? []} />
+                          </div>
+                        </section>
 
-                      <section
-                        id="inspector-problems-section"
-                        aria-label={t('problem.label')}
-                        data-testid="inspector-problems"
-                      >
-                        <h3
-                          id="inspector-problems-heading"
-                          ref={problemsHeading}
-                          tabIndex={-1}
-                          className="pane-heading focus-visible:outline-ring focus-visible:outline-2"
+                        <section
+                          id="inspector-problems-section"
+                          aria-label={t('problem.label')}
+                          data-testid="inspector-problems"
                         >
-                          {t('problem.label')}
-                        </h3>
-                        <div className="pt-2">
-                          <ProblemList problems={head?.problems ?? []} />
-                        </div>
-                      </section>
+                          <h3
+                            id="inspector-problems-heading"
+                            ref={problemsHeading}
+                            tabIndex={-1}
+                            className="pane-heading focus-visible:outline-ring focus-visible:outline-2"
+                          >
+                            {t('problem.label')}
+                          </h3>
+                          <div className="pt-2">
+                            <ProblemList problems={head?.problems ?? []} />
+                          </div>
+                        </section>
 
-                      <section
-                        aria-label={t('change.label')}
-                        data-testid="inspector-active-changes"
-                      >
-                        <span className="pane-heading">{t('change.label')}</span>
-                        <div className="pt-2">
-                          <ActiveChangeList changes={head?.activeChanges ?? []} />
-                        </div>
-                      </section>
-                    </>
-                  )}
-                </div>
-              )}
-            </AsyncState>
-          )}
+                        <section
+                          aria-label={t('change.label')}
+                          data-testid="inspector-active-changes"
+                        >
+                          <span className="pane-heading">{t('change.label')}</span>
+                          <div className="pt-2">
+                            <ActiveChangeList changes={head?.activeChanges ?? []} />
+                          </div>
+                        </section>
+                      </>
+                    )}
+                  </div>
+                )}
+              </AsyncState>
+            )}
+          </div>
         </div>
-      </div>
+      </InspectorTabPanel>
     </section>
+  )
+
+  return (
+    <TabsPrimitive.Root
+      asChild
+      value={tabValue}
+      activationMode="automatic"
+      onValueChange={(value) => onSetHistoryMode(value === 'history')}
+    >
+      {pane}
+    </TabsPrimitive.Root>
+  )
+}
+
+/** Keep one reading surface, with a registered empty panel for the other source. */
+function InspectorTabPanel({ enabled, value, children }: {
+  enabled: boolean
+  value: 'run' | 'history'
+  children: ReactNode
+}) {
+  if (!enabled) return children
+  return (
+    <>
+      <TabsPrimitive.Content
+        value={value}
+        asChild
+        className="focus-visible:outline-ring focus-visible:outline-2 focus-visible:-outline-offset-2"
+      >
+        {children}
+      </TabsPrimitive.Content>
+      <TabsPrimitive.Content value={value === 'run' ? 'history' : 'run'} />
+    </>
   )
 }
 
 function ViewTab({
+  value,
   label,
   selected,
-  onSelect,
 }: {
+  value: 'run' | 'history'
   label: string
   selected: boolean
-  onSelect: () => void
 }) {
   return (
-    <button
-      type="button"
-      role="tab"
-      aria-selected={selected}
-      onClick={onSelect}
+    <TabsPrimitive.Trigger
+      value={value}
       className={cn(
         'focus-visible:ring-ring rounded-md px-2 py-0.5 text-xs focus-visible:ring-2 focus-visible:outline-none',
         selected
@@ -488,7 +522,7 @@ function ViewTab({
       )}
     >
       {label}
-    </button>
+    </TabsPrimitive.Trigger>
   )
 }
 

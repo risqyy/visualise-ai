@@ -33,6 +33,15 @@ appears *above* what is being read.
 
 ## Decision
 
+### Inspector sources use a complete tabs interaction
+
+**Updated by #119:** the existing Radix Tabs primitives manage cyclic horizontal
+arrow navigation, automatic activation, roving focus and tab/panel associations.
+The selected source remains URL-controlled. The shared reading surface is the
+active tabpanel; an empty hidden panel registers the inactive source without
+mixing its evidence into the selected view. Relationship and empty inspectors
+retain a plain reading surface because they have no source tabs.
+
 ### Reported content counts provide direct section navigation
 
 **Updated by #118:** in the selected-run overview, feedback, diff, risk and
