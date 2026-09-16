@@ -243,3 +243,53 @@ test('canvas navigation keeps entry labels clear of toolbar and other controls',
     await page.screenshot({ path: testInfo.outputPath(`canvas-keyboard-${language}.png`) })
   }
 })
+
+async function assertAllMapBounds(page: Page) {
+  const geometry = await page.locator('.react-flow').evaluate((surface) => {
+    const drawing = surface.getBoundingClientRect()
+    const nodes = [...surface.querySelectorAll('.react-flow__node')]
+    const boxes = nodes.map((node) => {
+      const box = node.getBoundingClientRect()
+      return { id: node.getAttribute('data-id'), left: box.left, top: box.top, right: box.right, bottom: box.bottom,
+        inside: box.width > 0 && box.height > 0 && box.left >= drawing.left && box.right <= drawing.right &&
+          box.top >= drawing.top && box.bottom <= drawing.bottom }
+    })
+    const viewport = surface.querySelector('.react-flow__viewport')!
+    const actualZoom = new DOMMatrixReadOnly(getComputedStyle(viewport).transform).a
+    const reportedZoom = Number(surface.closest('[data-testid="architecture-canvas"]')!.getAttribute('data-canvas-zoom'))
+    return { drawing: { left: drawing.left, top: drawing.top, right: drawing.right, bottom: drawing.bottom },
+      boxes, actualZoom, reportedZoom }
+  })
+  expect(geometry.boxes.length, 'full self model including its proposal is rendered').toBe(29)
+  expect(geometry.boxes.filter((box) => !box.inside), `every map node must fit actual drawing bounds: ${JSON.stringify(geometry.drawing)}`).toEqual([])
+  expect(Math.abs(geometry.actualZoom - geometry.reportedZoom), 'native React Flow transform matches the published four-decimal zoom').toBeLessThanOrEqual(0.000051)
+  return geometry.actualZoom
+}
+
+test('whole map can fit below the former zoom floor and native zoom controls preserve that fit', async ({ page }, testInfo) => {
+  const project = `small-map-fit-${randomUUID().slice(0, 8)}`
+  const run = 'run-small-map-fit'
+  const summary = await runSimulator({ scenario: 'self', projectId: project, runId: run, speed: 0 })
+  expect(summary.created).toBe(summary.eventsSent)
+  expect(summary.conflicts).toBe(0)
+  await page.setViewportSize({ width: 1280, height: 660 })
+  await page.goto(`/projects/${project}/runs/${run}`)
+  await settled(page)
+  await showWholeModel(page)
+  await settled(page)
+  const fittedZoom = await assertAllMapBounds(page)
+  expect(fittedZoom, 'small drawing surface exercises the previous 0.12 clamp').toBeLessThan(0.12)
+  expect(fittedZoom).toBeGreaterThan(0)
+  await page.screenshot({ path: testInfo.outputPath('canvas-small-whole-map.png') })
+
+  const readNativeZoom = () => page.locator('.react-flow__viewport').evaluate((viewport) =>
+    new DOMMatrixReadOnly(getComputedStyle(viewport).transform).a,
+  )
+  await page.locator('.react-flow__controls-zoomin').click()
+  await settled(page)
+  expect(await readNativeZoom(), 'native zoom-in changes the fitted scale').toBeGreaterThan(fittedZoom * 1.1)
+  await page.locator('.react-flow__controls-zoomout').click()
+  await settled(page)
+  expect(await assertAllMapBounds(page), 'native zoom-out returns to the complete fitted map').toBeCloseTo(fittedZoom, 6)
+  await page.screenshot({ path: testInfo.outputPath('canvas-small-map-after-native-zoom.png') })
+})

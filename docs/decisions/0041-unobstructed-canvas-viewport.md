@@ -20,6 +20,13 @@ viewport, without a second set of overlay offsets or camera calculations.
 Opening tools changes available space but does not request a fit; explicit
 navigation still owns camera changes. Search remains a viewport-level portal.
 
+An explicit whole-map fit may lower the native minimum zoom below its normal
+0.12 limit when necessary to fit all component bounds. The limit is set before
+applying that camera and retained for the mounted canvas, so native zoom controls
+can return to the fitted overview. Remounts initialize it from the saved camera.
+Initial fitting retains its separate readable zoom floor. Live updates and tool
+disclosure neither lower this limit nor request another fit.
+
 ## Consequences
 
 This supersedes the toolbar/minimap overlay placement in ADR 0025. The minimap

@@ -131,7 +131,7 @@ import { useCanvasVoice } from './useCanvasVoice'
  * constant width inside the CSS transform (see `--vai-canvas-zoom`).
  */
 
-const MIN_ZOOM = 0.12
+const DEFAULT_MIN_ZOOM = 0.12
 const MAX_ZOOM = 2.5
 
 const NODE_TYPES = ARCHITECTURE_NODE_TYPES
@@ -354,6 +354,9 @@ function ArchitectureCanvasInner({
   // The very first viewport React Flow renders with. Read once so a later
   // camera change never re-mounts the flow.
   const [initialViewport] = useState<Viewport>(() => useUiStore.getState().camera)
+  const [minimumZoom, setMinimumZoom] = useState(() =>
+    Math.min(DEFAULT_MIN_ZOOM, initialViewport.zoom),
+  )
 
   const positionedNodes = useMemo(
     () => {
@@ -449,7 +452,7 @@ function ArchitectureCanvasInner({
    */
   const fitView = useCallback(
     (mode: FitMode, focusComponentId: ComponentId | null = null) => {
-      const { width, height, nodeLookup } = storeApi.getState()
+      const { width, height, nodeLookup, minZoom, setMinZoom } = storeApi.getState()
       if (nodeLookup.size === 0) return false
 
       const bounds = getNodesBounds([...nodeLookup.values()], { nodeLookup })
@@ -476,8 +479,16 @@ function ArchitectureCanvasInner({
         { width, height },
         mode === 'initial'
           ? { minZoom: MIN_READABLE_ZOOM, overflow: 'start', focus }
-          : { minZoom: MIN_ZOOM },
+          : { minZoom: 0 },
       )
+      // An explicit whole-map fit must accommodate the complete model even
+      // on a short drawing surface. Lower the native limit before applying
+      // that camera, and retain it so zooming in/out can return to this view.
+      // Live updates never change this limit or request a new fit.
+      if (viewport.zoom < minZoom) {
+        setMinZoom(viewport.zoom)
+        setMinimumZoom(viewport.zoom)
+      }
       void flow.setViewport(viewport)
       setCamera(viewport)
       setDetailLevel(detailLevelForZoom(viewport.zoom))
@@ -1881,7 +1892,7 @@ function ArchitectureCanvasInner({
             nodeTypes={NODE_TYPES}
             edgeTypes={EDGE_TYPES}
             defaultViewport={initialViewport}
-            minZoom={MIN_ZOOM}
+            minZoom={minimumZoom}
             maxZoom={MAX_ZOOM}
             onNodeClick={onNodeClick}
             onEdgeClick={onEdgeClick}
