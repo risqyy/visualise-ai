@@ -831,6 +831,12 @@ describe('architecture canvas — live updates never move the camera', () => {
           'false',
         ),
       )
+      await waitFor(() =>
+        expect(screen.getByTestId('architecture-canvas')).toHaveAttribute(
+          'data-fit-view-count',
+          '2',
+        ),
+      )
       const cameraAfterOrientation = useUiStore.getState().camera
 
       cleanup()
@@ -859,6 +865,13 @@ describe('architecture canvas — live updates never move the camera', () => {
 
       // Orientation owns the resulting camera. A stale search focus would add
       // another pan after this fit and produce a different viewport.
+      // ELK completion precedes the effect that applies the explicit fit.
+      await waitFor(() =>
+        expect(screen.getByTestId('architecture-canvas')).toHaveAttribute(
+          'data-fit-view-count',
+          '2',
+        ),
+      )
       expect(useUiStore.getState().camera).toEqual(cameraAfterOrientation)
     },
     CANVAS_TIMEOUT,

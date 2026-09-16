@@ -89,7 +89,7 @@
   "history": {
     "correctedInto": "— new content as {{type}}",
     "corrects": "corrects",
-    "currentRunSuffix": "(current run)",
+    "selectedRunSuffix": "(selected run)",
     "emptyTitle": "No older evidence",
     "label": "History",
     "laterCorrected": "corrected later — the entry remains",
@@ -139,7 +139,7 @@
   },
   "source": {
     "allRuns": "all runs",
-    "currentRun": "Current run",
+    "selectedRun": "Selected run",
     "history": "History",
     "label": "Evidence source"
   },

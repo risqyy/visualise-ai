@@ -209,7 +209,7 @@ export function InspectorPane({
           className="border-border flex shrink-0 items-center gap-1 border-b px-3 py-1.5"
         >
           <ViewTab
-            label={t('source.currentRun')}
+            label={t('source.selectedRun')}
             selected={!historyMode}
             onSelect={() => onSetHistoryMode(false)}
           />
@@ -306,7 +306,7 @@ export function InspectorPane({
                   >
                     <ComponentHistoryList
                       entries={historyEntries}
-                      currentRunId={head?.runId ?? null}
+                      selectedRunId={head?.runId ?? null}
                       hasNextPage={history.hasNextPage}
                       isFetchingNextPage={history.isFetchingNextPage}
                       onFetchNextPage={() => void history.fetchNextPage()}

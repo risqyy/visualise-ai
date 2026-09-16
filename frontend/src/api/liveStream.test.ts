@@ -44,6 +44,26 @@ function invalidatedNames(
 }
 
 describe('affectedQueryKeys', () => {
+  it.each([null, undefined, 'parent-orchestrator'])('refreshes current-run data only for a root start (parent: %s)', (parentAgentId) => {
+    const client = new QueryClient()
+    const currentKey = queryKeys.currentRun(PROJECT_ID)
+    const projectKey = queryKeys.projectDetail(PROJECT_ID)
+    const modelKey = queryKeys.architecture(PROJECT_ID)
+    client.setQueryData(currentKey, { runId: 'previous-run' })
+    client.setQueryData(projectKey, { currentRunId: 'previous-run' })
+    client.setQueryData(modelKey, { components: [], relationships: [] })
+    const event = streamedEvent('agent.started', {
+      role: 'orchestrator', displayName: 'Run author', assignedTask: 'Describe work',
+    }, { parentAgentId: parentAgentId ?? null })
+    // Go's live/replay envelope omits nil parents rather than serializing null.
+    if (parentAgentId === undefined) delete event.parentAgentId
+    applyLiveEvent(client, event)
+    expect(client.getQueryState(currentKey)?.isInvalidated).toBe(parentAgentId == null)
+    expect(client.getQueryState(projectKey)?.isInvalidated).toBe(parentAgentId == null)
+    expect(client.getQueryState(modelKey)?.isInvalidated).toBe(false)
+    expect(client.getQueryData(currentKey)).toEqual({ runId: 'previous-run' })
+    client.clear()
+  })
   it('invalidates the complete model and component histories once per atomic batch', () => {
     const event = streamedEvent('model.mutation_applied', {
       expectedModelRevision: 1,

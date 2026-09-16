@@ -32,7 +32,7 @@ test('6 · the history is its own tab and never mixes into the current run', asy
     `/projects/${MAIN_PROJECT}/runs/${MAIN_RUN}?component=${encodeURIComponent(TAX)}`,
   )
 
-  const currentTab = page.getByRole('tab', { name: 'Aktueller Run' })
+  const currentTab = page.getByRole('tab', { name: 'Ausgewählter Run' })
   const historyTab = page.getByRole('tab', { name: 'Historie' })
   await expect(currentTab).toHaveAttribute('aria-selected', 'true')
   await expect(historyTab).toHaveAttribute('aria-selected', 'false')

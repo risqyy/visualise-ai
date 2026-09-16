@@ -32,7 +32,7 @@ import { SCROLL_ANCHOR_ATTRIBUTE } from './scrollStability'
 export interface ComponentHistoryListProps {
   entries: readonly ComponentHistoryEntry[]
   /** Run the inspector is scoped to, so its own entries can be labelled. */
-  currentRunId: RunId | null
+  selectedRunId: RunId | null
   hasNextPage: boolean
   isFetchingNextPage: boolean
   onFetchNextPage: () => void
@@ -40,7 +40,7 @@ export interface ComponentHistoryListProps {
 
 export function ComponentHistoryList({
   entries,
-  currentRunId,
+  selectedRunId,
   hasNextPage,
   isFetchingNextPage,
   onFetchNextPage,
@@ -65,7 +65,7 @@ export function ComponentHistoryList({
       <ol className="space-y-1.5">
         {items.map((item) => (
           <li key={item.entry.serverEventId}>
-            <HistoryRow item={item} isCurrentRun={item.entry.runId === currentRunId} />
+            <HistoryRow item={item} isSelectedRun={item.entry.runId === selectedRunId} />
           </li>
         ))}
       </ol>
@@ -85,7 +85,7 @@ export function ComponentHistoryList({
   )
 }
 
-function HistoryRow({ item, isCurrentRun }: { item: HistoryItem; isCurrentRun: boolean }) {
+function HistoryRow({ item, isSelectedRun }: { item: HistoryItem; isSelectedRun: boolean }) {
   const { t } = useTranslation('inspector')
   const { entry } = item
 
@@ -120,7 +120,7 @@ function HistoryRow({ item, isCurrentRun }: { item: HistoryItem; isCurrentRun: b
         <ReportedText value={entry.agentId} className="font-mono" />
         <span aria-hidden="true"> · </span>
         {t('meta.runPrefix')} <ReportedText value={entry.runId} className="font-mono" />
-        {isCurrentRun && <span> {t('history.currentRunSuffix')}</span>}
+        {isSelectedRun && <span> {t('history.selectedRunSuffix')}</span>}
         <span aria-hidden="true"> · </span>
         <ReportedTime value={entry.occurredAt} />
       </p>

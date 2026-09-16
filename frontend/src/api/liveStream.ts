@@ -262,6 +262,11 @@ export function affectedQueryKeys(event: StreamedEvent, depth = 0): QueryKey[] {
     case 'work.reported':
       return [queryKeys.agents(project, run), queryKeys.components(project), queryKeys.runDetail(project, run), queryKeys.runs(project), queryKeys.projectDetail(project)]
     case 'agent.started':
+      // A root orchestrator opens a run and can change the project's current
+      // pointer. Child starts do not change the selected run's temporal context.
+      return event.parentAgentId == null && event.payload.role === 'orchestrator'
+        ? [queryKeys.agents(project, run), queryKeys.runs(project), queryKeys.projectDetail(project)]
+        : [queryKeys.agents(project, run)]
     case 'agent.status_reported':
     case 'agent.progress_reported':
     case 'agent.finished':
