@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
 import { prepare, DETAILS, type Settings, type Snapshot } from './prepare'
 import { layoutArchitecture } from '@/canvas/elkLayout'
+import { architectureObstacles, segmentIntersectsBox } from '@/canvas/obstacleRouting'
 import { boundedIDs, contained, intersects } from './painted'
 
 vi.mock('@/canvas/elkLayout', async (original) => {
@@ -40,12 +41,18 @@ describe('isolated native render preparation', () => {
     expect(result.resolved.missingReferences.componentIds).toEqual(['removed'])
     expect(result.viewport).toEqual({ x: 0, y: 0, zoom: 1 })
   })
-  it('preserves absent ELK self-edge routes so the native self-loop fallback can paint', async () => {
+  it('prepares a visible self-loop outside components when ELK omits its route', async () => {
     const snapshot = fixture()
     snapshot.model.relationships = [{ relationshipId: 'self-aa', sourceComponentId: 'aaa', targetComponentId: 'aaa', kind: 'dependency' }]
     const result = await prepare(snapshot, settings)
     expect(result.edges).toHaveLength(1)
-    expect(result.edges[0]?.data?.route).toBeUndefined()
+    const route = result.edges[0]!.data!.route!
+    expect(route.length).toBeGreaterThan(3)
+    for (let index = 1; index < route.length; index++) {
+      for (const box of architectureObstacles(result.nodes)) {
+        expect(segmentIntersectsBox(route[index - 1]!, route[index]!, box)).toBe(false)
+      }
+    }
   })
   it('reports native ELK failure rather than producing a fallback image', async () => {
     vi.mocked(layoutArchitecture).mockRejectedValueOnce(new Error('ELK rejected graph'))

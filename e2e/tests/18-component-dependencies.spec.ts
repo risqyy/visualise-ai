@@ -199,8 +199,8 @@ async function assertLabelAnnotations(page: Page, relationships: {
 }[]) {
   const annotations = await page.locator('[data-label-annotation="true"]').evaluateAll((elements, reported) => elements.map((element) => {
     const owner = element.getAttribute('data-label-for') ?? ''
-    const line = element.querySelector('line')
-    if (!line) throw new Error(`Missing annotation line for ${owner}`)
+    const line = element.querySelector<SVGGeometryElement>('line, path')
+    if (!line) throw new Error(`Missing annotation geometry for ${owner}`)
     const relationshipId = owner.replace(/^(edge-label-|overlay-mark-relationship-)/, '')
     const relationship = reported.find((candidate) => candidate.relationshipId === relationshipId)
     const pathId = owner.startsWith('edge-bundle-') || owner.startsWith('edge-collapse-')
@@ -215,9 +215,8 @@ async function assertLabelAnnotations(page: Page, relationships: {
     const pathMatrix = path?.getScreenCTM()
     if (!path || !lineMatrix || !pathMatrix) throw new Error(`Cannot find owned route for ${owner}`)
     const zoom = Math.hypot(pathMatrix.a, pathMatrix.b)
-    const point = (x: number, y: number) => new DOMPoint(x, y).matrixTransform(lineMatrix)
-    const anchor = point(line.x1.baseVal.value, line.y1.baseVal.value)
-    const label = point(line.x2.baseVal.value, line.y2.baseVal.value)
+    const anchor = line.getPointAtLength(0).matrixTransform(lineMatrix)
+    const label = line.getPointAtLength(line.getTotalLength()).matrixTransform(lineMatrix)
     let anchorDistance = Infinity, closestLabelDistance = Infinity
     const length = path.getTotalLength()
     for (let offset = 0; offset <= length; offset += 0.5 / zoom) {

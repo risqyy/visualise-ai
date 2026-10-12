@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest'
 
 import { appliedComponent, appliedRelationship } from '@/test/architectureFixtures'
-import { EDGE_LABEL_HIT_SIZE, EDGE_LABEL_MAX_WIDTH, placeEdgeLabels } from './edgeLabelLayout'
+import { EDGE_LABEL_HIT_SIZE, EDGE_LABEL_MAX_WIDTH, placeEdgeLabels, prepareLabelLeaders } from './edgeLabelLayout'
+import { architectureObstacles } from './obstacleRouting'
 import { attachmentCrossesObstacle, nearestPointOnRoute } from './edgeLabelAttachment'
 import type { LayoutPoint } from './elkLayout'
 import { projectArchitecture, type ArchitectureEdge, type ArchitectureNode } from './graphProjection'
@@ -38,6 +39,55 @@ function expectSeparate(positions: readonly LayoutPoint[], zoom: number) {
 }
 
 describe('shared edge label placement', () => {
+  it('routes a shelf attachment around an unrelated component while retaining its own member anchor', () => {
+    const graph = fixture(3)
+    const obstacle = { ...graph.nodes[0]!, id: 'unrelated', position: { x: 980, y: 590 } }
+    const edge = graph.edges[0]!
+    edge.data!.route = [{ x: 700, y: 479 }, { x: 1120, y: 479 }]
+    edge.data!.memberRoutes = { r0: [{ x: 700, y: 479 }, { x: 1120, y: 479 }] }
+    edge.data!.labelPositions = { 'relationship:r0': { x: 1049, y: 799 } }
+    const [prepared] = prepareLabelLeaders([edge], [...graph.nodes, obstacle])
+    const leader = prepared!.data!.labelLeaderRoutes!['relationship:r0']!
+    expect(leader.length).toBeGreaterThan(2)
+    expect(leader[0]).toEqual({ x: 1049, y: 479 })
+    expect(leader.at(-1)).toEqual({ x: 1049, y: 799 })
+    for (let index = 1; index < leader.length; index++) {
+      for (const box of architectureObstacles([...graph.nodes, obstacle])) {
+        expect(attachmentCrossesObstacle(leader[index - 1]!, leader[index]!, box)).toBe(false)
+      }
+    }
+  })
+
+  it('routes every annotation after dense placement exhausts local candidates and uses the shelf', () => {
+    const graph = fixture()
+    const template = graph.edges[0]!
+    const edges = Array.from({ length: 90 }, (_, index) => ({ ...template, id: `edge-${index.toString().padStart(3, '0')}`,
+      data: { ...template.data!, route: [{ x: 0, y: 200 }, { x: 450, y: 200 }] } }))
+    const positions = placeEdgeLabels(edges, graph.nodes, { detailLevel: 'standard', zoom: 1 })
+    expect([...positions.values()].some((labels) => labels.badge!.y > 600)).toBe(true)
+    const positioned = edges.map((edge) => ({ ...edge, data: { ...edge.data, labelPositions: positions.get(edge.id)! } }))
+    const result = prepareLabelLeaders(positioned, graph.nodes)
+    const obstacles = architectureObstacles(graph.nodes)
+    let detours = 0
+    for (const edge of result) {
+      const point = edge.data!.labelPositions!.badge!
+      const anchor = nearestPointOnRoute(point, edge.data!.route!)
+      if (Math.hypot(point.x - anchor.x, point.y - anchor.y) < 8) continue
+      const leader = edge.data!.labelLeaderRoutes!.badge!
+      expect(leader).toBeDefined()
+      expect(leader[0]).toEqual(anchor)
+      expect(leader.at(-1)).toEqual(point)
+      if (leader.length > 2) detours++
+      for (let index = 1; index < leader.length; index++) {
+        for (const obstacle of obstacles) {
+          expect(attachmentCrossesObstacle(leader[index - 1]!, leader[index]!, obstacle)).toBe(false)
+        }
+      }
+    }
+    expect(detours).toBeGreaterThan(0)
+    expect(prepareLabelLeaders([...positioned].reverse(), [...graph.nodes].reverse())).toEqual([...result].reverse())
+  })
+
   it('keeps a short bundle count in the corridor instead of reserving a long description', () => {
     const graph = fixture(3)
     graph.nodes[0]!.position = { x: 0, y: 0 }

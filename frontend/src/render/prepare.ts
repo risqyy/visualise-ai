@@ -4,10 +4,11 @@ import { collapseGraph } from '@/canvas/collapse'
 import { viewportForBounds } from '@/canvas/cameraPolicy'
 import { MIN_READABLE_ZOOM, type DetailLevel } from '@/canvas/detailLevel'
 import { staggeredLabelRatios } from '@/canvas/edgeGeometry'
-import { placeEdgeLabels } from '@/canvas/edgeLabelLayout'
+import { placeEdgeLabels, prepareLabelLeaders } from '@/canvas/edgeLabelLayout'
 import { layoutArchitecture } from '@/canvas/elkLayout'
 import { elkDirectionForOrientation } from '@/canvas/graphOrientation'
 import { projectArchitecture } from '@/canvas/graphProjection'
+import { routeArchitectureEdges } from '@/canvas/obstacleRouting'
 import { resolveArchitectureView } from '@/views/resolveArchitectureView'
 
 export interface Snapshot {
@@ -30,15 +31,15 @@ export async function prepare(snapshot: Snapshot, settings: Settings) {
   const projected = projectArchitecture(resolved.model, orientation)
   const collapsed = collapseGraph(projected.nodes, projected.edges, resolved.collapsedComponentIds, orientation)
   const layout = await layoutArchitecture(collapsed.nodes, collapsed.edges, { direction: elkDirectionForOrientation(orientation) })
-  const routed = collapsed.edges.map((edge) => ({
+  const routed = routeArchitectureEdges(collapsed.edges.map((edge) => ({
     ...edge,
     data: { ...edge.data!, ...(layout.routes[edge.id] ? { route: layout.routes[edge.id] } : {}) },
-  }))
+  })), layout.nodes, { expandedEdgeIds: settings.detailLevel === 'full' ? collapsed.edges.map((edge) => edge.id) : [] })
   const labelRatios = staggeredLabelRatios(routed.map((edge) => ({
-    id: edge.id, source: edge.source, target: edge.target, ...(edge.data.route ? { route: edge.data.route } : {}),
+    id: edge.id, source: edge.source, target: edge.target, ...(edge.data?.route ? { route: edge.data.route } : {}),
   })))
   const positioned = routed.map((edge) => ({
-    ...edge, data: { ...edge.data, labelRatio: labelRatios.get(edge.id) ?? 0.5 },
+    ...edge, data: { ...edge.data!, labelRatio: labelRatios.get(edge.id) ?? 0.5 },
   }))
   const viewport = layout.nodes.length === 0 ? { x: 0, y: 0, zoom: 1 } : viewportForBounds(
     getNodesBounds(layout.nodes.filter((node) => !node.parentId)), settings.viewport,
@@ -48,9 +49,9 @@ export async function prepare(snapshot: Snapshot, settings: Settings) {
     detailLevel: DETAILS[settings.detailLevel], zoom: viewport.zoom,
     expandedEdgeIds: settings.detailLevel === 'full' ? positioned.map((edge) => edge.id) : [],
   })
-  const edges = positioned.map((edge) => ({
+  const edges = prepareLabelLeaders(positioned.map((edge) => ({
     ...edge, data: { ...edge.data, labelPositions: labelPositions.get(edge.id) ?? {}, bundleExpanded: settings.detailLevel === 'full' },
-  }))
+  })), layout.nodes)
   return { nodes: layout.nodes, edges, viewport, resolved }
 }
 export type Prepared = Awaited<ReturnType<typeof prepare>>

@@ -54,6 +54,7 @@ import { useDetailLevel } from './useDetailLevel'
 
 interface EdgeRouteProps {
   points: LayoutPoint[]
+  cornerRadius?: number | undefined
   strokeDasharray: string
   marker: 'arrow' | 'arrowclosed'
   emphasised: boolean
@@ -79,6 +80,7 @@ interface EdgeRouteProps {
  */
 function EdgeRoute({
   points,
+  cornerRadius,
   strokeDasharray,
   marker,
   emphasised,
@@ -89,7 +91,7 @@ function EdgeRoute({
   overlay = null,
   dimmed = false,
 }: EdgeRouteProps) {
-  const path = roundedPolylinePath(points)
+  const path = roundedPolylinePath(points, cornerRadius)
   if (path === '') return null
 
   const state = overlay ? WORK_STATE_BY_ID[overlay.state] : null
@@ -151,9 +153,10 @@ function EdgeRoute({
 }
 
 /** HTML badge anchored to a point in flow coordinates. */
-function LabelLeader({ point, anchor, zIndex, dimmed = false, labelId }: {
+function LabelLeader({ point, anchor, leaderRoute, zIndex, dimmed = false, labelId }: {
   point: LayoutPoint
   anchor?: LayoutPoint
+  leaderRoute?: LayoutPoint[] | undefined
   zIndex: number
   dimmed?: boolean
   labelId?: string | undefined
@@ -163,8 +166,13 @@ function LabelLeader({ point, anchor, zIndex, dimmed = false, labelId }: {
     <svg width={1} height={1} aria-hidden="true"
       className="pointer-events-none absolute overflow-visible text-muted-foreground"
       style={{ left: 0, top: 0, zIndex, opacity: dimmed ? 0.25 : 1 }} data-label-annotation="true" data-label-for={labelId}>
-      <line x1={anchor.x} y1={anchor.y} x2={point.x} y2={point.y}
-        stroke="currentColor" strokeWidth={1} strokeOpacity={0.3} />
+      {leaderRoute && leaderRoute.length > 2 ? (
+        <path d={roundedPolylinePath(leaderRoute, 0)} fill="none"
+          stroke="currentColor" strokeWidth={1} strokeOpacity={0.3} />
+      ) : (
+        <line x1={leaderRoute?.[0]?.x ?? anchor.x} y1={leaderRoute?.[0]?.y ?? anchor.y} x2={point.x} y2={point.y}
+          stroke="currentColor" strokeWidth={1} strokeOpacity={0.3} />
+      )}
     </svg>
   )
 }
@@ -172,6 +180,7 @@ function LabelLeader({ point, anchor, zIndex, dimmed = false, labelId }: {
 function EdgeBadge({
   point,
   anchor,
+  leaderRoute,
   children,
   zIndex,
   onClick,
@@ -188,6 +197,7 @@ function EdgeBadge({
 }: {
   point: LayoutPoint
   anchor?: LayoutPoint
+  leaderRoute?: LayoutPoint[] | undefined
   children: ReactNode
   /** Keep this label above the SVG edge that owns it, including sub-flows. */
   zIndex: number
@@ -237,7 +247,7 @@ function EdgeBadge({
   if (onClick) {
     return (
       <>
-      <LabelLeader point={point} {...(anchor ? { anchor } : {})} zIndex={zIndex} dimmed={dimmed} labelId={testId} />
+      <LabelLeader point={point} {...(anchor ? { anchor } : {})} leaderRoute={leaderRoute} zIndex={zIndex} dimmed={dimmed} labelId={testId} />
       <button
         type="button"
         style={interactiveStyle}
@@ -293,6 +303,7 @@ function EdgeBadge({
 function EdgeOverlayMark({
   point,
   anchor,
+  leaderRoute,
   overlay,
   zIndex,
   dimmed = false,
@@ -300,6 +311,7 @@ function EdgeOverlayMark({
 }: {
   point: LayoutPoint
   anchor?: LayoutPoint
+  leaderRoute?: LayoutPoint[] | undefined
   overlay: ChangeOverlay
   /** Keep the visual mark above its edge without intercepting edge input. */
   zIndex: number
@@ -308,7 +320,7 @@ function EdgeOverlayMark({
 }) {
   return (
     <>
-    <LabelLeader point={point} {...(anchor ? { anchor } : {})} zIndex={zIndex} dimmed={dimmed} labelId={`overlay-mark-${overlay.targetKind}-${overlay.targetId}`} />
+    <LabelLeader point={point} {...(anchor ? { anchor } : {})} leaderRoute={leaderRoute} zIndex={zIndex} dimmed={dimmed} labelId={`overlay-mark-${overlay.targetKind}-${overlay.targetId}`} />
     <span
       style={{
         position: 'absolute',
@@ -414,7 +426,7 @@ export const RelationshipEdge = memo(function RelationshipEdge({
   const labelPoint = (key: string, preferred: LayoutPoint) => data.labelPositions?.[key] ?? preferred
   const labelAnchor = (key: string, ownRoute: LayoutPoint[], preferred: LayoutPoint) =>
     nearestPointOnRoute(labelPoint(key, preferred), ownRoute)
-  const memberRoute = (index: number, total: number) => bundleMemberRoute(
+  const memberRoute = (index: number, total: number) => data.memberRoutes?.[resolved[index]!.relationship.relationshipId] ?? bundleMemberRoute(
     route, index, total, data.fallbackOrientation,
     source === target ? { width: sourceWidth, height: sourceHeight } : undefined,
   )
@@ -446,6 +458,7 @@ export const RelationshipEdge = memo(function RelationshipEdge({
       <>
         <EdgeRoute
           points={route}
+          cornerRadius={data.routeCornerRadius}
           strokeDasharray={style?.strokeDasharray ?? '3 3'}
           marker={style?.marker ?? 'arrow'}
           emphasised={emphasised || componentRelated}
@@ -461,6 +474,7 @@ export const RelationshipEdge = memo(function RelationshipEdge({
             <EdgeOverlayMark
               point={labelPoint('overlay', pointAtRatio(route, 0.74))}
               anchor={labelAnchor('overlay', route, pointAtRatio(route, 0.74))}
+              leaderRoute={data.labelLeaderRoutes?.overlay}
               overlay={edgeOverlay}
               zIndex={edgeLabelZIndex}
               dimmed={dimmed}
@@ -471,6 +485,7 @@ export const RelationshipEdge = memo(function RelationshipEdge({
             <EdgeBadge
               point={labelPoint('badge', badgePoint)}
               anchor={labelAnchor('badge', route, badgePoint)}
+              leaderRoute={data.labelLeaderRoutes?.badge}
               zIndex={edgeLabelZIndex}
               onClick={() => {
                 if (level === 'minimal') {
@@ -518,6 +533,7 @@ export const RelationshipEdge = memo(function RelationshipEdge({
               <EdgeBadge
                 point={labelPoint('badge', badgePoint)}
                 anchor={labelAnchor('badge', route, badgePoint)}
+                leaderRoute={data.labelLeaderRoutes?.badge}
                 zIndex={edgeLabelZIndex}
                 onClick={() =>
                   selectRelationship(
@@ -556,6 +572,7 @@ export const RelationshipEdge = memo(function RelationshipEdge({
           <EdgeRoute
             key={entry.relationship.relationshipId}
             points={fanned}
+            cornerRadius={data.routeCornerRadius}
             strokeDasharray={style?.strokeDasharray ?? '3 3'}
             marker={style?.marker ?? 'arrow'}
             emphasised={emphasised || componentRelated}
@@ -578,6 +595,7 @@ export const RelationshipEdge = memo(function RelationshipEdge({
               key={`state-${entry.relationship.relationshipId}`}
               point={labelPoint(`overlay:${entry.relationship.relationshipId}`, pointAtRatio(fanned, 0.74))}
               anchor={labelAnchor(`overlay:${entry.relationship.relationshipId}`, fanned, pointAtRatio(fanned, 0.74))}
+                leaderRoute={data.labelLeaderRoutes?.[`overlay:${entry.relationship.relationshipId}`]}
               overlay={overlay}
               zIndex={edgeLabelZIndex}
               dimmed={hasSelection && entry.relationship.relationshipId !== selectedRelationshipId && !componentRelated}
@@ -596,6 +614,7 @@ export const RelationshipEdge = memo(function RelationshipEdge({
               key={entry.relationship.relationshipId}
               point={labelPoint(`relationship:${entry.relationship.relationshipId}`, pointAtRatio(fanned, labelRatio))}
               anchor={labelAnchor(`relationship:${entry.relationship.relationshipId}`, fanned, pointAtRatio(fanned, labelRatio))}
+                leaderRoute={data.labelLeaderRoutes?.[`relationship:${entry.relationship.relationshipId}`]}
               zIndex={edgeLabelZIndex}
               onClick={() =>
                 selectRelationship(

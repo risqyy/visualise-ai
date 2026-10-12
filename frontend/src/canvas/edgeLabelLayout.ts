@@ -2,9 +2,9 @@ import type { DetailLevel } from './detailLevel'
 import { bundleMemberRoute, fallbackRoute, pointAtRatio, selfLoopRoute } from './edgeGeometry'
 import { attachmentCrossesObstacle, nearestPointOnRoute } from './edgeLabelAttachment'
 import type { LayoutPoint } from './elkLayout'
+import { absoluteNodeBoxes, architectureObstacles, routeAnnotation } from './obstacleRouting'
 import {
   COMPOUND_HEADER_HEIGHT,
-  LEAF_NODE_SIZE,
   resolveRelationships,
   type ArchitectureEdge,
   type ArchitectureNode,
@@ -41,33 +41,6 @@ interface Request {
 function intersects(first: Box, second: Box): boolean {
   return first.left < second.right && first.right > second.left &&
     first.top < second.bottom && first.bottom > second.top
-}
-
-/** Resolve parent-relative positions without depending on React Flow's DOM. */
-function absoluteNodes(nodes: readonly ArchitectureNode[]): Map<string, Box> {
-  const byId = new Map(nodes.map((node) => [node.id, node]))
-  const boxes = new Map<string, Box>()
-  for (const node of nodes) {
-    let x = node.position.x
-    let y = node.position.y
-    let parent = node.parentId
-    const visited = new Set([node.id])
-    while (parent && !visited.has(parent)) {
-      visited.add(parent)
-      const ancestor = byId.get(parent)
-      if (!ancestor) break
-      x += ancestor.position.x
-      y += ancestor.position.y
-      parent = ancestor.parentId
-    }
-    boxes.set(node.id, {
-      left: x,
-      top: y,
-      right: x + (node.width ?? node.measured?.width ?? LEAF_NODE_SIZE.width),
-      bottom: y + (node.height ?? node.measured?.height ?? LEAF_NODE_SIZE.height),
-    })
-  }
-  return boxes
 }
 
 function routeFor(edge: ArchitectureEdge, boxes: ReadonlyMap<string, Box>): readonly LayoutPoint[] {
@@ -108,7 +81,7 @@ export function placeEdgeLabels(
     ? Math.max(options.zoom ?? 0.93, 0.01)
     : 0.93
   const expanded = new Set(options.expandedEdgeIds ?? [])
-  const boxes = absoluteNodes(nodes)
+  const boxes = absoluteNodeBoxes(nodes)
   const obstacles: Box[] = nodes.filter((node) => !node.hidden).map((node) => {
     const box = boxes.get(node.id) as Box
     return node.data.isCompound && !node.data.collapsed
@@ -133,7 +106,7 @@ export function placeEdgeLabels(
       for (const [index, entry] of resolved.entries()) {
         const relationshipId = entry.relationship.relationshipId
         const sourceBox = boxes.get(edge.source)
-        const fanned = bundleMemberRoute(route, index, resolved.length, edge.data.fallbackOrientation,
+        const fanned = edge.data.memberRoutes?.[relationshipId] ?? bundleMemberRoute(route, index, resolved.length, edge.data.fallbackOrientation,
           edge.source === edge.target && sourceBox
             ? { width: sourceBox.right - sourceBox.left, height: sourceBox.bottom - sourceBox.top }
             : undefined)
@@ -237,4 +210,41 @@ export function placeEdgeLabels(
     positions[request.key] = point
   }
   return result
+}
+
+/**
+ * A free label box does not imply that its attachment can reach the relationship
+ * without crossing a component. Route shelf fallbacks too, using the same current
+ * geometry in the canvas and native renderer. Keep each attachment on its own
+ * member path, never another edge or a convenient component boundary.
+ */
+export function prepareLabelLeaders(edges: readonly ArchitectureEdge[], nodes: readonly ArchitectureNode[]): ArchitectureEdge[] {
+  const obstacles = architectureObstacles(nodes), boxes = absoluteNodeBoxes(nodes)
+  return edges.map((edge) => {
+    if (!edge.data) return edge
+    const data = edge.data
+    const baseRoute = routeFor(edge, boxes)
+    const labelLeaderRoutes: Record<string, LayoutPoint[]> = Object.create(null)
+    for (const [key, point] of Object.entries(data.labelPositions ?? {})) {
+      if (key === 'collapse') continue // This action represents multiple paths.
+      const relationshipId = key.startsWith('relationship:') ? key.slice('relationship:'.length)
+        : key.startsWith('overlay:') ? key.slice('overlay:'.length) : null
+      const ownRoute = relationshipId ? data.memberRoutes?.[relationshipId] ?? baseRoute : baseRoute
+      if (!ownRoute.length) continue
+      const nearest = nearestPointOnRoute(point, ownRoute)
+      if (Math.hypot(point.x - nearest.x, point.y - nearest.y) < 8) continue
+      // A 1px ELK terminal can enter its own border. If that projection cannot
+      // escape, try projections/midpoints on this same relationship's segments.
+      const alternatives = ownRoute.slice(1).flatMap((end, index) => {
+        const start = ownRoute[index]!
+        return [nearestPointOnRoute(point, [start, end]),
+          { x: (start.x + end.x) / 2, y: (start.y + end.y) / 2 }]
+      }).sort((a, b) => Math.hypot(a.x - point.x, a.y - point.y) - Math.hypot(b.x - point.x, b.y - point.y))
+      for (const anchor of [nearest, ...alternatives]) {
+        const leader = routeAnnotation(anchor, point, obstacles)
+        if (leader) { labelLeaderRoutes[key] = leader; break }
+      }
+    }
+    return { ...edge, data: { ...data, labelLeaderRoutes } }
+  })
 }

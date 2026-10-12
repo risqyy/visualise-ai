@@ -2,6 +2,39 @@ import { describe, expect, it } from 'vitest'
 
 import { DEEP_FOCUS_PANE_LAYOUT, resetUiStore, useUiStore } from '@/state/uiStore'
 
+describe('architecture interaction lock', () => {
+  it('remembers the lock per project and view without replacing their camera or positions', () => {
+    resetUiStore()
+    const state = useUiStore.getState()
+    state.activateCanvasView('project-a', null)
+    state.setCamera({ x: 10, y: 25, zoom: 0.75 })
+    state.setNodePosition('service', { x: 100, y: 50 })
+    state.setCanvasLocked(true)
+    state.activateCanvasView('project-a', 'detail')
+    expect(useUiStore.getState().canvasLocked).toBe(false)
+    state.activateCanvasView('project-b', null)
+    expect(useUiStore.getState().canvasLocked).toBe(false)
+    state.activateCanvasView('project-a', null)
+    expect(useUiStore.getState()).toMatchObject({
+      canvasLocked: true,
+      camera: { x: 10, y: 25, zoom: 0.75 },
+      nodePositions: { service: { x: 100, y: 50 } },
+    })
+    state.setCanvasLocked(false)
+    expect(useUiStore.getState().camera).toEqual({ x: 10, y: 25, zoom: 0.75 })
+    expect(useUiStore.getState().nodePositions).toEqual({ service: { x: 100, y: 50 } })
+  })
+
+  it('does not persist a lock into a new browser session', () => {
+    useUiStore.getState().setCanvasLocked(true)
+    const persisted = JSON.parse(localStorage.getItem('visualise-ai.ui') ?? '{}').state
+    expect(persisted).not.toHaveProperty('canvasLocked')
+    expect(persisted).not.toHaveProperty('canvasViews')
+    resetUiStore()
+    expect(useUiStore.getState().canvasLocked).toBe(false)
+  })
+})
+
 describe('architecture focus pane arrangement', () => {
   it('folds both side panes and restores the exact previous arrangement', () => {
     const previousLayout = {

@@ -15,6 +15,8 @@ import type { ComponentId } from '@/api/types'
  * node renderers exactly the one action they need.
  */
 export interface CanvasNodeActions {
+  /** Disclosure changes the layout and is unavailable while the view is locked. */
+  locked?: boolean
   /** Opens or closes one container. */
   toggleCollapsed: (componentId: ComponentId, collapsed: boolean) => void
 }

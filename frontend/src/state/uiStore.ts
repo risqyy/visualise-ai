@@ -144,6 +144,7 @@ export interface PaneArrangement {
 }
 
 export interface CanvasViewState {
+  canvasLocked: boolean
   orientationOverride: GraphOrientation | null
   camera: CameraState
   cameraInitialized: boolean
@@ -159,10 +160,13 @@ export function canvasViewKey(projectId: string, viewId: string | null): string 
   return JSON.stringify([projectId, viewId])
 }
 function canvasViewState(state: UiState): CanvasViewState {
-  return { orientationOverride: state.orientationOverride, camera: state.camera, cameraInitialized: state.cameraInitialized, nodePositions: state.nodePositions, selectedComponentId: state.selectedComponentId, selectedRelationshipId: state.selectedRelationshipId, expandedEdgeIds: state.expandedEdgeIds, collapsedComponentIds: state.collapsedComponentIds }
+  return { canvasLocked: state.canvasLocked, orientationOverride: state.orientationOverride, camera: state.camera, cameraInitialized: state.cameraInitialized, nodePositions: state.nodePositions, selectedComponentId: state.selectedComponentId, selectedRelationshipId: state.selectedRelationshipId, expandedEdgeIds: state.expandedEdgeIds, collapsedComponentIds: state.collapsedComponentIds }
 }
 
 export interface UiState {
+  /** Per-view interaction lock. Live model updates and selection remain available. */
+  canvasLocked: boolean
+  setCanvasLocked: (locked: boolean) => void
   orientationOverride: GraphOrientation | null
   setCanvasOrientationOverride: (orientation: GraphOrientation | null) => void
   activeCanvasViewKey: string | null
@@ -258,6 +262,7 @@ export interface UiState {
 }
 
 const transientDefaults = {
+  canvasLocked: false,
   orientationOverride: null,
   activeCanvasViewKey: null,
   canvasViews: {},
@@ -296,6 +301,7 @@ export const useUiStore = create<UiState>()(
       toggleRightCollapsed: () => set((s) => ({ rightCollapsed: !s.rightCollapsed })),
 
       setCanvasOrientationOverride: (orientationOverride) => set({ orientationOverride }),
+      setCanvasLocked: (canvasLocked) => set({ canvasLocked }),
       activateCanvasView: (projectId, viewId, collapsedDefaults) => set((state) => {
         const key = canvasViewKey(projectId, viewId)
         if (state.activeCanvasViewKey === key) return state.collapsedComponentIds === null && collapsedDefaults !== undefined ? { collapsedComponentIds: collapsedDefaults } : {}
@@ -303,7 +309,7 @@ export const useUiStore = create<UiState>()(
         if (state.activeCanvasViewKey !== null) canvasViews[state.activeCanvasViewKey] = canvasViewState(state)
         const remembered = canvasViews[key]
         const next = remembered ?? (state.activeCanvasViewKey === null && viewId === null ? canvasViewState(state) : {
-          orientationOverride: null, camera: DEFAULT_CAMERA, cameraInitialized: false, nodePositions: {}, selectedComponentId: null, selectedRelationshipId: null, expandedEdgeIds: [], collapsedComponentIds: collapsedDefaults ?? null,
+          canvasLocked: false, orientationOverride: null, camera: DEFAULT_CAMERA, cameraInitialized: false, nodePositions: {}, selectedComponentId: null, selectedRelationshipId: null, expandedEdgeIds: [], collapsedComponentIds: collapsedDefaults ?? null,
         })
         return { ...next, activeCanvasViewKey: key, canvasViews, hoveredComponentId: null }
       }),

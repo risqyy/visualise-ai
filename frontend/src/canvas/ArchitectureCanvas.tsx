@@ -2,6 +2,7 @@ import {
   Background,
   BackgroundVariant,
   Controls,
+  ControlButton,
   MiniMap,
   Panel,
   ReactFlow,
@@ -18,6 +19,8 @@ import {
 import {
   Focus,
   Layers2,
+  LockKeyhole,
+  LockKeyholeOpen,
   Map,
   MapPinOff,
   Maximize2,
@@ -25,6 +28,8 @@ import {
   Search,
   Settings2,
   TriangleAlert,
+  ZoomIn,
+  ZoomOut,
 } from 'lucide-react'
 import type { TFunction } from 'i18next'
 import {
@@ -69,6 +74,7 @@ import {
   withNodeAccessibility,
 } from './canvasAccessibility'
 import { componentKindLabel } from './componentKinds'
+import { isComponentMoveClear } from './componentMovement'
 import { componentSearchEntries, searchComponentEntries } from './componentSearch'
 import {
   DETAIL_LEVEL_DESCRIPTION_KEYS,
@@ -78,7 +84,7 @@ import {
   detailLevelForZoom,
 } from './detailLevel'
 import { staggeredLabelRatios } from './edgeGeometry'
-import { placeEdgeLabels } from './edgeLabelLayout'
+import { placeEdgeLabels, prepareLabelLeaders } from './edgeLabelLayout'
 import { ARCHITECTURE_EDGE_TYPES, ARCHITECTURE_NODE_TYPES } from './flowRegistry'
 import {
   COMPOUND_NODE_TYPE,
@@ -88,6 +94,7 @@ import {
 } from './graphProjection'
 import type { GraphOrientation } from './graphOrientation'
 import { CanvasNodeActionsContext, type CanvasNodeActions } from './nodeActions'
+import { routeArchitectureEdges } from './obstacleRouting'
 import {
   spatialNavigationEntry,
   spatialNeighbor,
@@ -96,7 +103,6 @@ import {
 } from './spatialNavigation'
 import {
   applyTemporaryPositions,
-  routesInvalidatedByDrag,
   useArchitectureGraph,
 } from './useArchitectureGraph'
 import { useCanvasVoice } from './useCanvasVoice'
@@ -206,6 +212,8 @@ function ArchitectureCanvasInner({
   // `canvas:*` for the sentences (#42), `common:count.*` for the numbers (#40).
   // Stable per language, so it does not invalidate the label memos.
   const voice = useCanvasVoice()
+  const canvasLocked = useUiStore((state) => state.canvasLocked)
+  const setCanvasLocked = useUiStore((state) => state.setCanvasLocked)
   const collapsedComponentIds = useUiStore((state) => state.collapsedComponentIds)
   const setCollapsedComponentIds = useUiStore((state) => state.setCollapsedComponentIds)
   const setComponentCollapsed = useUiStore((state) => state.setComponentCollapsed)
@@ -287,7 +295,10 @@ function ArchitectureCanvasInner({
   const setCamera = useCallback((viewport: Viewport) => {
     // React Flow may finish a pending viewport transition after unmount. It
     // must never initialize or overwrite the next view's local camera.
-    if (mountedRef.current) updateCamera(viewport)
+    const state = useUiStore.getState()
+    if (mountedRef.current && !(state.canvasLocked && state.cameraInitialized)) {
+      updateCamera(viewport)
+    }
   }, [updateCamera])
   const nodePositions = useUiStore((state) => state.nodePositions)
   const setNodePosition = useUiStore((state) => state.setNodePosition)
@@ -452,6 +463,10 @@ function ArchitectureCanvasInner({
    */
   const fitView = useCallback(
     (mode: FitMode, focusComponentId: ComponentId | null = null) => {
+      // A lock before the first model still permits its initial placement.
+      // Every later fit, including a request queued before locking, is cancelled.
+      const state = useUiStore.getState()
+      if (state.canvasLocked && (mode !== 'initial' || state.cameraInitialized)) return false
       const { width, height, nodeLookup, minZoom, setMinZoom } = storeApi.getState()
       if (nodeLookup.size === 0) return false
 
@@ -548,6 +563,10 @@ function ArchitectureCanvasInner({
 
     const check = () => {
       architectureFocusFitRafRef.current = null
+      if (useUiStore.getState().canvasLocked) {
+        architectureFocusFitPendingRef.current = null
+        return
+      }
       const pending = architectureFocusFitPendingRef.current
       if (pending === null) return
 
@@ -663,7 +682,7 @@ function ArchitectureCanvasInner({
     const leaving = !architectureFocus && previousArchitectureFocusRef.current
     previousArchitectureFocusRef.current = architectureFocus
 
-    if (!entering && !leaving) return
+    if ((!entering && !leaving) || useUiStore.getState().canvasLocked) return
 
     architectureFocusFitPendingRef.current = {
       mode: entering ? 'enter' : 'exit',
@@ -703,6 +722,7 @@ function ArchitectureCanvasInner({
   const focusComponentInView = useCallback(
     (componentId: ComponentId) => {
       invalidatePendingSearchFocus()
+      if (useUiStore.getState().canvasLocked) return
       const { width, height, nodeLookup } = storeApi.getState()
       const node = nodeLookup.get(componentId)
       if (!node || width <= 0 || height <= 0) return
@@ -749,12 +769,30 @@ function ArchitectureCanvasInner({
     null,
   )
 
+  const onToggleLock = useCallback(() => {
+    const locking = !useUiStore.getState().canvasLocked
+    if (locking) {
+      // Capture the actual current frame, then interrupt an in-flight native
+      // zoom transition. Unlocking never replays any old camera request.
+      pendingFitRef.current = null
+      architectureFocusFitPendingRef.current = null
+      invalidatePendingSearchFocus()
+      if (useUiStore.getState().cameraInitialized) {
+        const viewport = flow.getViewport()
+        void flow.setViewport(viewport, { duration: 0 })
+        updateCamera(viewport)
+        userMovedCameraRef.current = true
+      }
+    }
+    setCanvasLocked(locking)
+  }, [flow, invalidatePendingSearchFocus, setCanvasLocked, updateCamera])
+
   useEffect(() => {
     const previous = orientationRef.current
     orientationRef.current = orientation
     // The first orientation is the URL/default input for the initial picture,
     // not a second explicit camera movement.
-    if (previous === null || previous === orientation || !allowOrientationAutoFit) return
+    if (previous === null || previous === orientation || !allowOrientationAutoFit || useUiStore.getState().canvasLocked) return
 
     invalidatePendingSearchFocus()
     // Positions are meaningful only in the coordinate system that produced
@@ -767,6 +805,7 @@ function ArchitectureCanvasInner({
   /** Fits now if the graph is already the right one, otherwise after re-layout. */
   const requestFit = useCallback(
     (mode: FitMode, afterRelayout: boolean) => {
+      if (useUiStore.getState().canvasLocked) return
       invalidatePendingSearchFocus()
       // "Lesbare Systemübersicht" reproduces the entry picture, and the entry picture keeps
       // the selected component on screen. The whole-model overview does not: it
@@ -855,6 +894,10 @@ function ArchitectureCanvasInner({
   // becomes a second automatic one.
   useEffect(() => {
     const pending = pendingFitRef.current
+    if (useUiStore.getState().canvasLocked) {
+      pendingFitRef.current = null
+      return
+    }
     if (pending === null || graph.isRelayouting || graph.nodes.length === 0) return
     pendingFitRef.current = null
     policyRef.current = onUserFitRequest(policyRef.current).state
@@ -911,7 +954,7 @@ function ArchitectureCanvasInner({
       const next = [...document.querySelectorAll<HTMLElement>('.react-flow__node')].find(
         (element) => element.getAttribute('data-id') === fallback,
       )
-      next?.focus()
+      next?.focus({ preventScroll: true })
     })
   }, [
     focusedNodeId,
@@ -931,11 +974,12 @@ function ArchitectureCanvasInner({
   const visualSelectedComponentId = selectedComponentId && visibleNodeIds.has(selectedComponentId)
     ? selectedComponentId : null
 
-  // Geometry depends on disclosure, zoom and positions, never on selection.
-  const positionedEdges = useMemo<ArchitectureEdge[]>(() => {
-    const invalidated = routesInvalidatedByDrag(graph.edges, nodePositions)
-    const routed = graph.edges.map((edge) => {
-      const route = invalidated.has(edge.id) ? undefined : graph.routes[edge.id]
+  // Path routing sees every current obstacle, including dragged containers and
+  // unrelated cards. Camera zoom and selection never rerun the route search.
+  const showMemberRoutes = detailLevel !== 'minimal'
+  const routedEdges = useMemo<ArchitectureEdge[]>(() => {
+    const candidates = graph.edges.map((edge) => {
+      const route = graph.routes[edge.id]
       if (!edge.data) return edge
       return {
         ...edge,
@@ -945,15 +989,22 @@ function ArchitectureCanvasInner({
         },
       }
     })
+    return routeArchitectureEdges(candidates, applyTemporaryPositions(graph.nodes, nodePositions, null), {
+      expandedEdgeIds: showMemberRoutes ? expandedEdgeIds : [],
+    })
+  }, [graph.edges, graph.nodes, graph.routes, nodePositions, showMemberRoutes, expandedEdgeIds])
+
+  // Label hit areas depend on zoom; route geometry above does not.
+  const positionedEdges = useMemo<ArchitectureEdge[]>(() => {
     const labelRatios = staggeredLabelRatios(
-      routed.map((edge) => ({
+      routedEdges.map((edge) => ({
         id: edge.id,
         source: edge.source,
         target: edge.target,
         ...(edge.data?.route ? { route: edge.data.route } : {}),
       })),
     )
-    const positioned = routed.map((edge) => {
+    const positioned = routedEdges.map((edge) => {
       const labelRatio = labelRatios.get(edge.id)
       if (!edge.data || labelRatio === undefined) return edge
       return { ...edge, data: { ...edge.data, labelRatio } }
@@ -962,10 +1013,10 @@ function ArchitectureCanvasInner({
       positioned, applyTemporaryPositions(graph.nodes, nodePositions, null),
       { detailLevel, expandedEdgeIds, zoom: camera.zoom },
     )
-    return positioned.map((edge) => edge.data ? {
+    return prepareLabelLeaders(positioned.map((edge) => edge.data ? {
       ...edge, data: { ...edge.data, labelPositions: labelPositions.get(edge.id) ?? {}, bundleExpanded: expandedEdgeIds.includes(edge.id) },
-    } : edge)
-  }, [graph.edges, graph.nodes, graph.routes, nodePositions, detailLevel, expandedEdgeIds, camera.zoom])
+    } : edge), applyTemporaryPositions(graph.nodes, nodePositions, null))
+  }, [routedEdges, graph.nodes, nodePositions, detailLevel, expandedEdgeIds, camera.zoom])
 
   const edges = useMemo<ArchitectureEdge[]>(() => {
     return withEdgeAccessibility(
@@ -1139,9 +1190,17 @@ function ArchitectureCanvasInner({
   // Temporary, local, never persisted and never sent anywhere.
   const onNodeDragStop = useCallback<OnNodeDrag>(
     (_event, node) => {
-      setNodePosition(node.id, { x: node.position.x, y: node.position.y })
+      if (useUiStore.getState().canvasLocked) return
+      const position = { x: node.position.x, y: node.position.y }
+      const previous = positionedNodes.find((candidate) => candidate.id === node.id)
+      if (isComponentMoveClear(positionedNodes, node.id, position)) {
+        setNodePosition(node.id, position)
+      } else if (previous) {
+        // Reconcile the native drag back to the last clear local position.
+        setNodePosition(node.id, previous.position)
+      }
     },
-    [setNodePosition],
+    [positionedNodes, setNodePosition],
   )
 
   const focusSpatialNode = useCallback(
@@ -1182,7 +1241,7 @@ function ArchitectureCanvasInner({
       const next = [...document.querySelectorAll<HTMLElement>('.react-flow__node')].find(
         (element) => element.getAttribute('data-id') === nextId,
       )
-      next?.focus()
+      next?.focus({ preventScroll: true })
     },
     [focusComponentInView, orientation, spatialNodes],
   )
@@ -1215,6 +1274,7 @@ function ArchitectureCanvasInner({
 
   const onMove = useCallback(
     (event: unknown, viewport: Viewport) => {
+      if (useUiStore.getState().canvasLocked) return
       if (event !== null && event !== undefined) invalidatePendingSearchFocus()
       setDetailLevel(detailLevelForZoom(viewport.zoom))
       publishZoom(viewport.zoom)
@@ -1224,6 +1284,7 @@ function ArchitectureCanvasInner({
 
   const onMoveEnd = useCallback(
     (event: unknown, viewport: Viewport) => {
+      if (useUiStore.getState().canvasLocked) return
       if (event !== null && event !== undefined) invalidatePendingSearchFocus()
       setCamera(viewport)
       setDetailLevel(detailLevelForZoom(viewport.zoom))
@@ -1365,6 +1426,7 @@ function ArchitectureCanvasInner({
    */
   const onToggleCollapsed = useCallback<CanvasNodeActions['toggleCollapsed']>(
     (componentId, collapsed) => {
+      if (useUiStore.getState().canvasLocked) return
       if (
         collapsed &&
         selectedComponentId !== undefined &&
@@ -1379,12 +1441,13 @@ function ArchitectureCanvasInner({
   )
 
   const nodeActions = useMemo<CanvasNodeActions>(
-    () => ({ toggleCollapsed: onToggleCollapsed }),
-    [onToggleCollapsed],
+    () => ({ toggleCollapsed: onToggleCollapsed, locked: canvasLocked }),
+    [onToggleCollapsed, canvasLocked],
   )
 
   /** "Gesamtkarte": everything open, everything on screen for orientation. */
   const onShowWholeModel = useCallback(() => {
+    if (useUiStore.getState().canvasLocked) return
     const willRelayout = graph.collapsedIds.length > 0
     if (willRelayout) setCollapsedComponentIds([])
     requestFit('user', willRelayout)
@@ -1392,6 +1455,7 @@ function ArchitectureCanvasInner({
 
   /** Back to the picture the project opened with. */
   const onBackToOverview = useCallback(() => {
+    if (useUiStore.getState().canvasLocked) return
     const target = graph.initialCollapsedIds
     const willRelayout =
       target.length !== graph.collapsedIds.length ||
@@ -1442,6 +1506,7 @@ function ArchitectureCanvasInner({
       onKeyDownCapture={onSurfaceKeyDownCapture}
       data-testid="architecture-canvas"
       data-fit-view-count={fitViewCount}
+      data-canvas-locked={canvasLocked ? 'true' : 'false'}
       data-detail-level={detailLevel}
       data-node-count={graph.appliedNodeCount}
       data-edge-count={graph.appliedEdgeCount}
@@ -1476,6 +1541,23 @@ function ArchitectureCanvasInner({
             aria-label={t('tool.primaryActions')}
             data-testid="canvas-primary-actions"
           >
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant={canvasLocked ? 'secondary' : 'ghost'}
+                  size="sm"
+                  className="canvas-toolbar-action h-7 gap-1 px-2 text-xs"
+                  aria-label={t('tool.lockView')}
+                  aria-pressed={canvasLocked}
+                  onClick={onToggleLock}
+                  data-testid="canvas-toggle-lock"
+                >
+                  {canvasLocked ? <LockKeyhole aria-hidden="true" /> : <LockKeyholeOpen aria-hidden="true" />}
+                  <span>{t(canvasLocked ? 'tool.locked' : 'tool.unlocked')}</span>
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent className="max-w-80">{t('tool.lockViewHint')}</TooltipContent>
+            </Tooltip>
             <Button
               ref={searchTriggerRef}
               variant="ghost"
@@ -1500,6 +1582,7 @@ function ArchitectureCanvasInner({
                     size="sm"
                     className="canvas-toolbar-action h-7 gap-1.5 px-2 text-xs"
                     onClick={onJumpToSelection}
+                    disabled={canvasLocked}
                     data-testid="canvas-jump-to-selection"
                   >
                     <MapPinOff aria-hidden="true" />
@@ -1519,6 +1602,7 @@ function ArchitectureCanvasInner({
                   size="sm"
                   className="canvas-toolbar-action h-7 gap-1.5 px-2 text-xs"
                   onClick={onShowWholeModel}
+                  disabled={canvasLocked}
                   data-testid="canvas-fit-view"
                 >
                   <Maximize2 aria-hidden="true" />
@@ -1538,6 +1622,7 @@ function ArchitectureCanvasInner({
                     size="sm"
                     className="canvas-toolbar-action h-7 gap-1.5 px-2 text-xs"
                     onClick={onBackToOverview}
+                    disabled={canvasLocked}
                     data-testid="canvas-back-to-overview"
                   >
                     <Layers2 aria-hidden="true" />
@@ -1558,6 +1643,7 @@ function ArchitectureCanvasInner({
                     size="sm"
                     className="canvas-toolbar-action h-7 gap-1.5 px-2 text-xs"
                     onClick={clearNodePositions}
+                    disabled={canvasLocked}
                     data-testid="canvas-reset-positions"
                   >
                     <RotateCcw aria-hidden="true" />
@@ -1575,6 +1661,7 @@ function ArchitectureCanvasInner({
                   size="sm"
                   className="canvas-toolbar-action h-7 gap-1.5 px-2 text-xs"
                   onClick={toggleArchitectureFocus}
+                  disabled={canvasLocked}
                   aria-pressed={architectureFocus}
                   data-testid="canvas-toggle-architecture-focus"
                 >
@@ -1611,13 +1698,33 @@ function ArchitectureCanvasInner({
           </div>
           <Controls
             showInteractive={false}
+            showZoom={false}
             // The built-in fit control is replaced by "Einpassen" in the toolbar,
             // which goes through the camera policy instead of around it.
             showFitView={false}
             orientation="horizontal"
             style={{ position: 'static', margin: 0 }}
             className="!border-border !bg-card/90 !shadow-none [&>button]:!border-border [&>button]:!bg-card [&>button]:!fill-current [&>button]:!text-foreground"
-          />
+          >
+            <ControlButton
+              className="react-flow__controls-zoomin"
+              disabled={canvasLocked || camera.zoom >= MAX_ZOOM}
+              aria-label={t('a11y.zoomIn')}
+              title={t('a11y.zoomIn')}
+              onClick={() => { void flow.zoomIn() }}
+            >
+              <ZoomIn className="!fill-none" aria-hidden="true" />
+            </ControlButton>
+            <ControlButton
+              className="react-flow__controls-zoomout"
+              disabled={canvasLocked || camera.zoom <= minimumZoom}
+              aria-label={t('a11y.zoomOut')}
+              title={t('a11y.zoomOut')}
+              onClick={() => { void flow.zoomOut() }}
+            >
+              <ZoomOut className="!fill-none" aria-hidden="true" />
+            </ControlButton>
+          </Controls>
         </div>
         {toolsOpen && (
           <div
@@ -1645,6 +1752,7 @@ function ArchitectureCanvasInner({
                   className="canvas-toolbar-action h-7 gap-1 px-2 text-xs"
                   aria-pressed={orientation === 'top-down'}
                   onClick={() => onOrientationChange('top-down')}
+                  disabled={canvasLocked}
                   data-testid="canvas-layout-top-down"
                 >
                   <span aria-hidden="true">↓ </span>
@@ -1656,6 +1764,7 @@ function ArchitectureCanvasInner({
                   className="canvas-toolbar-action h-7 gap-1 px-2 text-xs"
                   aria-pressed={orientation === 'left-right'}
                   onClick={() => onOrientationChange('left-right')}
+                  disabled={canvasLocked}
                   data-testid="canvas-layout-left-right"
                 >
                   <span aria-hidden="true">→ </span>
@@ -1746,8 +1855,8 @@ function ArchitectureCanvasInner({
             {minimapVisible && (
               <MiniMap
                 position="top-right"
-                pannable
-                zoomable
+                pannable={!canvasLocked}
+                zoomable={!canvasLocked}
                 ariaLabel={t('graph.minimapLabel')}
                 className="!border-border !bg-card shrink-0 !rounded-md !border"
                 style={{
@@ -1885,7 +1994,19 @@ function ArchitectureCanvasInner({
           </div>,
           document.body,
         )}
-        <div className="relative min-h-[15rem] flex-1" data-testid="canvas-drawing-surface">
+        <div
+          className="relative min-h-[15rem] flex-1"
+          data-testid="canvas-drawing-surface"
+          onMouseDownCapture={(event) => {
+            // React Flow admits middle-button gestures on nodes/edges before
+            // checking panOnDrag or any other disabled interaction option.
+            // Stop just that native exception; primary-button inspection stays usable.
+            if (event.button === 1 && useUiStore.getState().canvasLocked) {
+              event.preventDefault()
+              event.stopPropagation()
+            }
+          }}
+        >
           <ReactFlow
             nodes={nodes}
             edges={edges}
@@ -1900,7 +2021,16 @@ function ArchitectureCanvasInner({
             onMoveStart={onMoveStart}
             onMove={onMove}
             onMoveEnd={onMoveEnd}
-            nodesDraggable
+            nodesDraggable={!canvasLocked}
+            panOnDrag={!canvasLocked}
+            panOnScroll={false}
+            zoomOnScroll={!canvasLocked}
+            zoomOnPinch={!canvasLocked}
+            zoomOnDoubleClick={!canvasLocked}
+            {...(canvasLocked ? { zoomActivationKeyCode: null } : {})}
+            panActivationKeyCode={canvasLocked ? null : 'Space'}
+            autoPanOnNodeDrag={!canvasLocked}
+            autoPanOnSelection={!canvasLocked}
             nodesConnectable={false}
             edgesFocusable
             edgesReconnectable={false}
@@ -1916,7 +2046,7 @@ function ArchitectureCanvasInner({
             // view. That is a deliberate exception and the only one: it is
             // requested by the user's own Tab press, it keeps the zoom, and it is
             // not a `fitView` — `data-fit-view-count` does not move (ADR 0018).
-            autoPanOnNodeFocus
+            autoPanOnNodeFocus={!canvasLocked}
             ariaLabelConfig={ariaLabelConfig}
             aria-label={t('graph.label')}
             aria-describedby={instructionsId}
