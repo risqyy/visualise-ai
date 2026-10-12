@@ -54,6 +54,7 @@ import { useDetailLevel } from './useDetailLevel'
 
 interface EdgeRouteProps {
   points: LayoutPoint[]
+  cornerRadius?: number | undefined
   strokeDasharray: string
   marker: 'arrow' | 'arrowclosed'
   emphasised: boolean
@@ -79,6 +80,7 @@ interface EdgeRouteProps {
  */
 function EdgeRoute({
   points,
+  cornerRadius,
   strokeDasharray,
   marker,
   emphasised,
@@ -89,7 +91,7 @@ function EdgeRoute({
   overlay = null,
   dimmed = false,
 }: EdgeRouteProps) {
-  const path = roundedPolylinePath(points)
+  const path = roundedPolylinePath(points, cornerRadius)
   if (path === '') return null
 
   const state = overlay ? WORK_STATE_BY_ID[overlay.state] : null
@@ -414,7 +416,7 @@ export const RelationshipEdge = memo(function RelationshipEdge({
   const labelPoint = (key: string, preferred: LayoutPoint) => data.labelPositions?.[key] ?? preferred
   const labelAnchor = (key: string, ownRoute: LayoutPoint[], preferred: LayoutPoint) =>
     nearestPointOnRoute(labelPoint(key, preferred), ownRoute)
-  const memberRoute = (index: number, total: number) => bundleMemberRoute(
+  const memberRoute = (index: number, total: number) => data.memberRoutes?.[resolved[index]!.relationship.relationshipId] ?? bundleMemberRoute(
     route, index, total, data.fallbackOrientation,
     source === target ? { width: sourceWidth, height: sourceHeight } : undefined,
   )
@@ -446,6 +448,7 @@ export const RelationshipEdge = memo(function RelationshipEdge({
       <>
         <EdgeRoute
           points={route}
+          cornerRadius={data.routeCornerRadius}
           strokeDasharray={style?.strokeDasharray ?? '3 3'}
           marker={style?.marker ?? 'arrow'}
           emphasised={emphasised || componentRelated}
@@ -556,6 +559,7 @@ export const RelationshipEdge = memo(function RelationshipEdge({
           <EdgeRoute
             key={entry.relationship.relationshipId}
             points={fanned}
+            cornerRadius={data.routeCornerRadius}
             strokeDasharray={style?.strokeDasharray ?? '3 3'}
             marker={style?.marker ?? 'arrow'}
             emphasised={emphasised || componentRelated}

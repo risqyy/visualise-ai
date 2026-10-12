@@ -166,6 +166,10 @@ export interface RelationshipEdgeData extends Record<string, unknown> {
    * the edge then falls back to a plain orthogonal connection.
    */
   route?: { x: number; y: number }[]
+  /** Obstacle-aware individual paths for explicitly expanded bundle members. */
+  memberRoutes?: Record<string, { x: number; y: number }[]>
+  /** Smaller rounded corners when a narrow compound channel requires them. */
+  routeCornerRadius?: number
   /** URL-backed selection callback injected by the canvas shell. */
   onSelectRelationship?: (relationshipId: Identifier | null) => void
   /** URL-backed relationship selection used for immediate rendering. */

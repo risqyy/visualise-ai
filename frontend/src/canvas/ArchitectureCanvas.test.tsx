@@ -1,4 +1,4 @@
-import { act, cleanup, screen, waitFor, within } from '@testing-library/react'
+import { act, cleanup, fireEvent, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it } from 'vitest'
 
@@ -132,6 +132,89 @@ async function waitForCameraSettled(): Promise<void> {
 }
 
 describe('architecture canvas — rendering', () => {
+  it('locks navigation while selection, search and language changes remain available', async () => {
+    const user = userEvent.setup()
+    const { router, i18n } = renderCanvas()
+    const canvas = await waitForCanvas()
+    await waitForCameraSettled()
+    const viewport = viewportTransform()
+    const positions = useUiStore.getState().nodePositions
+    const lock = screen.getByTestId('canvas-toggle-lock')
+    expect(lock).toHaveAttribute('aria-pressed', 'false')
+    expect(lock).toHaveTextContent('Entsperrt')
+    await user.click(lock)
+    expect(lock).toHaveAttribute('aria-pressed', 'true')
+    expect(lock).toHaveTextContent('Gesperrt')
+    expect(canvas).toHaveAttribute('data-canvas-locked', 'true')
+    expect(screen.getByTestId('canvas-fit-view')).toBeDisabled()
+    expect(screen.getByTestId('canvas-toggle-architecture-focus')).toBeDisabled()
+    expect(document.querySelector('.react-flow__controls-zoomin')).toBeDisabled()
+    expect(document.querySelector('.react-flow__controls-zoomout')).toBeDisabled()
+    expect(screen.getByTestId('node-disclosure-platform')).toBeDisabled()
+    // The library's middle-button exception precedes its panOnDrag guard.
+    // Capture must cancel it without cancelling primary-button selection below.
+    expect(fireEvent.mouseDown(screen.getByTestId('canvas-node-platform.core.orders'), {
+      button: 1,
+      buttons: 4,
+    })).toBe(false)
+    await user.click(screen.getByTestId('canvas-toggle-tools'))
+    expect(screen.getByTestId('canvas-layout-top-down')).toBeDisabled()
+    expect(screen.getByTestId('canvas-layout-left-right')).toBeDisabled()
+
+    await user.click(screen.getByTestId('canvas-node-platform.core.orders'))
+    await waitFor(() => expect(router.state.location.search).toEqual({ component: 'platform.core.orders' }))
+    expect(screen.getByTestId('edge-path-rel:platform.core.orders~>platform.db'))
+      .toHaveAttribute('data-component-related', 'true')
+    await user.click(screen.getByTestId('canvas-component-search'))
+    await user.type(screen.getByTestId('canvas-component-search-input'), 'routing')
+    await user.click(screen.getByTestId('canvas-component-search-result'))
+    await waitFor(() => expect(router.state.location.search).toEqual({ component: 'platform.api.http.router' }))
+    expect(viewportTransform()).toBe(viewport)
+    expect(useUiStore.getState().nodePositions).toEqual(positions)
+    await act(async () => { await i18n.changeLanguage('en') })
+    expect(lock).toHaveAccessibleName('Lock architecture view')
+    expect(lock).toHaveTextContent('Locked')
+    expect(lock).toHaveAttribute('aria-pressed', 'true')
+
+    await user.click(lock)
+    expect(lock).toHaveAttribute('aria-pressed', 'false')
+    expect(screen.getByTestId('canvas-fit-view')).toBeEnabled()
+    expect(screen.getByTestId('node-disclosure-platform')).toBeEnabled()
+    expect(document.querySelector('.react-flow__controls-zoomin')).toBeEnabled()
+    expect(viewportTransform()).toBe(viewport)
+    expect(useUiStore.getState().nodePositions).toEqual(positions)
+  }, CANVAS_TIMEOUT)
+
+  it('still places the first model when the view was locked before loading', async () => {
+    useUiStore.getState().setCanvasLocked(true)
+    renderCanvas()
+    const canvas = await waitForCanvas()
+    expect(canvas).toHaveAttribute('data-canvas-locked', 'true')
+    expect(useUiStore.getState().camera).not.toEqual(DEFAULT_CAMERA)
+    expect(screen.getByTestId('canvas-fit-view')).toBeDisabled()
+  }, CANVAS_TIMEOUT)
+
+  it('cancels a queued fit when locking during relayout and never replays it on unlock', async () => {
+    renderCanvas(WORKSPACE_URL, nestedArchitectureResponse, ['platform.api', 'platform.core'])
+    const canvas = await waitForCanvas()
+    await waitForCameraSettled()
+    const viewport = viewportTransform()
+    const fitCount = canvas.getAttribute('data-fit-view-count')
+    // The first click schedules a fit for the expanded model; the second
+    // happens before ELK can finish that asynchronous layout.
+    act(() => {
+      screen.getByTestId('canvas-fit-view').click()
+      screen.getByTestId('canvas-toggle-lock').click()
+    })
+    await screen.findByTestId('canvas-node-platform.api.http.router')
+    await waitFor(() => expect(canvas).toHaveAttribute('data-layouting', 'false'))
+    expect(viewportTransform()).toBe(viewport)
+    expect(canvas.getAttribute('data-fit-view-count')).toBe(fitCount)
+    act(() => { screen.getByTestId('canvas-toggle-lock').click() })
+    expect(viewportTransform()).toBe(viewport)
+    expect(canvas.getAttribute('data-fit-view-count')).toBe(fitCount)
+  }, CANVAS_TIMEOUT)
+
   it(
     'renders every component of the nested snapshot as a node',
     async () => {

@@ -109,7 +109,7 @@ function DisclosureToggle({
   hiddenCount,
 }: DisclosureToggleProps) {
   const voice = useCanvasVoice()
-  const { toggleCollapsed } = use(CanvasNodeActionsContext)
+  const { toggleCollapsed, locked = false } = use(CanvasNodeActionsContext)
   const Icon = collapsed ? ChevronRight : ChevronDown
   // The visible title is the short action and counts through the locale-aware
   // formatter (#40); the accessible name additionally says *which* container
@@ -133,6 +133,7 @@ function DisclosureToggle({
       title={title}
       aria-label={label}
       aria-expanded={!collapsed}
+      disabled={locked}
       data-testid={`node-disclosure-${componentId}`}
       onPointerDown={(event) => event.stopPropagation()}
       onClick={(event) => {
