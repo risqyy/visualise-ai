@@ -1,4 +1,5 @@
 import { bundleMemberRoute, fallbackRoute, selfLoopRoute } from './edgeGeometry'
+import { attachmentCrossesObstacle } from './edgeLabelAttachment'
 import type { LayoutPoint } from './elkLayout'
 import { COMPOUND_HEADER_HEIGHT, LEAF_NODE_SIZE, resolveRelationships, type ArchitectureEdge, type ArchitectureNode } from './graphProjection'
 
@@ -192,6 +193,25 @@ function searchRoute(start: LayoutPoint, end: LayoutPoint, preferred: readonly L
       costs[key] = cost
       previous[key] = current.key
       queue.push({ key, cost, priority: cost + length(b, end) })
+    }
+  }
+  return null
+}
+
+/** Arrowless label attachments use sharp bends so clearance is not cut away. */
+export function routeAnnotation(start: LayoutPoint, end: LayoutPoint, boxes: readonly NodeBox[]): LayoutPoint[] | null {
+  if (boxes.every((box) => !attachmentCrossesObstacle(start, end, box))) return [start, end]
+  for (const clearance of [4, 0]) {
+    const obstacles = boxes.map((box, index) => inflate({ ...box, id: String(index) }, clearance))
+    const relevant = new Map(obstacles.filter((box) => attachmentCrossesObstacle(start, end, box))
+      .map((box) => [box.id, box]))
+    for (let attempt = 0; attempt <= obstacles.length; attempt++) {
+      const route = searchRoute(start, end, [start, end], [...relevant.values()], [], [start, end])
+      if (!route) break
+      const blockers = obstacles.filter((box) => !relevant.has(box.id) &&
+        segments(route).some(({ a, b }) => segmentIntersectsBox(a, b, box)))
+      if (!blockers.length) return route
+      for (const box of blockers) relevant.set(box.id, box)
     }
   }
   return null

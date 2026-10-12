@@ -170,6 +170,8 @@ export interface RelationshipEdgeData extends Record<string, unknown> {
   memberRoutes?: Record<string, { x: number; y: number }[]>
   /** Smaller rounded corners when a narrow compound channel requires them. */
   routeCornerRadius?: number
+  /** Arrowless annotation paths, starting on their own relationship route. */
+  labelLeaderRoutes?: Record<string, { x: number; y: number }[]>
   /** URL-backed selection callback injected by the canvas shell. */
   onSelectRelationship?: (relationshipId: Identifier | null) => void
   /** URL-backed relationship selection used for immediate rendering. */

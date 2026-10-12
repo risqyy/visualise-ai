@@ -95,6 +95,7 @@ async function assertClearRoutes(page: Page, context: string) {
     })
     const paths = [...document.querySelectorAll<SVGPathElement>('path[data-relationship-kind]')]
     const violations: string[] = []
+    const annotationViolations: string[] = []
     let samples = 0
     for (const path of paths) {
       const matrix = path.getScreenCTM()
@@ -112,12 +113,30 @@ async function assertClearRoutes(page: Page, context: string) {
         }
       }
     }
-    return { samples, paths: paths.length, obstacles: obstacles.length, violations }
+    // Annotation leaders are drawn paths too. Their entire painted route must
+    // avoid bodies; there is no component-port exemption for a label connector.
+    for (const leader of document.querySelectorAll<SVGGeometryElement>('[data-label-annotation="true"] line, [data-label-annotation="true"] path')) {
+      const matrix = leader.getScreenCTM()
+      if (!matrix) throw new Error('Annotation has no screen matrix')
+      const zoom = Math.hypot(matrix.a, matrix.b)
+      const length = leader.getTotalLength()
+      for (let offset = 0; offset <= length; offset += 1 / zoom) {
+        const point = leader.getPointAtLength(offset).matrixTransform(matrix)
+        for (const box of obstacles) {
+          if (point.x > box.left + 1 && point.x < box.right - 1 && point.y > box.top + 1 && point.y < box.bottom - 1) {
+            const violation = `${leader.closest('[data-label-for]')?.getAttribute('data-label-for')} crosses ${box.id}`
+            if (!annotationViolations.includes(violation)) annotationViolations.push(violation)
+          }
+        }
+      }
+    }
+    return { samples, paths: paths.length, obstacles: obstacles.length, violations, annotationViolations }
   })
   expect(geometry.paths, context).toBeGreaterThanOrEqual(5)
   expect(geometry.obstacles, context).toBe(components.length)
   expect(geometry.samples, context).toBeGreaterThan(100)
   expect(geometry.violations, context).toEqual([])
+  expect(geometry.annotationViolations, `${context}: label leaders must also avoid component bodies and headers`).toEqual([])
 }
 
 async function moveObstacleAcrossRoute(page: Page, orientation: 'top-down' | 'left-right') {

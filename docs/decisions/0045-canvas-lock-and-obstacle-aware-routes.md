@@ -36,6 +36,14 @@ Path length, bends, crossings and shared lane length contribute to route cost;
 this reduces avoidable crossings without claiming arbitrary graphs are planar.
 Labels and their attachment lines use the resulting individual member routes.
 
+Label boxes can still need a shelf outside all occupied rectangles when local
+placement is exhausted. Their annotations therefore have a separate final
+routing pass: a free label box alone does not guarantee a free straight leader.
+Keep unobstructed straight attachments, otherwise find an orthogonal path around
+component bodies and container titles. These faint, arrowless annotations begin
+on their own member route and have sharp corners so rounding cannot cut into an
+obstacle. Both renderers consume the same prepared annotation paths.
+
 The search begins with obstacles touching the preferred path and adds blockers
 found on candidates. Every accepted candidate is checked against all components,
 but distant components do not automatically enlarge each local search grid.
@@ -58,7 +66,8 @@ or provisional geometry physically traps a handle in overlapping bodies, no
 orthogonal route can satisfy the clearance requirement; retain the relationship
 instead of silently removing it. Normal user drops reject such placements.
 
-Routing is memoized independently of camera zoom and selection. Tests cover
+Relationship routing is memoized independently of camera zoom and selection;
+annotation routing follows the zoom-dependent label positions. Tests cover
 unrelated moved obstacles, moved ancestors, both orientations, expanded parallel
 and self-relations, narrow title gaps, deterministic permutations and actual
 nested ELK results. Native preparation verifies explicit self-loop geometry.

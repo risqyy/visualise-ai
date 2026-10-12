@@ -4,7 +4,7 @@ import { collapseGraph } from '@/canvas/collapse'
 import { viewportForBounds } from '@/canvas/cameraPolicy'
 import { MIN_READABLE_ZOOM, type DetailLevel } from '@/canvas/detailLevel'
 import { staggeredLabelRatios } from '@/canvas/edgeGeometry'
-import { placeEdgeLabels } from '@/canvas/edgeLabelLayout'
+import { placeEdgeLabels, prepareLabelLeaders } from '@/canvas/edgeLabelLayout'
 import { layoutArchitecture } from '@/canvas/elkLayout'
 import { elkDirectionForOrientation } from '@/canvas/graphOrientation'
 import { projectArchitecture } from '@/canvas/graphProjection'
@@ -49,9 +49,9 @@ export async function prepare(snapshot: Snapshot, settings: Settings) {
     detailLevel: DETAILS[settings.detailLevel], zoom: viewport.zoom,
     expandedEdgeIds: settings.detailLevel === 'full' ? positioned.map((edge) => edge.id) : [],
   })
-  const edges = positioned.map((edge) => ({
+  const edges = prepareLabelLeaders(positioned.map((edge) => ({
     ...edge, data: { ...edge.data, labelPositions: labelPositions.get(edge.id) ?? {}, bundleExpanded: settings.detailLevel === 'full' },
-  }))
+  })), layout.nodes)
   return { nodes: layout.nodes, edges, viewport, resolved }
 }
 export type Prepared = Awaited<ReturnType<typeof prepare>>

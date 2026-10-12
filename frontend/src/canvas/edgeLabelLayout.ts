@@ -2,7 +2,7 @@ import type { DetailLevel } from './detailLevel'
 import { bundleMemberRoute, fallbackRoute, pointAtRatio, selfLoopRoute } from './edgeGeometry'
 import { attachmentCrossesObstacle, nearestPointOnRoute } from './edgeLabelAttachment'
 import type { LayoutPoint } from './elkLayout'
-import { absoluteNodeBoxes } from './obstacleRouting'
+import { absoluteNodeBoxes, architectureObstacles, routeAnnotation } from './obstacleRouting'
 import {
   COMPOUND_HEADER_HEIGHT,
   resolveRelationships,
@@ -210,4 +210,41 @@ export function placeEdgeLabels(
     positions[request.key] = point
   }
   return result
+}
+
+/**
+ * A free label box does not imply that its attachment can reach the relationship
+ * without crossing a component. Route shelf fallbacks too, using the same current
+ * geometry in the canvas and native renderer. Keep each attachment on its own
+ * member path, never another edge or a convenient component boundary.
+ */
+export function prepareLabelLeaders(edges: readonly ArchitectureEdge[], nodes: readonly ArchitectureNode[]): ArchitectureEdge[] {
+  const obstacles = architectureObstacles(nodes), boxes = absoluteNodeBoxes(nodes)
+  return edges.map((edge) => {
+    if (!edge.data) return edge
+    const data = edge.data
+    const baseRoute = routeFor(edge, boxes)
+    const labelLeaderRoutes: Record<string, LayoutPoint[]> = Object.create(null)
+    for (const [key, point] of Object.entries(data.labelPositions ?? {})) {
+      if (key === 'collapse') continue // This action represents multiple paths.
+      const relationshipId = key.startsWith('relationship:') ? key.slice('relationship:'.length)
+        : key.startsWith('overlay:') ? key.slice('overlay:'.length) : null
+      const ownRoute = relationshipId ? data.memberRoutes?.[relationshipId] ?? baseRoute : baseRoute
+      if (!ownRoute.length) continue
+      const nearest = nearestPointOnRoute(point, ownRoute)
+      if (Math.hypot(point.x - nearest.x, point.y - nearest.y) < 8) continue
+      // A 1px ELK terminal can enter its own border. If that projection cannot
+      // escape, try projections/midpoints on this same relationship's segments.
+      const alternatives = ownRoute.slice(1).flatMap((end, index) => {
+        const start = ownRoute[index]!
+        return [nearestPointOnRoute(point, [start, end]),
+          { x: (start.x + end.x) / 2, y: (start.y + end.y) / 2 }]
+      }).sort((a, b) => Math.hypot(a.x - point.x, a.y - point.y) - Math.hypot(b.x - point.x, b.y - point.y))
+      for (const anchor of [nearest, ...alternatives]) {
+        const leader = routeAnnotation(anchor, point, obstacles)
+        if (leader) { labelLeaderRoutes[key] = leader; break }
+      }
+    }
+    return { ...edge, data: { ...data, labelLeaderRoutes } }
+  })
 }

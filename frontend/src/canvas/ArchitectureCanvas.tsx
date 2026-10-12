@@ -84,7 +84,7 @@ import {
   detailLevelForZoom,
 } from './detailLevel'
 import { staggeredLabelRatios } from './edgeGeometry'
-import { placeEdgeLabels } from './edgeLabelLayout'
+import { placeEdgeLabels, prepareLabelLeaders } from './edgeLabelLayout'
 import { ARCHITECTURE_EDGE_TYPES, ARCHITECTURE_NODE_TYPES } from './flowRegistry'
 import {
   COMPOUND_NODE_TYPE,
@@ -1013,9 +1013,9 @@ function ArchitectureCanvasInner({
       positioned, applyTemporaryPositions(graph.nodes, nodePositions, null),
       { detailLevel, expandedEdgeIds, zoom: camera.zoom },
     )
-    return positioned.map((edge) => edge.data ? {
+    return prepareLabelLeaders(positioned.map((edge) => edge.data ? {
       ...edge, data: { ...edge.data, labelPositions: labelPositions.get(edge.id) ?? {}, bundleExpanded: expandedEdgeIds.includes(edge.id) },
-    } : edge)
+    } : edge), applyTemporaryPositions(graph.nodes, nodePositions, null))
   }, [routedEdges, graph.nodes, nodePositions, detailLevel, expandedEdgeIds, camera.zoom])
 
   const edges = useMemo<ArchitectureEdge[]>(() => {
